@@ -1,0 +1,835 @@
+/**
+ * Frontend styles for IWP WooCommerce Integration v2
+ *
+ * @package IWP_Woo_V2
+ * @since 2.0.0
+ */
+
+/* General Styles */
+.iwp-woo-v2-notice,
+.iwp-woo-v2-shop-notice,
+.iwp-woo-v2-product-notice,
+.iwp-woo-v2-cart-notice,
+.iwp-woo-v2-checkout-notice {
+    padding: 15px;
+    margin: 15px 0;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background: #f9f9f9;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.iwp-woo-v2-notice p,
+.iwp-woo-v2-shop-notice p,
+.iwp-woo-v2-product-notice p,
+.iwp-woo-v2-cart-notice p,
+.iwp-woo-v2-checkout-notice p {
+    margin: 0;
+    color: #666;
+}
+
+/* Message Types */
+.iwp-woo-v2-message {
+    padding: 10px 15px;
+    margin: 15px 0;
+    border-radius: 5px;
+    border-left: 4px solid #00a0d2;
+}
+
+.iwp-woo-v2-message p {
+    margin: 0;
+    line-height: 1.5;
+}
+
+.iwp-woo-v2-message-success {
+    background: #f0fff4;
+    border-left-color: #46b450;
+    color: #155724;
+}
+
+.iwp-woo-v2-message-error {
+    background: #fff5f5;
+    border-left-color: #dc3232;
+    color: #721c24;
+}
+
+.iwp-woo-v2-message-warning {
+    background: #fffbf0;
+    border-left-color: #ffb900;
+    color: #856404;
+}
+
+.iwp-woo-v2-message-info {
+    background: #f0f8ff;
+    border-left-color: #00a0d2;
+    color: #0c5460;
+}
+
+/* Product Tab */
+.iwp-woo-v2-product-tab {
+    padding: 20px 0;
+}
+
+.iwp-woo-v2-product-tab h2 {
+    margin-top: 0;
+    color: #333;
+    font-size: 24px;
+    line-height: 1.3;
+}
+
+.iwp-woo-v2-product-tab p {
+    margin-bottom: 15px;
+    color: #666;
+    line-height: 1.6;
+}
+
+.iwp-woo-v2-product-tab a {
+    color: #0073aa;
+    text-decoration: none;
+}
+
+.iwp-woo-v2-product-tab a:hover {
+    text-decoration: underline;
+}
+
+/* Info Shortcode */
+.iwp-woo-v2-info-shortcode {
+    padding: 15px;
+    margin: 15px 0;
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    text-align: center;
+}
+
+.iwp-woo-v2-detailed-info {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.iwp-woo-v2-detailed-info h3 {
+    margin-top: 0;
+    color: #333;
+    font-size: 20px;
+}
+
+.iwp-woo-v2-detailed-info p {
+    margin-bottom: 10px;
+    color: #666;
+    line-height: 1.6;
+}
+
+.iwp-woo-v2-detailed-info small {
+    color: #999;
+    font-size: 12px;
+}
+
+/* Loading States */
+.iwp-woo-v2-loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #0073aa;
+    border-radius: 50%;
+    animation: iwp-woo-v2-spin 1s linear infinite;
+    margin-right: 10px;
+}
+
+@keyframes iwp-woo-v2-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .iwp-woo-v2-notice,
+    .iwp-woo-v2-shop-notice,
+    .iwp-woo-v2-product-notice,
+    .iwp-woo-v2-cart-notice,
+    .iwp-woo-v2-checkout-notice {
+        padding: 10px;
+        margin: 10px 0;
+        font-size: 13px;
+    }
+    
+    .iwp-woo-v2-product-tab {
+        padding: 15px 0;
+    }
+    
+    .iwp-woo-v2-product-tab h2 {
+        font-size: 20px;
+    }
+    
+    .iwp-woo-v2-info-shortcode {
+        padding: 10px;
+        margin: 10px 0;
+    }
+}
+
+/* WooCommerce Specific Styles */
+.woocommerce .iwp-woo-v2-notice,
+.woocommerce-page .iwp-woo-v2-notice {
+    border-color: #96588a;
+    background: #f7f7f7;
+}
+
+.woocommerce .iwp-woo-v2-notice p,
+.woocommerce-page .iwp-woo-v2-notice p {
+    color: #515151;
+}
+
+/* Theme Compatibility */
+.iwp-woo-v2-notice:empty,
+.iwp-woo-v2-shop-notice:empty,
+.iwp-woo-v2-product-notice:empty,
+.iwp-woo-v2-cart-notice:empty,
+.iwp-woo-v2-checkout-notice:empty {
+    display: none;
+}
+
+/* Accessibility */
+.iwp-woo-v2-notice:focus,
+.iwp-woo-v2-shop-notice:focus,
+.iwp-woo-v2-product-notice:focus,
+.iwp-woo-v2-cart-notice:focus,
+.iwp-woo-v2-checkout-notice:focus {
+    outline: 2px solid #0073aa;
+    outline-offset: 2px;
+}
+
+/* InstaWP Customer Sites Styles */
+.iwp-woo-v2-customer-sites {
+    margin: 30px 0;
+    padding: 20px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+}
+
+.iwp-sites-title {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 24px;
+    font-weight: 600;
+}
+
+.iwp-sites-description {
+    margin: 0 0 20px 0;
+    color: #666;
+    font-size: 14px;
+}
+
+.iwp-site-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: box-shadow 0.3s ease;
+}
+
+.iwp-site-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.iwp-site-header {
+    background: #f8f9fa;
+    padding: 15px 20px;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.iwp-site-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+    display: flex;
+    align-items: center;
+}
+
+.iwp-status-icon {
+    margin-right: 8px;
+    font-size: 16px;
+}
+
+.iwp-site-status {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.iwp-status-completed .iwp-site-status {
+    background: #d4edda;
+    color: #155724;
+}
+
+.iwp-status-progress .iwp-site-status {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.iwp-status-failed .iwp-site-status {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.iwp-site-content {
+    padding: 20px;
+}
+
+.iwp-site-details {
+    margin-bottom: 20px;
+}
+
+.iwp-site-url {
+    margin-bottom: 15px;
+    font-size: 14px;
+}
+
+.iwp-site-url a {
+    color: #0073aa;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.iwp-site-url a:hover {
+    text-decoration: underline;
+}
+
+.iwp-site-credentials {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.iwp-credential-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    gap: 10px;
+}
+
+.iwp-credential-row:last-child {
+    margin-bottom: 0;
+}
+
+.iwp-credential-value {
+    background: #fff;
+    border: 1px solid #ddd;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: #333;
+    min-width: 150px;
+}
+
+.iwp-copy-btn,
+.iwp-show-password-btn {
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.iwp-copy-btn:hover,
+.iwp-show-password-btn:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+}
+
+.iwp-copy-btn.iwp-copy-success {
+    background: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+}
+
+.iwp-copy-btn.iwp-copy-error {
+    background: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+.iwp-site-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.iwp-btn {
+    display: inline-block;
+    padding: 10px 16px;
+    background: #0073aa;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.iwp-btn:hover {
+    background: #005177;
+    color: #fff;
+    text-decoration: none;
+}
+
+.iwp-btn-secondary {
+    background: #6c757d;
+}
+
+.iwp-btn-secondary:hover {
+    background: #545b62;
+}
+
+.iwp-btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+.iwp-site-progress,
+.iwp-site-error {
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+.iwp-site-progress {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+}
+
+.iwp-site-error {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.iwp-site-meta {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #e9ecef;
+    color: #6c757d;
+    font-size: 12px;
+}
+
+/* My Account Dashboard Sites */
+.iwp-woo-v2-dashboard-sites {
+    margin: 30px 0;
+}
+
+.iwp-sites-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.iwp-dashboard-site-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 20px;
+    transition: box-shadow 0.3s ease;
+}
+
+.iwp-dashboard-site-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.iwp-dashboard-site-card h4 {
+    margin: 0 0 5px 0;
+    color: #333;
+    font-size: 16px;
+}
+
+.iwp-order-info {
+    color: #666;
+    font-size: 12px;
+    margin-bottom: 15px;
+}
+
+.iwp-dashboard-site-card .iwp-site-actions {
+    margin-top: 15px;
+}
+
+/* Thank You Page Context */
+.iwp-woo-v2-context-thank-you {
+    background: #d4edda;
+    border-color: #c3e6cb;
+}
+
+.iwp-woo-v2-context-thank-you .iwp-sites-title {
+    color: #155724;
+}
+
+/* Email Styles (inline styles are used in PHP, but this provides fallback) */
+.iwp-woo-v2-email-sites {
+    margin: 20px 0;
+    padding: 20px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .iwp-woo-v2-customer-sites {
+        padding: 15px;
+        margin: 20px 0;
+    }
+    
+    .iwp-site-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .iwp-site-content {
+        padding: 15px;
+    }
+    
+    .iwp-credential-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    
+    .iwp-credential-value {
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .iwp-site-actions {
+        flex-direction: column;
+    }
+    
+    .iwp-btn {
+        text-align: center;
+        width: 100%;
+    }
+    
+    .iwp-sites-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .iwp-sites-title {
+        font-size: 20px;
+    }
+    
+    .iwp-site-title {
+        font-size: 16px;
+    }
+    
+    .iwp-copy-btn,
+    .iwp-show-password-btn {
+        padding: 8px 12px;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .iwp-woo-v2-notice,
+    .iwp-woo-v2-shop-notice,
+    .iwp-woo-v2-product-notice,
+    .iwp-woo-v2-cart-notice,
+    .iwp-woo-v2-checkout-notice {
+        background: transparent !important;
+        box-shadow: none !important;
+        border: 1px solid #000 !important;
+    }
+    
+    .iwp-copy-btn,
+    .iwp-show-password-btn {
+        display: none;
+    }
+    
+    .iwp-password-hidden {
+        display: none;
+    }
+    
+    .iwp-credential-value::after {
+        content: " (hidden for security)";
+        font-style: italic;
+    }
+}
+
+/* Domain Mapping Styles */
+.iwp-btn-tertiary {
+    background: #28a745;
+    color: #fff;
+}
+
+.iwp-btn-tertiary:hover {
+    background: #218838;
+    color: #fff;
+}
+
+.iwp-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.iwp-modal-content {
+    background: #fff;
+    border-radius: 8px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+}
+
+.iwp-modal-header {
+    padding: 20px 25px;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.iwp-modal-header h3 {
+    margin: 0;
+    font-size: 20px;
+    color: #333;
+}
+
+.iwp-modal-close {
+    font-size: 24px;
+    cursor: pointer;
+    color: #999;
+    line-height: 1;
+    padding: 5px;
+}
+
+.iwp-modal-close:hover {
+    color: #333;
+}
+
+.iwp-modal-body {
+    padding: 25px;
+}
+
+.iwp-domain-instructions {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.iwp-cname-example {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 12px;
+    margin: 10px 0 0 0;
+    font-family: 'Courier New', monospace;
+}
+
+.iwp-cname-example code {
+    font-size: 14px;
+    color: #333;
+    word-break: break-all;
+}
+
+.iwp-domain-placeholder {
+    color: #007cba;
+    font-weight: bold;
+}
+
+.iwp-target-url {
+    color: #d63384;
+    font-weight: bold;
+}
+
+.iwp-form-group {
+    margin-bottom: 15px;
+}
+
+.iwp-form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #333;
+}
+
+.iwp-form-group input[type="text"],
+.iwp-form-group select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background: #fff;
+}
+
+.iwp-form-group input[type="text"]:focus,
+.iwp-form-group select:focus {
+    outline: none;
+    border-color: #007cba;
+    box-shadow: 0 0 0 2px rgba(0, 124, 186, 0.1);
+}
+
+.iwp-form-group small {
+    display: block;
+    margin-top: 5px;
+    color: #666;
+    font-size: 12px;
+}
+
+
+.iwp-form-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: flex-end;
+    border-top: 1px solid #e9ecef;
+    padding-top: 20px;
+    margin-top: 25px;
+}
+
+.iwp-domain-result {
+    margin-top: 20px;
+    padding: 15px;
+    border-radius: 4px;
+    border-left: 4px solid #007cba;
+}
+
+.iwp-domain-result-success {
+    background: #d4edda;
+    border-left-color: #28a745;
+    color: #155724;
+}
+
+.iwp-domain-result-error {
+    background: #f8d7da;
+    border-left-color: #dc3545;
+    color: #721c24;
+}
+
+.iwp-domain-result p {
+    margin: 0;
+}
+
+/* Existing Domains Display */
+.iwp-existing-domains {
+    margin-top: 30px;
+    padding-top: 25px;
+    border-top: 1px solid #e9ecef;
+}
+
+.iwp-existing-domains h4 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 16px;
+}
+
+.iwp-domains-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.iwp-domain-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px 15px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+}
+
+.iwp-domain-name {
+    font-weight: 500;
+    color: #333;
+    font-family: 'Courier New', monospace;
+    flex: 1;
+}
+
+.iwp-domain-type {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.iwp-domain-type-primary {
+    background: #007cba;
+    color: #fff;
+}
+
+.iwp-domain-type-alias {
+    background: #6c757d;
+    color: #fff;
+}
+
+.iwp-domain-date {
+    color: #666;
+    font-size: 11px;
+}
+
+/* Mobile Responsive for Domain Modal */
+@media (max-width: 768px) {
+    .iwp-modal-content {
+        width: 95%;
+        margin: 20px;
+    }
+    
+    .iwp-modal-header,
+    .iwp-modal-body {
+        padding: 20px;
+    }
+    
+    .iwp-form-actions {
+        flex-direction: column;
+    }
+    
+    .iwp-form-actions .iwp-btn {
+        width: 100%;
+        text-align: center;
+    }
+    
+    .iwp-domain-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .iwp-domain-name {
+        word-break: break-all;
+    }
+}
+
+/* Modal Open Body Style */
+body.iwp-modal-open {
+    overflow: hidden;
+}

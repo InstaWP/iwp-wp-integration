@@ -1,0 +1,486 @@
+<?php
+/**
+ * Sites Model for IWP WooCommerce Integration v2
+ *
+ * Manages database operations for the iwp_woo_v2_sites table
+ *
+ * @package IWP_Woo_V2
+ * @since 2.0.0
+ */
+
+// Prevent direct access
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+/**
+ * IWP_Woo_V2_Sites_Model class
+ */
+class IWP_Woo_V2_Sites_Model {
+
+    /**
+     * Table name
+     *
+     * @var string
+     */
+    private static $table_name;
+
+    /**
+     * Initialize the model
+     */
+    public static function init() {
+        global $wpdb;
+        self::$table_name = $wpdb->prefix . 'iwp_woo_v2_sites';
+    }
+
+    /**
+     * Create a new site record
+     *
+     * @param array $data Site data
+     * @return int|false Site ID on success, false on failure
+     */
+    public static function create($data) {
+        global $wpdb;
+        
+        if (!self::$table_name) {
+            self::init();
+        }
+
+        // Prepare data with defaults
+        $defaults = array(
+            'status' => 'creating',
+            'source' => 'woocommerce',
+            'is_pool' => 0,
+            'is_reserved' => 1,
+            'user_id' => 0,
+            'created_at' => current_time('mysql'),
+            'updated_at' => current_time('mysql')
+        );
+
+        $site_data = wp_parse_args($data, $defaults);
+
+        // Sanitize data
+        $site_data = array(
+            'site_id' => sanitize_text_field($site_data['site_id']),
+            'site_url' => !empty($site_data['site_url']) ? esc_url_raw($site_data['site_url']) : null,
+            'wp_username' => !empty($site_data['wp_username']) ? sanitize_text_field($site_data['wp_username']) : null,
+            'wp_password' => !empty($site_data['wp_password']) ? $site_data['wp_password'] : null, // Don't sanitize password
+            'wp_admin_url' => !empty($site_data['wp_admin_url']) ? esc_url_raw($site_data['wp_admin_url']) : null,
+            's_hash' => !empty($site_data['s_hash']) ? sanitize_text_field($site_data['s_hash']) : null,
+            'status' => sanitize_text_field($site_data['status']),
+            'task_id' => !empty($site_data['task_id']) ? sanitize_text_field($site_data['task_id']) : null,
+            'snapshot_slug' => !empty($site_data['snapshot_slug']) ? sanitize_text_field($site_data['snapshot_slug']) : null,
+            'plan_id' => !empty($site_data['plan_id']) ? sanitize_text_field($site_data['plan_id']) : null,
+            'product_id' => !empty($site_data['product_id']) ? intval($site_data['product_id']) : null,
+            'order_id' => !empty($site_data['order_id']) ? intval($site_data['order_id']) : null,
+            'user_id' => intval($site_data['user_id']),
+            'source' => sanitize_text_field($site_data['source']),
+            'source_data' => !empty($site_data['source_data']) ? wp_json_encode($site_data['source_data']) : null,
+            'is_pool' => intval($site_data['is_pool']),
+            'is_reserved' => intval($site_data['is_reserved']),
+            'expiry_hours' => !empty($site_data['expiry_hours']) ? intval($site_data['expiry_hours']) : null,
+            'api_response' => !empty($site_data['api_response']) ? wp_json_encode($site_data['api_response']) : null,
+            'created_at' => $site_data['created_at'],
+            'updated_at' => $site_data['updated_at']
+        );
+
+        $result = $wpdb->insert(
+            self::$table_name,
+            $site_data,
+            array(
+                '%s', // site_id
+                '%s', // site_url
+                '%s', // wp_username
+                '%s', // wp_password
+                '%s', // wp_admin_url
+                '%s', // s_hash
+                '%s', // status
+                '%s', // task_id
+                '%s', // snapshot_slug
+                '%s', // plan_id
+                '%d', // product_id
+                '%d', // order_id
+                '%d', // user_id
+                '%s', // source
+                '%s', // source_data
+                '%d', // is_pool
+                '%d', // is_reserved
+                '%d', // expiry_hours
+                '%s', // api_response
+                '%s', // created_at
+                '%s'  // updated_at
+            )
+        );
+
+        if ($result === false) {
+            IWP_Woo_V2_Logger::error('Failed to create site record', 'sites-model', array(
+                'error' => $wpdb->last_error,
+                'data' => $site_data
+            ));
+            return false;
+        }
+
+        $site_id = $wpdb->insert_id;
+        IWP_Woo_V2_Logger::info('Site record created successfully', 'sites-model', array(
+            'db_id' => $site_id,
+            'site_id' => $site_data['site_id']
+        ));
+
+        return $site_id;
+    }
+
+    /**
+     * Update a site record
+     *
+     * @param string $site_id InstaWP site ID
+     * @param array $data Update data
+     * @return bool Success
+     */
+    public static function update($site_id, $data) {
+        global $wpdb;
+        
+        if (!self::$table_name) {
+            self::init();
+        }
+
+        // Add updated timestamp
+        $data['updated_at'] = current_time('mysql');
+
+        // Sanitize updatable fields
+        $allowed_fields = array(
+            'site_url', 'wp_username', 'wp_password', 'wp_admin_url', 's_hash',
+            'status', 'task_id', 'api_response', 'updated_at'
+        );
+
+        $update_data = array();
+        $format = array();
+
+        foreach ($data as $key => $value) {
+            if (in_array($key, $allowed_fields)) {
+                switch ($key) {
+                    case 'site_url':
+                    case 'wp_admin_url':
+                        $update_data[$key] = !empty($value) ? esc_url_raw($value) : null;
+                        $format[] = '%s';
+                        break;
+                    case 'wp_username':
+                    case 's_hash':
+                    case 'status':
+                    case 'task_id':
+                        $update_data[$key] = !empty($value) ? sanitize_text_field($value) : null;
+                        $format[] = '%s';
+                        break;
+                    case 'wp_password':
+                        $update_data[$key] = $value; // Don't sanitize password
+                        $format[] = '%s';
+                        break;
+                    case 'api_response':
+                        $update_data[$key] = !empty($value) ? wp_json_encode($value) : null;
+                        $format[] = '%s';
+                        break;
+                    case 'updated_at':
+                        $update_data[$key] = $value;
+                        $format[] = '%s';
+                        break;
+                }
+            }
+        }
+
+        if (empty($update_data)) {
+            return false;
+        }
+
+        $result = $wpdb->update(
+            self::$table_name,
+            $update_data,
+            array('site_id' => sanitize_text_field($site_id)),
+            $format,
+            array('%s')
+        );
+
+        if ($result === false) {
+            IWP_Woo_V2_Logger::error('Failed to update site record', 'sites-model', array(
+                'site_id' => $site_id,
+                'error' => $wpdb->last_error
+            ));
+            return false;
+        }
+
+        IWP_Woo_V2_Logger::info('Site record updated successfully', 'sites-model', array(
+            'site_id' => $site_id,
+            'updated_fields' => array_keys($update_data)
+        ));
+
+        return true;
+    }
+
+    /**
+     * Get a site by InstaWP site ID
+     *
+     * @param string $site_id InstaWP site ID
+     * @return object|null Site object or null if not found
+     */
+    public static function get_by_site_id($site_id) {
+        global $wpdb;
+        
+        if (!self::$table_name) {
+            self::init();
+        }
+
+        $site = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM " . self::$table_name . " WHERE site_id = %s",
+            sanitize_text_field($site_id)
+        ));
+
+        if ($site) {
+            // Decode JSON fields
+            if (!empty($site->source_data)) {
+                $site->source_data = json_decode($site->source_data, true);
+            }
+            if (!empty($site->api_response)) {
+                $site->api_response = json_decode($site->api_response, true);
+            }
+        }
+
+        return $site;
+    }
+
+    /**
+     * Get sites by order ID
+     *
+     * @param int $order_id Order ID
+     * @return array Array of site objects
+     */
+    public static function get_by_order_id($order_id) {
+        global $wpdb;
+        
+        if (!self::$table_name) {
+            self::init();
+        }
+
+        $sites = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM " . self::$table_name . " WHERE order_id = %d ORDER BY created_at DESC",
+            intval($order_id)
+        ));
+
+        // Decode JSON fields for each site
+        foreach ($sites as $site) {
+            if (!empty($site->source_data)) {
+                $site->source_data = json_decode($site->source_data, true);
+            }
+            if (!empty($site->api_response)) {
+                $site->api_response = json_decode($site->api_response, true);
+            }
+        }
+
+        return $sites;
+    }
+
+    /**
+     * Get sites by user ID
+     *
+     * @param int $user_id User ID
+     * @return array Array of site objects
+     */
+    public static function get_by_user_id($user_id) {
+        global $wpdb;
+        
+        if (!self::$table_name) {
+            self::init();
+        }
+
+        $sites = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM " . self::$table_name . " WHERE user_id = %d ORDER BY created_at DESC",
+            intval($user_id)
+        ));
+
+        // Decode JSON fields for each site
+        foreach ($sites as $site) {
+            if (!empty($site->source_data)) {
+                $site->source_data = json_decode($site->source_data, true);
+            }
+            if (!empty($site->api_response)) {
+                $site->api_response = json_decode($site->api_response, true);
+            }
+        }
+
+        return $sites;
+    }
+
+    /**
+     * Get all sites with optional filters
+     *
+     * @param array $args Query arguments
+     * @return array Array of site objects
+     */
+    public static function get_all($args = array()) {
+        global $wpdb;
+        
+        if (!self::$table_name) {
+            self::init();
+        }
+
+        $defaults = array(
+            'status' => '',
+            'source' => '',
+            'limit' => 20,
+            'offset' => 0,
+            'orderby' => 'created_at',
+            'order' => 'DESC'
+        );
+
+        $args = wp_parse_args($args, $defaults);
+
+        $where_clauses = array();
+        $where_values = array();
+
+        if (!empty($args['status'])) {
+            $where_clauses[] = "status = %s";
+            $where_values[] = sanitize_text_field($args['status']);
+        }
+
+        if (!empty($args['source'])) {
+            $where_clauses[] = "source = %s";
+            $where_values[] = sanitize_text_field($args['source']);
+        }
+
+        $where_sql = !empty($where_clauses) ? 'WHERE ' . implode(' AND ', $where_clauses) : '';
+
+        $orderby = sanitize_sql_orderby($args['orderby'] . ' ' . $args['order']);
+        if (!$orderby) {
+            $orderby = 'created_at DESC';
+        }
+
+        $limit = intval($args['limit']);
+        $offset = intval($args['offset']);
+
+        $sql = "SELECT * FROM " . self::$table_name . " " . $where_sql . " ORDER BY " . $orderby . " LIMIT %d OFFSET %d";
+
+        $where_values[] = $limit;
+        $where_values[] = $offset;
+
+        $sites = $wpdb->get_results($wpdb->prepare($sql, $where_values));
+
+        // Decode JSON fields for each site
+        foreach ($sites as $site) {
+            if (!empty($site->source_data)) {
+                $site->source_data = json_decode($site->source_data, true);
+            }
+            if (!empty($site->api_response)) {
+                $site->api_response = json_decode($site->api_response, true);
+            }
+        }
+
+        return $sites;
+    }
+
+    /**
+     * Get sites by status
+     *
+     * @param string $status Site status
+     * @return array Array of site objects
+     */
+    public static function get_by_status($status) {
+        return self::get_all(array('status' => $status, 'limit' => -1));
+    }
+
+    /**
+     * Get pending sites (creating or progress status)
+     *
+     * @return array Array of site objects
+     */
+    public static function get_pending_sites() {
+        global $wpdb;
+        
+        if (!self::$table_name) {
+            self::init();
+        }
+
+        $sites = $wpdb->get_results(
+            "SELECT * FROM " . self::$table_name . " WHERE status IN ('creating', 'progress') AND task_id IS NOT NULL ORDER BY created_at ASC"
+        );
+
+        // Decode JSON fields for each site
+        foreach ($sites as $site) {
+            if (!empty($site->source_data)) {
+                $site->source_data = json_decode($site->source_data, true);
+            }
+            if (!empty($site->api_response)) {
+                $site->api_response = json_decode($site->api_response, true);
+            }
+        }
+
+        return $sites;
+    }
+
+    /**
+     * Delete a site record
+     *
+     * @param string $site_id InstaWP site ID
+     * @return bool Success
+     */
+    public static function delete($site_id) {
+        global $wpdb;
+        
+        if (!self::$table_name) {
+            self::init();
+        }
+
+        $result = $wpdb->delete(
+            self::$table_name,
+            array('site_id' => sanitize_text_field($site_id)),
+            array('%s')
+        );
+
+        if ($result === false) {
+            IWP_Woo_V2_Logger::error('Failed to delete site record', 'sites-model', array(
+                'site_id' => $site_id,
+                'error' => $wpdb->last_error
+            ));
+            return false;
+        }
+
+        IWP_Woo_V2_Logger::info('Site record deleted successfully', 'sites-model', array(
+            'site_id' => $site_id
+        ));
+
+        return true;
+    }
+
+    /**
+     * Get total count of sites
+     *
+     * @param array $filters Optional filters
+     * @return int Total count
+     */
+    public static function get_total_count($filters = array()) {
+        global $wpdb;
+        
+        if (!self::$table_name) {
+            self::init();
+        }
+
+        $where_clauses = array();
+        $where_values = array();
+
+        if (!empty($filters['status'])) {
+            $where_clauses[] = "status = %s";
+            $where_values[] = sanitize_text_field($filters['status']);
+        }
+
+        if (!empty($filters['source'])) {
+            $where_clauses[] = "source = %s";
+            $where_values[] = sanitize_text_field($filters['source']);
+        }
+
+        $where_sql = !empty($where_clauses) ? 'WHERE ' . implode(' AND ', $where_clauses) : '';
+
+        $sql = "SELECT COUNT(*) FROM " . self::$table_name . " " . $where_sql;
+
+        if (!empty($where_values)) {
+            return intval($wpdb->get_var($wpdb->prepare($sql, $where_values)));
+        } else {
+            return intval($wpdb->get_var($sql));
+        }
+    }
+}

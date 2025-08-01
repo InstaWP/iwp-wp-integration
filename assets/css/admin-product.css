@@ -1,0 +1,154 @@
+/**
+ * Admin Product CSS for IWP WooCommerce Integration v2
+ *
+ * @package IWP_Woo_V2
+ * @since 2.0.0
+ */
+
+/* InstaWP Product Tab Styles */
+#iwp_instawp_product_data {
+    padding: 20px;
+}
+
+#iwp_instawp_product_data .options_group {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+}
+
+#iwp_instawp_product_data .options_group:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+/* Site Expiry Settings Styles */
+._iwp_site_expiry_type_field .wrap {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+._iwp_site_expiry_type_field label {
+    display: flex;
+    align-items: center;
+    font-weight: normal;
+}
+
+._iwp_site_expiry_type_field input[type="radio"] {
+    margin-right: 5px;
+}
+
+._iwp_site_expiry_hours_field {
+    transition: opacity 0.3s ease;
+}
+
+._iwp_site_expiry_hours_field input[type="number"] {
+    width: 100px;
+}
+
+/* Snapshot Preview Styles */
+.iwp-snapshot-preview {
+    border: 1px solid #ddd;
+    padding: 15px;
+    border-radius: 4px;
+    background: #f9f9f9;
+    margin-top: 10px;
+}
+
+.iwp-snapshot-preview h5 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 16px;
+}
+
+.iwp-snapshot-preview p {
+    margin: 0 0 15px 0;
+    color: #666;
+    line-height: 1.5;
+}
+
+.iwp-snapshot-preview img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Refresh Button Styles */
+#iwp-refresh-product-snapshots {
+    margin-left: 10px;
+}
+
+#iwp-refresh-product-snapshots:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Snapshot Selection Styles */
+#_iwp_selected_snapshot {
+    min-width: 300px;
+}
+
+/* Loading States */
+.iwp-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.iwp-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid #ccc;
+    border-top-color: #0073aa;
+    border-radius: 50%;
+    animation: iwp-spin 1s linear infinite;
+}
+
+@keyframes iwp-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 782px) {
+    .iwp-template-preview {
+        padding: 10px;
+    }
+    
+    .iwp-template-preview h5 {
+        font-size: 14px;
+    }
+    
+    #_iwp_selected_template {
+        min-width: 100%;
+    }
+}
+
+/* Notice Styles */
+.iwp-notice {
+    padding: 10px 15px;
+    margin: 10px 0;
+    border-radius: 4px;
+    border-left: 4px solid #0073aa;
+    background: #f0f8ff;
+}
+
+.iwp-notice.error {
+    border-left-color: #d63638;
+    background: #fff0f0;
+}
+
+.iwp-notice.warning {
+    border-left-color: #dba617;
+    background: #fffbf0;
+}
+
+.iwp-notice.success {
+    border-left-color: #00a32a;
+    background: #f0fff4;
+}
