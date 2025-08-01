@@ -3,7 +3,7 @@ Major:
 [ ] Need to test with WooCommerce Subscription plugin, so that we can handle the subscription plan cancellation. 
 [ ] Add description to the InstaWP site after creation. 
 [ ] If a demo site has been changed plan we need to store that in the Site table too with some kind of indication. 
-
+[ ] 
 
 Minor:
 [ ] Order change of Sites and Setttings (Sites on Top). 
