@@ -136,9 +136,6 @@ class IWP_Settings_Page {
                 </p>
                 
                 <div class="iwp-team-controls">
-                    <label for="iwp-team-select" class="iwp-team-label">
-                        <?php esc_html_e('User\'s Logged In Team', 'iwp-wp-integration'); ?>
-                    </label>
                     <div class="iwp-team-dropdown-container">
                         <select id="iwp-team-select" class="iwp-team-select">
                             <?php $this->render_team_options(); ?>
@@ -295,26 +292,24 @@ class IWP_Settings_Page {
      * Display snapshots data
      */
     private function display_snapshots() {
-        $snapshots = get_transient('iwp_snapshots');
+        // Get team-specific or general cache key
+        $options = get_option('iwp_options', array());
+        $team_id = isset($options['selected_team_id']) ? intval($options['selected_team_id']) : null;
+        $cache_key = $team_id ? 'iwp_snapshots_team_' . $team_id : 'iwp_snapshots';
+        $snapshots = get_transient($cache_key);
         
         if (empty($snapshots)) {
             echo '<p>' . esc_html__('No snapshots cached. Click refresh to load data.', 'iwp-wp-integration') . '</p>';
             return;
         }
 
-        // Check if the response has the expected data structure
-        $snapshot_data = $snapshots;
-        if (isset($snapshots['data']) && is_array($snapshots['data'])) {
-            $snapshot_data = $snapshots['data'];
-        }
-
-        if (empty($snapshot_data) || !is_array($snapshot_data)) {
-            echo '<p>' . esc_html__('No valid snapshot data found. Click refresh to reload.', 'iwp-wp-integration') . '</p>';
+        if (!is_array($snapshots)) {
+            echo '<p>' . esc_html__('Invalid snapshot data format. Click refresh to reload.', 'iwp-wp-integration') . '</p>';
             return;
         }
 
         echo '<div class="iwp-snapshots-grid">';
-        foreach ($snapshot_data as $snapshot) {
+        foreach ($snapshots as $snapshot) {
             if (!is_array($snapshot)) {
                 continue;
             }
@@ -335,7 +330,11 @@ class IWP_Settings_Page {
      * Display plans data
      */
     private function display_plans() {
-        $plans = get_transient('iwp_plans');
+        // Get team-specific or general cache key
+        $options = get_option('iwp_options', array());
+        $team_id = isset($options['selected_team_id']) ? intval($options['selected_team_id']) : null;
+        $cache_key = $team_id ? 'iwp_plans_team_' . $team_id : 'iwp_plans';
+        $plans = get_transient($cache_key);
         
         if (empty($plans)) {
             echo '<p>' . esc_html__('No plans cached. Click refresh to load data.', 'iwp-wp-integration') . '</p>';
@@ -347,23 +346,16 @@ class IWP_Settings_Page {
             return;
         }
 
-        // Count plans with numeric keys (this is how the API returns plans)
-        $plan_count = 0;
-        foreach ($plans as $key => $value) {
-            if (is_numeric($key) && is_array($value) && isset($value['id'])) {
-                $plan_count++;
-            }
-        }
-
-        if ($plan_count === 0) {
-            echo '<p>' . esc_html__('No valid plans found. Click refresh to reload.', 'iwp-wp-integration') . '</p>';
+        // Check if we have any plans
+        if (count($plans) === 0) {
+            echo '<p>' . esc_html__('No plans found. Click refresh to reload.', 'iwp-wp-integration') . '</p>';
             return;
         }
 
         echo '<div class="iwp-plans-grid">';
-        foreach ($plans as $key => $plan) {
-            // Only process numeric keys that contain plan arrays
-            if (!is_numeric($key) || !is_array($plan) || !isset($plan['id'])) {
+        foreach ($plans as $plan) {
+            // Process each plan in the array
+            if (!is_array($plan) || !isset($plan['id'])) {
                 continue;
             }
             
@@ -633,7 +625,7 @@ class IWP_Settings_Page {
         <style>
         .iwp-admin-tabs {
             border-bottom: 1px solid #ccd0d4;
-            margin: 0 0 20px 0;
+            margin: 0 0 0px 0;
         }
         
         .iwp-tab-content {

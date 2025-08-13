@@ -91,9 +91,11 @@ class IWP_Admin_Simple {
      * Get menu icon
      */
     private function get_menu_icon() {
-        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M10 2C5.6 2 2 5.6 2 10s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 14c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6z"/>
-            <circle cx="10" cy="10" r="2.5"/>
+        // InstaWP logo SVG - custom design with lightning bolt for "instant" and blue branding
+        $svg = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.9"/>
+            <path d="M13.5 7L9.5 13H11L10.5 17L14.5 11H13L13.5 7Z" fill="white"/>
+            <path d="M7 16C7.5 15.5 8 15 8.5 14.5C9 15 9.5 15.5 10 16C10.5 15.5 11 15 11.5 14.5C12 15 12.5 15.5 13 16C13.5 15.5 14 15 14.5 14.5C15 15 15.5 15.5 16 16C16.5 15.5 17 15 17.5 14.5" stroke="white" stroke-width="0.5" fill="none" opacity="0.4"/>
         </svg>';
         
         return 'data:image/svg+xml;base64,' . base64_encode($svg);
@@ -342,7 +344,7 @@ class IWP_Admin_Simple {
         // General Settings Section
         add_settings_section(
             'iwp_general',
-            esc_html__('Integration Settings', 'iwp-wp-integration'),
+            esc_html__('WooCommerce Integration Settings', 'iwp-wp-integration'),
             array($this, 'general_section_callback'),
             'iwp_settings'
         );
@@ -493,8 +495,10 @@ class IWP_Admin_Simple {
         
         // Always preserve team selection and other settings that aren't in forms
         // This ensures team selection and other AJAX-set values are not lost
-        if (isset($existing['selected_team_id'])) {
-            $sanitized['selected_team_id'] = $existing['selected_team_id'];
+        // Get the most current options in case they were updated after page load (e.g., via AJAX)
+        $current_options = get_option('iwp_options', array());
+        if (isset($current_options['selected_team_id'])) {
+            $sanitized['selected_team_id'] = $current_options['selected_team_id'];
         }
         
         return $sanitized;

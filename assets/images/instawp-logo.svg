@@ -1,0 +1,10 @@
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- InstaWP-style logo representing instant/fast WordPress -->
+  <circle cx="12" cy="12" r="10" fill="#2196F3" stroke="#1976D2" stroke-width="1"/>
+  
+  <!-- Lightning bolt for "instant" -->
+  <path d="M13.5 7L9.5 13H11L10.5 17L14.5 11H13L13.5 7Z" fill="white"/>
+  
+  <!-- WordPress-style "W" subtle outline -->
+  <path d="M7 16C7.5 15.5 8 15 8.5 14.5C9 15 9.5 15.5 10 16C10.5 15.5 11 15 11.5 14.5C12 15 12.5 15.5 13 16C13.5 15.5 14 15 14.5 14.5C15 15 15.5 15.5 16 16C16.5 15.5 17 15 17.5 14.5" stroke="white" stroke-width="0.5" fill="none" opacity="0.3"/>
+</svg>

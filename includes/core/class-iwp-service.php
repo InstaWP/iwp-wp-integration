@@ -97,13 +97,14 @@ class IWP_Service {
             return $options;
         }
         
-        if (isset($snapshots['data']) && is_array($snapshots['data'])) {
-            foreach ($snapshots['data'] as $snapshot) {
-                if (isset($snapshot['slug']) && isset($snapshot['name'])) {
+        // Snapshots are now returned as a direct array from the API client
+        if (is_array($snapshots) && !empty($snapshots)) {
+            foreach ($snapshots as $snapshot) {
+                if (is_array($snapshot) && isset($snapshot['slug']) && isset($snapshot['name'])) {
                     $options[$snapshot['slug']] = sanitize_text_field($snapshot['name']);
                 }
             }
-            IWP_Logger::info('Loaded snapshots for dropdown', 'service', array('count' => count($snapshots['data'])));
+            IWP_Logger::info('Loaded snapshots for dropdown', 'service', array('count' => count($snapshots)));
         } else {
             IWP_Logger::warning('No snapshots data found in API response', 'service');
             $options[''] = __('No snapshots available', 'iwp-wp-integration');
@@ -128,11 +129,11 @@ class IWP_Service {
             return $options;
         }
         
-        // Plans are in numbered keys (0, 1, 2, etc.) not in 'data' array
+        // Plans are now returned as a direct array from the API client
         $plan_count = 0;
         if (isset($plans) && is_array($plans)) {
-            foreach ($plans as $key => $plan) {
-                if (is_numeric($key) && is_array($plan) && isset($plan['id']) && isset($plan['display_name'])) {
+            foreach ($plans as $plan) {
+                if (is_array($plan) && isset($plan['id']) && isset($plan['display_name'])) {
                     $plan_label = sanitize_text_field($plan['display_name']);
                     if (isset($plan['short_description']) && !empty($plan['short_description'])) {
                         $plan_label .= ' - ' . sanitize_text_field($plan['short_description']);
@@ -516,17 +517,42 @@ class IWP_Service {
             'options_before' => $options
         ));
         
+        // Bypass WordPress settings API sanitization by temporarily removing the filter
+        // This prevents the sanitize_settings callback from interfering with AJAX updates
+        $sanitize_callback = null;
+        if (has_filter('sanitize_option_iwp_options')) {
+            global $wp_filter;
+            if (isset($wp_filter['sanitize_option_iwp_options'])) {
+                $sanitize_callback = $wp_filter['sanitize_option_iwp_options'];
+                unset($wp_filter['sanitize_option_iwp_options']);
+            }
+        }
+        
         $result = update_option('iwp_options', $options);
+        
+        // Restore the sanitization callback
+        if ($sanitize_callback !== null) {
+            $wp_filter['sanitize_option_iwp_options'] = $sanitize_callback;
+        }
         
         IWP_Logger::debug('Update option result', 'service', array(
             'result' => $result,
-            'team_id' => $new_team_id
+            'team_id' => $new_team_id,
+            'options_serialized_length' => strlen(serialize($options))
         ));
         
         // WordPress update_option returns false if the value hasn't changed
         // So we need to check if the value was actually set correctly
         $updated_options = get_option('iwp_options', array());
         $actually_set = isset($updated_options['selected_team_id']) && $updated_options['selected_team_id'] === $new_team_id;
+        
+        IWP_Logger::debug('Verification check', 'service', array(
+            'updated_options_has_team_id' => isset($updated_options['selected_team_id']),
+            'updated_team_id_value' => isset($updated_options['selected_team_id']) ? $updated_options['selected_team_id'] : 'NOT_SET',
+            'new_team_id' => $new_team_id,
+            'types_match' => isset($updated_options['selected_team_id']) ? (gettype($updated_options['selected_team_id']) === gettype($new_team_id)) : false,
+            'strict_comparison' => isset($updated_options['selected_team_id']) ? ($updated_options['selected_team_id'] === $new_team_id) : false
+        ));
         
         // Consider it successful if the value is now correct, regardless of update_option return
         $success = $actually_set || ($result !== false);

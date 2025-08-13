@@ -203,12 +203,22 @@ class IWP_API_Client {
             return $response;
         }
 
+        // Handle new API response format with status, message, and data fields
+        if (isset($response['data']) && is_array($response['data'])) {
+            $snapshots_data = $response['data'];
+            IWP_Logger::debug('Using snapshots from data field', 'api-client', array('status' => $response['status'] ?? 'unknown', 'message' => $response['message'] ?? 'no message'));
+        } else {
+            // Fallback for legacy response format
+            $snapshots_data = $response;
+            IWP_Logger::debug('Using legacy snapshots response format', 'api-client');
+        }
+
         // Cache for configurable duration (default 15 minutes)
         $cache_duration = apply_filters('iwp_snapshots_cache_duration', 15 * MINUTE_IN_SECONDS);
-        set_transient($cache_key, $response, $cache_duration);
+        set_transient($cache_key, $snapshots_data, $cache_duration);
         IWP_Logger::info('Snapshots cached', 'api-client', array('cache_key' => $cache_key, 'duration_minutes' => $cache_duration / 60));
 
-        return $response;
+        return $snapshots_data;
     }
 
     /**
@@ -273,22 +283,28 @@ class IWP_API_Client {
             return $response;
         }
 
+        // Handle new API response format with status, message, and data fields
+        if (isset($response['data']) && is_array($response['data'])) {
+            $plans_data = $response['data'];
+            IWP_Logger::debug('Using plans from data field', 'api-client', array('status' => $response['status'] ?? 'unknown', 'message' => $response['message'] ?? 'no message'));
+        } else {
+            // Fallback for legacy response format
+            $plans_data = $response;
+            IWP_Logger::debug('Using legacy plans response format', 'api-client');
+        }
+
         // Cache for configurable duration (default 1 hour)
         $cache_duration = apply_filters('iwp_plans_cache_duration', HOUR_IN_SECONDS);
-        set_transient($cache_key, $response, $cache_duration);
+        set_transient($cache_key, $plans_data, $cache_duration);
         
-        // Count plans from numbered keys (0, 1, 2, etc.)
+        // Count plans from the data
         $plan_count = 0;
-        if (isset($response) && is_array($response)) {
-            foreach ($response as $key => $value) {
-                if (is_numeric($key) && is_array($value) && isset($value['id'])) {
-                    $plan_count++;
-                }
-            }
+        if (isset($plans_data) && is_array($plans_data)) {
+            $plan_count = count($plans_data);
         }
         
         IWP_Logger::info('Successfully fetched plans', 'api-client', array('count' => $plan_count, 'cache_key' => $cache_key));
-        return $response;
+        return $plans_data;
     }
 
     /**

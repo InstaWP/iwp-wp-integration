@@ -71,26 +71,11 @@ class IWP_Admin {
      * @return string Base64 encoded SVG data URI or URL
      */
     private function get_instawp_menu_icon() {
-        // Try to use the official InstaWP logo from their CDN
-        $logo_url = 'https://instawp.com/wp-content/uploads/2023/10/Logo-symbol-white.svg';
-        
-        // For WordPress admin menus, we can use either:
-        // 1. A direct URL (WordPress will handle caching)
-        // 2. A base64 encoded SVG for reliability
-        
-        // Use properly sized SVG icon optimized for WordPress admin sidebar
-        // Force use of local SVG to avoid sizing issues with external logo
-        $use_external_logo = apply_filters('iwp_use_external_logo', false);
-        
-        if ($use_external_logo) {
-            return $logo_url;
-        }
-        
-        // InstaWP-inspired SVG icon optimized for WordPress admin sidebar (20x20)
-        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M10 2C5.6 2 2 5.6 2 10s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 14c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6z"/>
-            <circle cx="10" cy="10" r="2.5"/>
-            <path d="M10 5.5c2.5 0 4.5 2 4.5 4.5s-2 4.5-4.5 4.5-4.5-2-4.5-4.5 2-4.5 4.5-4.5m0-1c-3 0-5.5 2.5-5.5 5.5S7 15.5 10 15.5s5.5-2.5 5.5-5.5S13 4.5 10 4.5z"/>
+        // InstaWP logo SVG - custom design with lightning bolt for "instant" and blue branding
+        $svg = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.9"/>
+            <path d="M13.5 7L9.5 13H11L10.5 17L14.5 11H13L13.5 7Z" fill="white"/>
+            <path d="M7 16C7.5 15.5 8 15 8.5 14.5C9 15 9.5 15.5 10 16C10.5 15.5 11 15 11.5 14.5C12 15 12.5 15.5 13 16C13.5 15.5 14 15 14.5 14.5C15 15 15.5 15.5 16 16C16.5 15.5 17 15 17.5 14.5" stroke="white" stroke-width="0.5" fill="none" opacity="0.4"/>
         </svg>';
         
         return 'data:image/svg+xml;base64,' . base64_encode($svg);
@@ -937,14 +922,10 @@ class IWP_Admin {
 
         error_log('IWP WooCommerce V2: Plans fetched successfully in admin interface');
         
-        // Count plans from numbered keys
+        // Count plans (now they are a direct array)
         $plan_count = 0;
         if (isset($plans) && is_array($plans)) {
-            foreach ($plans as $key => $value) {
-                if (is_numeric($key) && is_array($value) && isset($value['id'])) {
-                    $plan_count++;
-                }
-            }
+            $plan_count = count($plans);
         }
         error_log('IWP WooCommerce V2: Number of plans found: ' . $plan_count);
 
@@ -957,8 +938,8 @@ class IWP_Admin {
         if ($plan_count > 0) {
             echo '<div class="iwp-plans-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">';
             
-            foreach ($plans as $key => $plan) {
-                if (!is_numeric($key) || !is_array($plan) || !isset($plan['id'])) {
+            foreach ($plans as $plan) {
+                if (!is_array($plan) || !isset($plan['id'])) {
                     continue;
                 }
                 $plan_id = isset($plan['id']) ? sanitize_text_field($plan['id']) : '';

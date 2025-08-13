@@ -1,11 +1,18 @@
 Major:
 [ ] Cancellation / Refund of the order should delete the site.
-[ ] Need to test with WooCommerce Subscription plugin, so that we can handle the subscription plan cancellation. 
-[ ] Add description to the InstaWP site after creation. 
 [ ] If a demo site has been changed plan we need to store that in the Site table too with some kind of indication. 
-[ ] 
+ 
 
 Minor:
 [ ] Order change of Sites and Setttings (Sites on Top). 
-[ ] API Key on top of the settings page. 
-[ ]
+[.] API Key on top of the settings page. 
+
+DONE
+[.] update iwp_site_id via edit site in case of shortcode widget.
+[.] subscription integration.  - not tested.
+[.] remove the references of "woo"
+[.] centralize sites table 
+[.] prepare the code base for edd etc. 
+[.] auto deactivate iwp-demo-helper
+[.] Need to test with WooCommerce Subscription plugin, so that we can handle the subscription plan cancellation. 
+[.] Add description to the InstaWP site after creation. 

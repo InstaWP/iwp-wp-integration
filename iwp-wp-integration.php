@@ -120,8 +120,14 @@ function iwp_init() {
 add_action('plugins_loaded', function() {
     if (defined('WP_DEBUG') && WP_DEBUG) {
         // Hook into WordPress error handling to catch wpdb::prepare notices
-        add_filter('wp_php_error_args', function($error, $type, $message, $file, $line) {
-            if (strpos($message, 'wpdb::prepare was called incorrectly') !== false) {
+        add_filter('wp_php_error_args', function($error, $type = '', $message = '', $file = '', $line = '') {
+            if (is_array($error) && isset($error['message'])) {
+                $message = $error['message'];
+                $file = isset($error['file']) ? $error['file'] : '';
+                $line = isset($error['line']) ? $error['line'] : '';
+            }
+            
+            if (!empty($message) && strpos($message, 'wpdb::prepare was called incorrectly') !== false) {
                 error_log('=== IWP DEBUG: WPDB::PREPARE ERROR CAUGHT ===');
                 error_log('Message: ' . $message);
                 error_log('File: ' . $file);
