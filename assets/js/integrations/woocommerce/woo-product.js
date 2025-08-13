@@ -2,7 +2,7 @@
  * Admin Product JavaScript for InstaWP WooCommerce Integration
  *
  * @package IWP
- * @since 2.0.0
+ * @since 0.0.1
  */
 
 jQuery(document).ready(function($) {

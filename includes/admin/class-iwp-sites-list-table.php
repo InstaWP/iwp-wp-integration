@@ -3,7 +3,7 @@
  * Sites List Table for InstaWP Integration
  *
  * @package IWP
- * @since 2.0.0
+ * @since 0.0.1
  */
 
 // Prevent direct access

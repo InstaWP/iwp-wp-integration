@@ -4,7 +4,7 @@
 
 The InstaWP Integration plugin is a comprehensive WordPress plugin that provides seamless integration with InstaWP's site creation and management platform. Originally designed as "IWP WooCommerce Integration v2", it has evolved into a full-featured WordPress plugin supporting multiple integration points and standalone functionality.
 
-**Current Version**: 2.0.0  
+**Current Version**: 0.0.1  
 **WordPress Compatibility**: 5.0+  
 **WooCommerce Compatibility**: 5.0+ (Optional)  
 **PHP Requirements**: 7.4+  
