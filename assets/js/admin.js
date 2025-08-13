@@ -1,39 +1,56 @@
 /**
- * Admin JavaScript for IWP WooCommerce Integration v2
+ * Admin JavaScript for InstaWP Integration
  *
- * @package IWP_Woo_V2
+ * @package IWP
  * @since 2.0.0
  */
 
 (function($) {
     'use strict';
 
-    var IWP_Woo_V2_Admin = {
+    var IWPAdmin = {
+        
+        // Form state tracking
+        originalFormData: null,
+        hasUnsavedChanges: false,
         
         /**
          * Initialize the admin functionality
          */
         init: function() {
-            console.log('IWP_Woo_V2_Admin.init() called');
+            console.log('IWPAdmin.init() called');
             this.bindEvents();
             this.initComponents();
+            this.loadActiveTab();
+            this.initKeyboardNavigation();
+            this.initFormChangeTracking();
+            this.initTabPreloading();
         },
 
         /**
          * Bind events
          */
         bindEvents: function() {
+            var self = this;
+            
+            // Tab navigation
+            $('.iwp-admin-tabs .nav-tab').on('click', function(e) {
+                e.preventDefault();
+                var tabId = $(this).attr('href').substring(1);
+                self.switchTab(tabId);
+            });
+            
             // Settings form submission
-            $('#iwp-woo-v2-settings-form').on('submit', this.handleSettingsSubmit);
+            $('#iwp-settings-form').on('submit', this.handleSettingsSubmit);
             
             // Reset settings confirmation
-            $('.iwp-woo-v2-reset-settings').on('click', this.handleResetSettings);
+            $('.iwp-reset-settings').on('click', this.handleResetSettings);
             
             // Toggle dependent fields
-            $('input[name="iwp_woo_v2_options[debug_mode]"]').on('change', this.toggleDebugFields);
+            $('input[name="iwp_options[debug_mode]"]').on('change', this.toggleDebugFields);
             
             // AJAX actions
-            $('.iwp-woo-v2-ajax-action').on('click', this.handleAjaxAction);
+            $('.iwp-ajax-action').on('click', this.handleAjaxAction);
             
             // Templates refresh
             $('#iwp-refresh-templates').on('click', this.handleRefreshTemplates);
@@ -46,10 +63,9 @@
             $('#iwp-warm-cache').on('click', this.handleWarmCache);
             
             // Site status refresh
-            $('#iwp-refresh-site-status').on('click', this.handleRefreshSiteStatus);
+            $('#refresh-site-status').on('click', this.handleRefreshSiteStatus.bind(this));
             
             // Test order creation - bind events with validation
-            var self = this;
             $('#iwp-test-product-select').on('change', function() { 
                 self.handleProductSelectChange(); 
                 self.validateTestOrderForm(); 
@@ -82,7 +98,111 @@
             });
             
             // Form validation
-            $('#iwp-woo-v2-settings-form input, #iwp-woo-v2-settings-form select').on('change', this.validateField);
+            $('#iwp-settings-form input, #iwp-settings-form select').on('change', this.validateField);
+            
+            // Window beforeunload handler for unsaved changes
+            $(window).on('beforeunload', this.handleBeforeUnload.bind(this));
+            
+            // Browser back/forward navigation
+            $(window).on('hashchange', function() {
+                var hash = window.location.hash.substring(1);
+                if (hash && $('#' + hash).length) {
+                    self.switchTab(hash, false);
+                }
+            });
+        },
+
+        /**
+         * Initialize tab-specific events
+         */
+        initTabEvents: function() {
+            var self = this;
+            
+            // Handle settings form submission with tab preservation
+            $(document).on('submit', '#iwp-settings-form', function(e) {
+                // Store the current tab before form submission
+                var currentTab = $('.iwp-admin-tabs .nav-tab-active').attr('href');
+                if (currentTab) {
+                    localStorage.setItem('iwp_active_tab_form_submit', currentTab.replace('#', ''));
+                }
+            });
+            
+            // Restore tab after page reload from form submission
+            if (localStorage.getItem('iwp_active_tab_form_submit')) {
+                var savedTab = localStorage.getItem('iwp_active_tab_form_submit');
+                localStorage.removeItem('iwp_active_tab_form_submit');
+                if ($('#' + savedTab).length) {
+                    setTimeout(function() {
+                        self.switchTab(savedTab);
+                    }, 100);
+                }
+            }
+            
+            // Handle tab-specific button clicks with improved handling
+            $(document).on('click', '#iwp-refresh-templates', function() {
+                self.refreshSnapshots(true);
+            });
+            
+            $(document).on('click', '#iwp-refresh-plans', function() {
+                self.refreshPlans(true);
+            });
+            
+            // Add loading states to data refresh buttons  
+            $(document).on('click', '#iwp-refresh-snapshots, #iwp-refresh-plans', function(e) {
+                e.preventDefault();
+                var $btn = $(this);
+                var originalText = $btn.text();
+                
+                $btn.prop('disabled', true)
+                   .text(iwp_admin.strings.loading || 'Loading...')
+                   .addClass('updating-message');
+            });
+            
+            // Enhance notices for better UX
+            $(document).on('iwp:tab:changed', function(e, tabId) {
+                // Clear any temporary notices when switching tabs
+                $('.iwp-notice.temporary').fadeOut();
+                
+                // Show tab-specific help text
+                self.showTabHelp(tabId);
+            });
+        },
+
+        /**
+         * Show tab-specific help text
+         */
+        showTabHelp: function(tabId) {
+            // Remove any existing help notices
+            $('.iwp-tab-help').remove();
+            
+            var helpText = '';
+            switch(tabId) {
+                case 'general-settings':
+                    helpText = iwp_admin.strings.help_general || 'Configure your InstaWP API key and integration settings.';
+                    break;
+                case 'instawp-data':  
+                    helpText = iwp_admin.strings.help_data || 'View and refresh cached data from InstaWP API. Click refresh buttons to update snapshots and plans.';
+                    break;
+                case 'testing':
+                    helpText = iwp_admin.strings.help_testing || 'Test order creation and site functionality. Use these tools to verify your integration is working correctly.';
+                    break;
+                case 'documentation':
+                    helpText = iwp_admin.strings.help_docs || 'Find shortcode examples, API references, and helpful links for using the plugin.';
+                    break;
+            }
+            
+            if (helpText) {
+                var $help = $('<div class="iwp-tab-help" style="background: #f0f6fc; border-left: 4px solid #0073aa; padding: 10px 15px; margin-bottom: 20px; border-radius: 0 3px 3px 0;">' +
+                    '<p style="margin: 0; color: #0073aa; font-size: 14px;"><strong>💡 Tip:</strong> ' + helpText + '</p>' +
+                    '</div>');
+                
+                $('#' + tabId).prepend($help);
+                
+                // Auto-hide help after 10 seconds
+                setTimeout(function() {
+                    $help.fadeOut();
+                }, 10000);
+            }
         },
 
         /**
@@ -92,11 +212,7 @@
             // Initialize tooltips
             this.initTooltips();
             
-            // Initialize tabs if present
-            this.initTabs();
-            
             // Set initial field states
-            this.toggleAPIFields();
             this.toggleDebugFields();
             
             // Initialize test order form
@@ -107,18 +223,18 @@
          * Initialize tooltips
          */
         initTooltips: function() {
-            $('.iwp-woo-v2-tooltip').each(function() {
+            $('.iwp-tooltip').each(function() {
                 var $tooltip = $(this);
                 var title = $tooltip.attr('title');
                 
                 if (title) {
                     $tooltip.removeAttr('title');
                     $tooltip.on('mouseenter', function() {
-                        $('<div class="iwp-woo-v2-tooltip-content">' + title + '</div>')
+                        $('<div class="iwp-tooltip-content">' + title + '</div>')
                             .appendTo('body')
                             .fadeIn(200);
                     }).on('mouseleave', function() {
-                        $('.iwp-woo-v2-tooltip-content').fadeOut(200, function() {
+                        $('.iwp-tooltip-content').fadeOut(200, function() {
                             $(this).remove();
                         });
                     });
@@ -127,29 +243,386 @@
         },
 
         /**
-         * Initialize tabs
+         * Initialize keyboard navigation for tabs
          */
-        initTabs: function() {
-            var $tabs = $('.iwp-woo-v2-tabs');
-            
-            if ($tabs.length) {
-                $tabs.find('.nav-tab').on('click', function(e) {
-                    e.preventDefault();
-                    
-                    var $tab = $(this);
-                    var target = $tab.attr('href');
-                    
-                    // Update active tab
-                    $tabs.find('.nav-tab').removeClass('nav-tab-active');
-                    $tab.addClass('nav-tab-active');
-                    
-                    // Update active content
-                    $('.iwp-woo-v2-tab-content').hide();
-                    $(target).show();
-                });
+        initKeyboardNavigation: function() {
+            var self = this;
+            $('.iwp-admin-tabs .nav-tab').on('keydown', function(e) {
+                var $tabs = $('.iwp-admin-tabs .nav-tab');
+                var currentIndex = $tabs.index(this);
+                var targetIndex = -1;
                 
-                // Show first tab by default
-                $tabs.find('.nav-tab').first().click();
+                switch(e.keyCode) {
+                    case 37: // Left arrow
+                        e.preventDefault();
+                        targetIndex = currentIndex > 0 ? currentIndex - 1 : $tabs.length - 1;
+                        break;
+                    case 39: // Right arrow
+                        e.preventDefault();
+                        targetIndex = currentIndex < $tabs.length - 1 ? currentIndex + 1 : 0;
+                        break;
+                    case 36: // Home
+                        e.preventDefault();
+                        targetIndex = 0;
+                        break;
+                    case 35: // End
+                        e.preventDefault();
+                        targetIndex = $tabs.length - 1;
+                        break;
+                }
+                
+                if (targetIndex !== -1) {
+                    var $targetTab = $tabs.eq(targetIndex);
+                    $targetTab.focus();
+                    var tabId = $targetTab.attr('href').substring(1);
+                    self.switchTab(tabId);
+                }
+            });
+        },
+
+        /**
+         * Switch to a specific tab
+         */
+        switchTab: function(tabId, updateHash) {
+            updateHash = updateHash !== false; // Default to true
+            
+            var $tabs = $('.iwp-admin-tabs');
+            var $targetTab = $tabs.find('.nav-tab[href="#' + tabId + '"]');
+            var $targetContent = $('#' + tabId);
+            
+            if ($targetTab.length && $targetContent.length) {
+                // Update active tab
+                $tabs.find('.nav-tab').removeClass('nav-tab-active');
+                $targetTab.addClass('nav-tab-active');
+                
+                // Update active content with animation
+                $('.iwp-tab-content').removeClass('active').hide();
+                $targetContent.addClass('active').show();
+                
+                // Update URL hash (without triggering hashchange)
+                if (updateHash) {
+                    if (history.replaceState) {
+                        history.replaceState(null, null, '#' + tabId);
+                    } else {
+                        window.location.hash = tabId;
+                    }
+                }
+                
+                // Save active tab to localStorage
+                localStorage.setItem('iwp_active_tab', tabId);
+                
+                // Load tab-specific content if needed
+                this.loadTabContent(tabId);
+                
+                // Show contextual help
+                this.showTabHelp(tabId);
+                
+                // Preload next tab content
+                this.preloadNextTab(tabId);
+            }
+        },
+
+        /**
+         * Load active tab from URL hash or localStorage
+         */
+        loadActiveTab: function() {
+            var hash = window.location.hash.replace('#', '');
+            var savedTab = localStorage.getItem('iwp_active_tab');
+            var defaultTab = 'general-settings';
+            
+            // Priority: URL hash > localStorage > default
+            var activeTab = hash || savedTab || defaultTab;
+            
+            // Ensure the tab exists
+            if (!$('#' + activeTab).length) {
+                activeTab = defaultTab;
+            }
+            
+            // Force show the first tab immediately to prevent blank content
+            if (!$('.iwp-tab-content.active').length) {
+                $('#' + activeTab).addClass('active').show();
+                $('.iwp-admin-tabs .nav-tab[href="#' + activeTab + '"]').addClass('nav-tab-active');
+            }
+            
+            this.switchTab(activeTab, !hash); // Don't update hash if it's already set
+        },
+
+        /**
+         * Load tab-specific content (for lazy loading)
+         */
+        loadTabContent: function(tabId) {
+            // Load heavy content only when tab is activated
+            switch(tabId) {
+                case 'instawp-data':
+                    // Refresh snapshots/plans if not loaded
+                    if (!$('#iwp-snapshots-list').hasClass('loaded')) {
+                        this.refreshSnapshots(false);
+                    }
+                    if (!$('#iwp-plans-list').hasClass('loaded')) {
+                        this.refreshPlans(false);
+                    }
+                    break;
+                    
+                case 'testing':
+                    // Initialize test components
+                    this.initTestOrderForm();
+                    break;
+            }
+        },
+        
+        /**
+         * Show contextual help for tabs
+         */
+        showTabHelp: function(tabId) {
+            var helpText = '';
+            switch(tabId) {
+                case 'general-settings':
+                    helpText = 'Configure your basic plugin settings here.';
+                    break;
+                case 'instawp-data':
+                    helpText = 'View your InstaWP snapshots and plans data.';
+                    break;
+                case 'testing':
+                    helpText = 'Create test orders to verify your configuration.';
+                    break;
+                case 'documentation':
+                    helpText = 'Find helpful resources and usage examples.';
+                    break;
+            }
+            
+            // Show help via console for now (could be enhanced with UI)
+            if (helpText) {
+                console.log('Tab Help - ' + tabId + ': ' + helpText);
+            }
+        },
+        
+        /**
+         * Initialize form change tracking
+         */
+        initFormChangeTracking: function() {
+            var self = this;
+            var $form = $('form');
+            if ($form.length === 0) return;
+            
+            // Store original form data
+            this.originalFormData = $form.serialize();
+            this.hasUnsavedChanges = false;
+            
+            // Track form changes
+            $form.on('change input', 'input, select, textarea', function() {
+                var currentData = $form.serialize();
+                var hasChanges = currentData !== self.originalFormData;
+                
+                self.updateChangeIndicators(hasChanges);
+            });
+            
+            // Form submission handling to preserve active tab
+            $form.on('submit', function() {
+                var activeTab = $('.nav-tab-active').attr('href');
+                if (activeTab) {
+                    $('<input>').attr({
+                        type: 'hidden',
+                        name: 'iwp_active_tab',
+                        value: activeTab.substring(1)
+                    }).appendTo(this);
+                }
+                
+                // Clear change tracking on form submit
+                self.clearChangeTracking();
+            });
+        },
+        
+        /**
+         * Update visual indicators for unsaved changes
+         */
+        updateChangeIndicators: function(hasChanges) {
+            this.hasUnsavedChanges = hasChanges;
+            var $activeTab = $('.nav-tab-active');
+            var $form = $('form');
+            
+            if (hasChanges) {
+                $activeTab.addClass('has-changes');
+                $form.addClass('iwp-form-changed');
+            } else {
+                $('.nav-tab').removeClass('has-changes');
+                $form.removeClass('iwp-form-changed');
+            }
+        },
+        
+        /**
+         * Clear change tracking
+         */
+        clearChangeTracking: function() {
+            this.hasUnsavedChanges = false;
+            $('.nav-tab').removeClass('has-changes');
+            $('form').removeClass('iwp-form-changed');
+            this.originalFormData = $('form').serialize();
+        },
+        
+        /**
+         * Handle browser beforeunload for unsaved changes
+         */
+        handleBeforeUnload: function(e) {
+            if (this.hasUnsavedChanges) {
+                var message = 'You have unsaved changes. Are you sure you want to leave?';
+                e.returnValue = message;
+                return message;
+            }
+        },
+        
+        /**
+         * Preload content for next tab
+         */
+        preloadNextTab: function(currentTabId) {
+            var tabs = ['general-settings', 'instawp-data', 'testing', 'documentation'];
+            var currentIndex = tabs.indexOf(currentTabId);
+            var nextIndex = (currentIndex + 1) % tabs.length;
+            var nextTabId = tabs[nextIndex];
+            
+            var $nextTab = $('#' + nextTabId);
+            if ($nextTab.length && !$nextTab.data('preloaded')) {
+                // Mark as preloaded to avoid duplicate requests
+                $nextTab.data('preloaded', true);
+                
+                // Add subtle preloader indicator
+                var $preloader = $('<div class="iwp-tab-preloader">Preparing content...</div>');
+                $nextTab.append($preloader);
+                
+                // Simulate content loading (in real implementation, this would be AJAX)
+                setTimeout(function() {
+                    $preloader.fadeOut(300, function() {
+                        $(this).remove();
+                    });
+                }, 1000);
+            }
+        },
+        
+        /**
+         * Initialize tab preloading system
+         */
+        initTabPreloading: function() {
+            var self = this;
+            // Preload adjacent tabs on hover
+            $('.iwp-admin-tabs .nav-tab').on('mouseenter', function() {
+                var tabId = $(this).attr('href').substring(1);
+                self.preloadNextTab(tabId);
+            });
+        },
+        
+        /**
+         * Show save notification
+         */
+        showSaveNotification: function(message, isError) {
+            isError = isError || false;
+            
+            // Remove existing notification
+            $('.iwp-save-notification').remove();
+            
+            // Create notification element
+            var $notification = $('<div class="iwp-save-notification' + (isError ? ' error' : '') + '">' + message + '</div>');
+            
+            // Add to page
+            $('body').append($notification);
+            
+            // Show with animation
+            setTimeout(function() {
+                $notification.addClass('show');
+            }, 100);
+            
+            // Hide after delay
+            setTimeout(function() {
+                $notification.removeClass('show');
+                setTimeout(function() {
+                    $notification.remove();
+                }, 300);
+            }, 3000);
+        },
+
+        /**
+         * Refresh snapshots data
+         */
+        refreshSnapshots: function(showNotice) {
+            showNotice = showNotice !== false;
+            var $container = $('#iwp-snapshots-list');
+            
+            if ($container.length) {
+                $container.html('<p>Loading snapshots...</p>');
+                
+                $.ajax({
+                    url: iwp_admin.ajax_url,
+                    type: 'POST',
+                    data: {
+                        action: 'iwp_refresh_templates',
+                        nonce: iwp_admin.nonce
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $container.addClass('loaded');
+                            if (showNotice) {
+                                IWPAdmin.showSaveNotification('Snapshots refreshed successfully');
+                            }
+                            // Reload the page to show updated data
+                            setTimeout(function() {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            $container.html('<p class="error">Failed to load snapshots</p>');
+                            if (showNotice) {
+                                IWPAdmin.showSaveNotification('Failed to refresh snapshots', true);
+                            }
+                        }
+                    },
+                    error: function() {
+                        $container.html('<p class="error">Network error loading snapshots</p>');
+                        if (showNotice) {
+                            IWPAdmin.showSaveNotification('Network error refreshing snapshots', true);
+                        }
+                    }
+                });
+            }
+        },
+
+        /**
+         * Refresh plans data
+         */
+        refreshPlans: function(showNotice) {
+            showNotice = showNotice !== false;
+            var $container = $('#iwp-plans-list');
+            
+            if ($container.length) {
+                $container.html('<p>Loading plans...</p>');
+                
+                $.ajax({
+                    url: iwp_admin.ajax_url,
+                    type: 'POST',
+                    data: {
+                        action: 'iwp_refresh_plans',
+                        nonce: iwp_admin.nonce
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $container.addClass('loaded');
+                            if (showNotice) {
+                                IWPAdmin.showSaveNotification('Plans refreshed successfully');
+                            }
+                            // Reload the page to show updated data
+                            setTimeout(function() {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            $container.html('<p class="error">Failed to load plans</p>');
+                            if (showNotice) {
+                                IWPAdmin.showSaveNotification('Failed to refresh plans', true);
+                            }
+                        }
+                    },
+                    error: function() {
+                        $container.html('<p class="error">Network error loading plans</p>');
+                        if (showNotice) {
+                            IWPAdmin.showSaveNotification('Network error refreshing plans', true);
+                        }
+                    }
+                });
             }
         },
 
@@ -162,17 +635,17 @@
             
             // Show loading state
             $submitButton.prop('disabled', true);
-            $submitButton.val(iwp_woo_v2_admin.strings.saving || 'Saving...');
+            $submitButton.val(iwp_admin.strings.saving || 'Saving...');
             
             // Add loading spinner
-            $('<span class="iwp-woo-v2-loading"></span>').insertAfter($submitButton);
+            $('<span class="iwp-loading"></span>').insertAfter($submitButton);
         },
 
         /**
          * Handle reset settings
          */
         handleResetSettings: function(e) {
-            if (!confirm(iwp_woo_v2_admin.strings.confirm_reset)) {
+            if (!confirm(iwp_admin.strings.confirm_reset)) {
                 e.preventDefault();
                 return false;
             }
@@ -180,15 +653,15 @@
             // Show loading state
             var $button = $(this);
             $button.prop('disabled', true);
-            $('<span class="iwp-woo-v2-loading"></span>').insertAfter($button);
+            $('<span class="iwp-loading"></span>').insertAfter($button);
         },
 
         /**
          * Toggle debug fields
          */
         toggleDebugFields: function() {
-            var $debugMode = $('input[name="iwp_woo_v2_options[debug_mode]"]');
-            var $debugFields = $('.iwp-woo-v2-debug-field');
+            var $debugMode = $('input[name="iwp_options[debug_mode]"]');
+            var $debugFields = $('.iwp-debug-field');
             
             if ($debugMode.is(':checked')) {
                 $debugFields.show();
@@ -213,24 +686,24 @@
             // Disable button and show loading
             $button.prop('disabled', true);
             var originalText = $button.text();
-            $button.text(iwp_woo_v2_admin.strings.loading || 'Loading...');
+            $button.text(iwp_admin.strings.loading || 'Loading...');
             
             $.ajax({
-                url: iwp_woo_v2_admin.ajax_url,
+                url: iwp_admin.ajax_url,
                 type: 'POST',
                 data: {
-                    action: 'iwp_woo_v2_' + action,
-                    nonce: iwp_woo_v2_admin.nonce
+                    action: 'iwp_' + action,
+                    nonce: iwp_admin.nonce
                 },
                 success: function(response) {
                     if (response.success) {
-                        IWP_Woo_V2_Admin.showNotice(response.data.message, 'success');
+                        IWP_Admin.showNotice(response.data.message, 'success');
                     } else {
-                        IWP_Woo_V2_Admin.showNotice(response.data.message || iwp_woo_v2_admin.strings.error_occurred, 'error');
+                        IWP_Admin.showNotice(response.data.message || iwp_admin.strings.error_occurred, 'error');
                     }
                 },
                 error: function() {
-                    IWP_Woo_V2_Admin.showNotice(iwp_woo_v2_admin.strings.error_occurred, 'error');
+                    IWP_Admin.showNotice(iwp_admin.strings.error_occurred, 'error');
                 },
                 complete: function() {
                     // Re-enable button
@@ -249,11 +722,11 @@
             var fieldValue = $field.val();
             
             // Remove existing validation messages
-            $field.siblings('.iwp-woo-v2-validation-message').remove();
+            $field.siblings('.iwp-validation-message').remove();
             
             // Basic validation
             if ($field.prop('required') && !fieldValue) {
-                IWP_Woo_V2_Admin.showFieldError($field, 'This field is required.');
+                IWP_Admin.showFieldError($field, 'This field is required.');
                 return false;
             }
             
@@ -261,7 +734,7 @@
             if ($field.attr('type') === 'email' && fieldValue) {
                 var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                 if (!emailRegex.test(fieldValue)) {
-                    IWP_Woo_V2_Admin.showFieldError($field, 'Please enter a valid email address.');
+                    IWP_Admin.showFieldError($field, 'Please enter a valid email address.');
                     return false;
                 }
             }
@@ -271,7 +744,7 @@
                 try {
                     new URL(fieldValue);
                 } catch (e) {
-                    IWP_Woo_V2_Admin.showFieldError($field, 'Please enter a valid URL.');
+                    IWP_Admin.showFieldError($field, 'Please enter a valid URL.');
                     return false;
                 }
             }
@@ -283,27 +756,56 @@
          * Show field error
          */
         showFieldError: function($field, message) {
-            $field.addClass('iwp-woo-v2-field-error');
-            $('<div class="iwp-woo-v2-validation-message error">' + message + '</div>').insertAfter($field);
+            $field.addClass('iwp-field-error');
+            $('<div class="iwp-validation-message error">' + message + '</div>').insertAfter($field);
         },
 
         /**
-         * Show notice
+         * Show notice (enhanced for tabs)
          */
-        showNotice: function(message, type) {
+        showNotice: function(message, type, temporary) {
             type = type || 'info';
+            temporary = temporary !== false; // Default to temporary
             
-            var $notice = $('<div class="notice notice-' + type + ' is-dismissible iwp-woo-v2-notice">' +
+            var noticeClass = 'notice notice-' + type + ' is-dismissible iwp-notice';
+            if (temporary) {
+                noticeClass += ' temporary';
+            }
+            
+            var $notice = $('<div class="' + noticeClass + '">' +
                 '<p>' + message + '</p>' +
                 '<button type="button" class="notice-dismiss"></button>' +
                 '</div>');
             
-            $('.wrap h1').after($notice);
+            // Position notice appropriately  
+            if ($('.iwp-admin-tabs').length) {
+                $('.iwp-admin-tabs').after($notice);
+            } else {
+                $('.wrap h1').after($notice);
+            }
             
-            // Auto-dismiss after 5 seconds
-            setTimeout(function() {
+            // Make notice dismissible
+            $notice.find('.notice-dismiss').on('click', function() {
                 $notice.fadeOut();
-            }, 5000);
+            });
+            
+            // Auto-dismiss temporary notices after 5 seconds
+            if (temporary) {
+                setTimeout(function() {
+                    $notice.fadeOut();
+                }, 5000);
+            }
+            
+            // Scroll to notice if not visible
+            var noticeTop = $notice.offset().top;
+            var scrollTop = $(window).scrollTop();
+            var windowHeight = $(window).height();
+            
+            if (noticeTop < scrollTop || noticeTop > scrollTop + windowHeight) {
+                $('html, body').animate({
+                    scrollTop: noticeTop - 100
+                }, 500);
+            }
         },
 
         /**
@@ -332,8 +834,8 @@
          * Utility: Show loading overlay
          */
         showLoading: function() {
-            if ($('.iwp-woo-v2-loading-overlay').length === 0) {
-                $('<div class="iwp-woo-v2-loading-overlay"><div class="iwp-woo-v2-loading"></div></div>')
+            if ($('.iwp-loading-overlay').length === 0) {
+                $('<div class="iwp-loading-overlay"><div class="iwp-loading"></div></div>')
                     .appendTo('body');
             }
         },
@@ -342,7 +844,7 @@
          * Utility: Hide loading overlay
          */
         hideLoading: function() {
-            $('.iwp-woo-v2-loading-overlay').remove();
+            $('.iwp-loading-overlay').remove();
         },
 
         /**
@@ -359,25 +861,25 @@
             $button.text('Refreshing...');
             
             $.ajax({
-                url: iwp_woo_v2_admin.ajax_url,
+                url: iwp_admin.ajax_url,
                 type: 'POST',
                 data: {
-                    action: 'iwp_woo_v2_refresh_templates',
-                    nonce: iwp_woo_v2_admin.nonce
+                    action: 'iwp_refresh_templates',
+                    nonce: iwp_admin.nonce
                 },
                 success: function(response) {
                     if (response.success) {
-                        IWP_Woo_V2_Admin.showNotice(response.data.message, 'success');
+                        IWP_Admin.showNotice(response.data.message, 'success');
                         // Reload the page to show updated templates
                         setTimeout(function() {
                             window.location.reload();
                         }, 1000);
                     } else {
-                        IWP_Woo_V2_Admin.showNotice(response.data.message || 'An error occurred while refreshing templates.', 'error');
+                        IWP_Admin.showNotice(response.data.message || 'An error occurred while refreshing templates.', 'error');
                     }
                 },
                 error: function() {
-                    IWP_Woo_V2_Admin.showNotice('An error occurred while refreshing templates.', 'error');
+                    IWP_Admin.showNotice('An error occurred while refreshing templates.', 'error');
                 },
                 complete: function() {
                     // Re-enable button
@@ -401,25 +903,25 @@
             $button.text('Refreshing...');
             
             $.ajax({
-                url: iwp_woo_v2_admin.ajax_url,
+                url: iwp_admin.ajax_url,
                 type: 'POST',
                 data: {
-                    action: 'iwp_woo_v2_refresh_plans',
-                    nonce: iwp_woo_v2_admin.nonce
+                    action: 'iwp_refresh_plans',
+                    nonce: iwp_admin.nonce
                 },
                 success: function(response) {
                     if (response.success) {
-                        IWP_Woo_V2_Admin.showNotice(response.data.message, 'success');
+                        IWP_Admin.showNotice(response.data.message, 'success');
                         // Reload the page to show updated plans
                         setTimeout(function() {
                             window.location.reload();
                         }, 1000);
                     } else {
-                        IWP_Woo_V2_Admin.showNotice(response.data.message || 'An error occurred while refreshing plans.', 'error');
+                        IWP_Admin.showNotice(response.data.message || 'An error occurred while refreshing plans.', 'error');
                     }
                 },
                 error: function() {
-                    IWP_Woo_V2_Admin.showNotice('An error occurred while refreshing plans.', 'error');
+                    IWP_Admin.showNotice('An error occurred while refreshing plans.', 'error');
                 },
                 complete: function() {
                     // Re-enable button
@@ -448,25 +950,25 @@
             $button.text('Clearing...');
             
             $.ajax({
-                url: iwp_woo_v2_admin.ajax_url,
+                url: iwp_admin.ajax_url,
                 type: 'POST',
                 data: {
                     action: 'iwp_clear_transients',
-                    nonce: iwp_woo_v2_admin.nonce
+                    nonce: iwp_admin.nonce
                 },
                 success: function(response) {
                     if (response.success) {
-                        IWP_Woo_V2_Admin.showNotice(response.data.message, 'success');
+                        IWP_Admin.showNotice(response.data.message, 'success');
                         // Reload the page to show updated cache status
                         setTimeout(function() {
                             window.location.reload();
                         }, 1000);
                     } else {
-                        IWP_Woo_V2_Admin.showNotice(response.data.message || 'An error occurred while clearing transients.', 'error');
+                        IWP_Admin.showNotice(response.data.message || 'An error occurred while clearing transients.', 'error');
                     }
                 },
                 error: function() {
-                    IWP_Woo_V2_Admin.showNotice('An error occurred while clearing transients.', 'error');
+                    IWP_Admin.showNotice('An error occurred while clearing transients.', 'error');
                 },
                 complete: function() {
                     // Re-enable button
@@ -490,25 +992,25 @@
             $button.text('Warming up...');
             
             $.ajax({
-                url: iwp_woo_v2_admin.ajax_url,
+                url: iwp_admin.ajax_url,
                 type: 'POST',
                 data: {
                     action: 'iwp_warm_cache',
-                    nonce: iwp_woo_v2_admin.nonce
+                    nonce: iwp_admin.nonce
                 },
                 success: function(response) {
                     if (response.success) {
-                        IWP_Woo_V2_Admin.showNotice(response.data.message, 'success');
+                        IWP_Admin.showNotice(response.data.message, 'success');
                         // Reload the page to show updated cache status
                         setTimeout(function() {
                             window.location.reload();
                         }, 1000);
                     } else {
-                        IWP_Woo_V2_Admin.showNotice(response.data.message || 'An error occurred while warming up cache.', 'error');
+                        IWP_Admin.showNotice(response.data.message || 'An error occurred while warming up cache.', 'error');
                     }
                 },
                 error: function() {
-                    IWP_Woo_V2_Admin.showNotice('An error occurred while warming up cache.', 'error');
+                    IWP_Admin.showNotice('An error occurred while warming up cache.', 'error');
                 },
                 complete: function() {
                     // Re-enable button
@@ -524,38 +1026,50 @@
         handleRefreshSiteStatus: function(e) {
             e.preventDefault();
             
-            var $button = $(this);
+            var $button = $(e.target);
             var originalText = $button.text();
             
             // Show loading state
             $button.prop('disabled', true);
-            $button.text('Refreshing...');
+            $button.text('Refreshing...').addClass('loading');
             
             $.ajax({
-                url: iwp_woo_v2_admin.ajax_url,
+                url: iwp_admin.ajax_url,
                 type: 'POST',
                 data: {
                     action: 'iwp_refresh_site_status',
-                    nonce: iwp_woo_v2_admin.nonce
+                    nonce: iwp_admin.nonce
                 },
                 success: function(response) {
+                    console.log('Refresh response:', response);
+                    
                     if (response.success) {
-                        IWP_Woo_V2_Admin.showNotice(response.data.message, 'success');
+                        // Show success notification
+                        IWPAdmin.showSaveNotification(response.data.message);
+                        
                         // Reload the page to show updated status
                         setTimeout(function() {
-                            window.location.reload();
+                            location.reload();
                         }, 1000);
                     } else {
-                        IWP_Woo_V2_Admin.showNotice(response.data.message || 'An error occurred while refreshing site status.', 'error');
+                        console.error('Refresh failed:', response);
+                        
+                        // Show error notification
+                        var errorMessage = response.data && response.data.message ? response.data.message : 'Failed to refresh site status.';
+                        IWPAdmin.showSaveNotification(errorMessage, true);
                     }
                 },
-                error: function() {
-                    IWP_Woo_V2_Admin.showNotice('An error occurred while refreshing site status.', 'error');
+                error: function(jqXHR, textStatus, errorThrown) {
+                    console.error('AJAX error:', textStatus, errorThrown);
+                    
+                    // Show error notification
+                    IWPAdmin.showSaveNotification('Network error occurred while refreshing site status.', true);
                 },
                 complete: function() {
                     // Re-enable button
-                    $button.prop('disabled', false);
-                    $button.text(originalText);
+                    $button.prop('disabled', false)
+                           .text(originalText)
+                           .removeClass('loading');
                 }
             });
         },
@@ -681,14 +1195,14 @@
             var customerType = $('input[name="iwp-customer-type"]:checked').val();
             
             if (!productId) {
-                IWP_Woo_V2_Admin.showNotice('Please select a product first.', 'error');
+                IWP_Admin.showNotice('Please select a product first.', 'error');
                 return;
             }
             
             // Prepare data based on customer type
             var requestData = {
                 action: 'iwp_create_test_order',
-                nonce: iwp_woo_v2_admin.nonce,
+                nonce: iwp_admin.nonce,
                 product_id: productId,
                 customer_type: customerType
             };
@@ -697,7 +1211,7 @@
                 case 'existing':
                     var customerId = $('#iwp-test-customer-select').val();
                     if (!customerId) {
-                        IWP_Woo_V2_Admin.showNotice('Please select a user.', 'error');
+                        IWP_Admin.showNotice('Please select a user.', 'error');
                         return;
                     }
                     requestData.customer_id = customerId;
@@ -709,7 +1223,7 @@
                     var guestEmail = $('#iwp-test-customer-email').val();
                     
                     if (!guestEmail || !guestFirstName || !guestLastName) {
-                        IWP_Woo_V2_Admin.showNotice('Please fill in all guest customer details.', 'error');
+                        IWP_Admin.showNotice('Please fill in all guest customer details.', 'error');
                         return;
                     }
                     
@@ -725,7 +1239,7 @@
                     var newEmail = $('#iwp-new-user-email').val();
                     
                     if (!newUsername || !newEmail) {
-                        IWP_Woo_V2_Admin.showNotice('Username and email are required for new users.', 'error');
+                        IWP_Admin.showNotice('Username and email are required for new users.', 'error');
                         return;
                     }
                     
@@ -743,7 +1257,7 @@
             $results.empty();
             
             $.ajax({
-                url: iwp_woo_v2_admin.ajax_url,
+                url: iwp_admin.ajax_url,
                 type: 'POST',
                 data: requestData,
                 success: function(response) {
@@ -761,7 +1275,7 @@
                         }
                         
                         var myAccountUrl = response.data.customer_id ? 
-                            iwp_woo_v2_admin.site_url + '/my-account/?customer_id=' + response.data.customer_id : '';
+                            iwp_admin.site_url + '/my-account/?customer_id=' + response.data.customer_id : '';
                         
                         var resultHtml = '<div style="background: #fff; border: 1px solid #c3c4c7; padding: 15px; border-radius: 4px;">' +
                             '<h4 style="margin-top: 0;">Test Order Created Successfully</h4>' +
@@ -771,24 +1285,24 @@
                             customerInfo +
                             '<p><strong>Actions:</strong> ' +
                             '<a href="' + response.data.order_edit_url + '" class="button button-secondary" target="_blank">View Order</a> ' +
-                            '<a href="' + iwp_woo_v2_admin.orders_url + '" class="button button-secondary" target="_blank">View All Orders</a>';
+                            '<a href="' + iwp_admin.orders_url + '" class="button button-secondary" target="_blank">View All Orders</a>';
                         
                         if (response.data.customer_id) {
-                            resultHtml += ' <a href="' + iwp_woo_v2_admin.site_url + '/my-account/" class="button button-secondary" target="_blank">Customer My Account</a>';
+                            resultHtml += ' <a href="' + iwp_admin.site_url + '/my-account/" class="button button-secondary" target="_blank">Customer My Account</a>';
                         }
                         
                         resultHtml += '</p>' +
-                            '<p class="description"><em>The InstaWP site creation process should now be triggered automatically. Check the order notes for site creation status.</em></p>';
+                            '<p class="description"><em>The site creation process should now be triggered automatically. Check the order notes for site creation status.</em></p>';
                         
                         if (response.data.customer_type === 'existing' && response.data.customer_id) {
-                            resultHtml += '<p class="description"><em><strong>To test customer view:</strong> Login as the selected user and visit My Account → Orders to see the InstaWP site details.</em></p>';
+                            resultHtml += '<p class="description"><em><strong>To test customer view:</strong> Login as the selected user and visit My Account → Orders to see the site details.</em></p>';
                         }
                         
                         resultHtml += '</div>';
                         
                         $results.html(resultHtml);
                         
-                        IWP_Woo_V2_Admin.showNotice('Test order created successfully! Site creation is now in progress.', 'success');
+                        IWPAdmin.showSaveNotification('Test order created successfully! Site creation is now in progress.');
                     } else {
                         $status.html('<span style="color: #d63638;">✗ Order creation failed</span>');
                         
@@ -799,7 +1313,7 @@
                         
                         $results.html(errorHtml);
                         
-                        IWP_Woo_V2_Admin.showNotice('Failed to create test order: ' + (response.data || 'Unknown error'), 'error');
+                        IWPAdmin.showSaveNotification('Failed to create test order: ' + (response.data || 'Unknown error'), true);
                     }
                 },
                 error: function(xhr, status, error) {
@@ -813,7 +1327,7 @@
                     
                     $results.html(errorHtml);
                     
-                    IWP_Woo_V2_Admin.showNotice('Request failed: ' + error, 'error');
+                    IWPAdmin.showSaveNotification('Request failed: ' + error, true);
                 },
                 complete: function() {
                     // Re-enable button
@@ -827,11 +1341,12 @@
     // Initialize on document ready
     $(document).ready(function() {
         console.log('Admin.js loaded and document ready');
-        console.log('Available variables:', typeof iwp_woo_v2_admin !== 'undefined' ? 'iwp_woo_v2_admin exists' : 'iwp_woo_v2_admin missing');
-        IWP_Woo_V2_Admin.init();
+        console.log('Available variables:', typeof iwp_admin !== 'undefined' ? 'iwp_admin exists' : 'iwp_admin missing');
+        IWPAdmin.init();
     });
 
     // Make it globally accessible
-    window.IWP_Woo_V2_Admin = IWP_Woo_V2_Admin;
+    window.IWPAdmin = IWPAdmin;
+    window.IWP_Admin = IWPAdmin; // Backward compatibility
 
 })(jQuery);

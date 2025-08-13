@@ -142,6 +142,7 @@ jQuery(document).ready(function($) {
         const $messageDiv = $form.find('.iwp-site-creator-message');
         const $resultsDiv = $form.find('.iwp-site-creator-results');
 
+
         if (data.status === 'completed') {
             // Site is ready, show results
             displaySiteResults(data, $container, $resultsDiv);
@@ -149,7 +150,7 @@ jQuery(document).ready(function($) {
             setTimeout(function() {
                 $statusDiv.hide();
             }, 3000);
-        } else if (data.status === 'in_progress' && data.task_id) {
+        } else if ((data.status === 'progress' || data.status === 'in_progress') && data.task_id) {
             // Site is being created, check status periodically
             $messageDiv.text(iwp_shortcode_ajax.messages.checking_status);
             checkTaskStatus(data.task_id, $form, data);
@@ -185,10 +186,13 @@ jQuery(document).ready(function($) {
                             // Merge initial data with status response
                             const siteData = $.extend({}, initialData, response.data);
                             displaySiteResults(siteData, $container, $resultsDiv);
-                            showSuccess('Site created successfully!', $statusDiv, $messageDiv, $submitButton);
+                            
+                            // Show finalizing message and wait 5 seconds before applying post_options
+                            $messageDiv.text(iwp_shortcode_ajax.messages.finalizing);
+                            
                             setTimeout(function() {
-                                $statusDiv.hide();
-                            }, 3000);
+                                applyDelayedPostOptions(siteData.site_id || siteData.id, $statusDiv, $messageDiv, $submitButton);
+                            }, 5000);
                         } else if (status === 'failed') {
                             clearInterval(statusInterval);
                             showError('Site creation failed: ' + (response.data.message || 'Unknown error'), $statusDiv, $messageDiv, $submitButton);
@@ -229,8 +233,18 @@ jQuery(document).ready(function($) {
             $container.find('.iwp-site-creator-password').text(data.admin_password);
         }
         
-        if (data.admin_url) {
-            $container.find('.iwp-site-creator-admin-url').attr('href', data.admin_url);
+        // Handle Magic Login vs regular admin login
+        if (data.s_hash) {
+            // Use Magic Login
+            const magicLoginUrl = 'https://app.instawp.io/wordpress-auto-login?site=' + encodeURIComponent(data.s_hash);
+            $container.find('.iwp-site-creator-admin-url')
+                .attr('href', magicLoginUrl)
+                .text('Magic Login');
+        } else if (data.admin_url) {
+            // Use regular admin login
+            $container.find('.iwp-site-creator-admin-url')
+                .attr('href', data.admin_url)
+                .text('Login to Admin');
         }
 
         // Show results
@@ -289,5 +303,43 @@ jQuery(document).ready(function($) {
 
     function stopProgressAnimation() {
         $('.iwp-site-creator-progress-bar').removeClass('animating');
+    }
+
+    function applyDelayedPostOptions(siteId, $statusDiv, $messageDiv, $submitButton) {
+        if (!siteId) {
+            console.error('No site ID provided for post_options application');
+            showSuccess('Site created successfully!', $statusDiv, $messageDiv, $submitButton);
+            setTimeout(function() {
+                $statusDiv.hide();
+            }, 3000);
+            return;
+        }
+
+        $.ajax({
+            url: iwp_shortcode_ajax.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'iwp_apply_delayed_post_options',
+                site_id: siteId,
+                nonce: iwp_shortcode_ajax.nonce_apply_post_options
+            },
+            dataType: 'json',
+            success: function(response) {
+                if (response.data && response.data.warning) {
+                    console.warn('Post options warning:', response.data.warning);
+                }
+                // Just hide the status div - don't show duplicate success message
+                setTimeout(function() {
+                    $statusDiv.hide();
+                }, 1000);
+            },
+            error: function(xhr, status, error) {
+                console.error('Post options AJAX error:', error);
+                // Just hide the status div - site was still created successfully
+                setTimeout(function() {
+                    $statusDiv.hide();
+                }, 1000);
+            }
+        });
     }
 });

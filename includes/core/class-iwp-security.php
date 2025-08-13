@@ -2,7 +2,7 @@
 /**
  * Enhanced Security Helper Class
  *
- * @package IWP_Woo_V2
+ * @package IWP
  * @since 2.0.0
  */
 
@@ -12,11 +12,11 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * IWP_Woo_V2_Security class
+ * IWP_Security class
  * 
  * Centralized security validation and sanitization methods
  */
-class IWP_Woo_V2_Security {
+class IWP_Security {
 
     /**
      * Validate AJAX request with nonce and capability check
@@ -30,14 +30,14 @@ class IWP_Woo_V2_Security {
         // Check nonce
         if (!wp_verify_nonce($_POST[$nonce_field] ?? '', $nonce_action)) {
             wp_send_json_error(array(
-                'message' => __('Security check failed.', 'instawp-integration')
+                'message' => __('Security check failed.', 'iwp-wp-integration')
             ));
         }
 
         // Check user capabilities
         if (!current_user_can($capability)) {
             wp_send_json_error(array(
-                'message' => __('Insufficient permissions.', 'instawp-integration')
+                'message' => __('Insufficient permissions.', 'iwp-wp-integration')
             ));
         }
 
@@ -55,12 +55,12 @@ class IWP_Woo_V2_Security {
     public static function validate_ajax_request_soft($nonce_action, $capability = 'manage_options', $nonce_field = 'nonce') {
         // Check nonce
         if (!wp_verify_nonce($_POST[$nonce_field] ?? '', $nonce_action)) {
-            return new WP_Error('nonce_failed', __('Security check failed.', 'instawp-integration'));
+            return new WP_Error('nonce_failed', __('Security check failed.', 'iwp-wp-integration'));
         }
 
         // Check user capabilities
         if (!current_user_can($capability)) {
-            return new WP_Error('insufficient_permissions', __('Insufficient permissions.', 'instawp-integration'));
+            return new WP_Error('insufficient_permissions', __('Insufficient permissions.', 'iwp-wp-integration'));
         }
 
         return true;
@@ -240,7 +240,7 @@ class IWP_Woo_V2_Security {
         $required_fields = array('name', 'admin_email');
         foreach ($required_fields as $field) {
             if (empty($data[$field])) {
-                $errors[] = sprintf(__('Field %s is required.', 'instawp-integration'), $field);
+                $errors[] = sprintf(__('Field %s is required.', 'iwp-wp-integration'), $field);
             }
         }
 
@@ -257,7 +257,7 @@ class IWP_Woo_V2_Security {
 
         // Validate email
         if (!is_email($sanitized['admin_email'])) {
-            return new WP_Error('invalid_email', __('Invalid email address.', 'instawp-integration'));
+            return new WP_Error('invalid_email', __('Invalid email address.', 'iwp-wp-integration'));
         }
 
         return $sanitized;

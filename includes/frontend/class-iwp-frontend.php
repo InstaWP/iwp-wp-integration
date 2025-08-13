@@ -2,7 +2,7 @@
 /**
  * Frontend class for IWP WooCommerce Integration v2
  *
- * @package IWP_Woo_V2
+ * @package IWP
  * @since 2.0.0
  */
 
@@ -12,9 +12,9 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * IWP_Woo_V2_Frontend class
+ * IWP_Frontend class
  */
-class IWP_Woo_V2_Frontend {
+class IWP_Frontend {
 
     /**
      * Track displayed orders to prevent duplicates
@@ -44,17 +44,20 @@ class IWP_Woo_V2_Frontend {
         add_action('woocommerce_before_checkout_form', array($this, 'before_checkout_form'));
         add_action('woocommerce_after_checkout_form', array($this, 'after_checkout_form'));
         add_filter('woocommerce_product_tabs', array($this, 'add_product_tab'));
-        add_shortcode('iwp_woo_v2_info', array($this, 'info_shortcode'));
+        add_shortcode('iwp_info', array($this, 'info_shortcode'));
         
-        // Customer order details integration - keep only the order details hook
-        add_action('woocommerce_order_details_after_order_table', array($this, 'display_order_instawp_sites_after_table'), 10);
-        // Note: Removed woocommerce_thankyou hook to prevent duplicate display
+        // Customer order details integration
+        // For thank you page (order-received)
+        add_action('woocommerce_thankyou', array($this, 'display_order_sites_thankyou'), 10);
+        
+        // For order view page (view-order) - but not on thank you page
+        add_action('woocommerce_view_order', array($this, 'display_order_sites_view'), 10);
         
         // Email integration
-        add_action('woocommerce_email_order_details', array($this, 'add_instawp_to_emails'), 15, 4);
+        add_action('woocommerce_email_order_details', array($this, 'add_sites_to_emails'), 15, 4);
         
         // My Account dashboard integration
-        add_action('woocommerce_account_dashboard', array($this, 'display_customer_instawp_sites'), 15);
+        add_action('woocommerce_account_dashboard', array($this, 'display_customer_sites'), 15);
         
         // Site ID parameter handling
         add_action('init', array($this, 'handle_site_id_parameter'));
@@ -72,29 +75,30 @@ class IWP_Woo_V2_Frontend {
         }
 
         wp_enqueue_script(
-            'iwp-woo-v2-frontend',
-            IWP_WOO_V2_PLUGIN_URL . 'assets/js/frontend.js',
+            'instawp-integration-frontend',
+            IWP_PLUGIN_URL . 'assets/js/frontend.js',
             array('jquery'),
-            IWP_WOO_V2_VERSION,
+            IWP_VERSION,
             true
         );
 
         wp_enqueue_style(
-            'iwp-woo-v2-frontend',
-            IWP_WOO_V2_PLUGIN_URL . 'assets/css/frontend.css',
+            'instawp-integration-frontend',
+            IWP_PLUGIN_URL . 'assets/css/frontend.css',
             array(),
-            IWP_WOO_V2_VERSION
+            IWP_VERSION
         );
 
         wp_localize_script(
-            'iwp-woo-v2-frontend',
-            'iwp_woo_v2_frontend',
+            'instawp-integration-frontend',
+            'iwp_frontend',
             array(
                 'ajax_url' => admin_url('admin-ajax.php'),
-                'nonce' => wp_create_nonce('iwp_woo_v2_frontend_nonce'),
+                'nonce' => wp_create_nonce('iwp_frontend_nonce'),
+                'add_domain_nonce' => wp_create_nonce('iwp_add_domain_nonce'),
                 'strings' => array(
-                    'loading' => esc_html__('Loading...', 'iwp-woo-v2'),
-                    'error' => esc_html__('An error occurred. Please try again.', 'iwp-woo-v2'),
+                    'loading' => esc_html__('Loading...', 'iwp-wp-integration'),
+                    'error' => esc_html__('An error occurred. Please try again.', 'iwp-wp-integration'),
                 ),
             )
         );
@@ -104,11 +108,11 @@ class IWP_Woo_V2_Frontend {
      * Before shop loop
      */
     public function before_shop_loop() {
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         
         if (isset($options['enabled']) && $options['enabled'] === 'yes') {
-            echo '<div class="iwp-woo-v2-shop-notice">';
-            echo '<p>' . esc_html__('Enhanced by InstaWP WooCommerce Integration', 'iwp-woo-v2') . '</p>';
+            echo '<div class="instawp-integration-shop-notice">';
+            // Removed branding message
             echo '</div>';
         }
     }
@@ -118,7 +122,7 @@ class IWP_Woo_V2_Frontend {
      */
     public function after_shop_loop() {
         // Add any content after shop loop if needed
-        do_action('iwp_woo_v2_after_shop_loop');
+        do_action('iwp_after_shop_loop');
     }
 
     /**
@@ -131,12 +135,12 @@ class IWP_Woo_V2_Frontend {
             return;
         }
 
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         
         if (isset($options['enabled']) && $options['enabled'] === 'yes') {
             // Add product enhancement notice
-            echo '<div class="iwp-woo-v2-product-notice">';
-            echo '<p>' . esc_html__('Product enhanced by InstaWP', 'iwp-woo-v2') . '</p>';
+            echo '<div class="instawp-integration-product-notice">';
+            // Removed branding message
             echo '</div>';
         }
     }
@@ -146,18 +150,18 @@ class IWP_Woo_V2_Frontend {
      */
     public function after_single_product() {
         // Add any content after single product if needed
-        do_action('iwp_woo_v2_after_single_product');
+        do_action('iwp_after_single_product');
     }
 
     /**
      * Before cart
      */
     public function before_cart() {
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         
         if (isset($options['enabled']) && $options['enabled'] === 'yes') {
-            echo '<div class="iwp-woo-v2-cart-notice">';
-            echo '<p>' . esc_html__('Cart powered by InstaWP', 'iwp-woo-v2') . '</p>';
+            echo '<div class="instawp-integration-cart-notice">';
+            // Removed branding message
             echo '</div>';
         }
     }
@@ -167,18 +171,18 @@ class IWP_Woo_V2_Frontend {
      */
     public function after_cart() {
         // Add any content after cart if needed
-        do_action('iwp_woo_v2_after_cart');
+        do_action('iwp_after_cart');
     }
 
     /**
      * Before checkout form
      */
     public function before_checkout_form() {
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         
         if (isset($options['enabled']) && $options['enabled'] === 'yes') {
-            echo '<div class="iwp-woo-v2-checkout-notice">';
-            echo '<p>' . esc_html__('Secure checkout powered by InstaWP', 'iwp-woo-v2') . '</p>';
+            echo '<div class="instawp-integration-checkout-notice">';
+            // Removed branding message
             echo '</div>';
         }
     }
@@ -188,7 +192,7 @@ class IWP_Woo_V2_Frontend {
      */
     public function after_checkout_form() {
         // Add any content after checkout form if needed
-        do_action('iwp_woo_v2_after_checkout_form');
+        do_action('iwp_after_checkout_form');
     }
 
     /**
@@ -198,11 +202,11 @@ class IWP_Woo_V2_Frontend {
      * @return array
      */
     public function add_product_tab($tabs) {
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         
         if (isset($options['enabled']) && $options['enabled'] === 'yes') {
             $tabs['iwp_info'] = array(
-                'title' => esc_html__('InstaWP Info', 'iwp-woo-v2'),
+                'title' => esc_html__('Site Info', 'iwp-wp-integration'),
                 'priority' => 50,
                 'callback' => array($this, 'product_tab_content')
             );
@@ -215,10 +219,8 @@ class IWP_Woo_V2_Frontend {
      * Product tab content
      */
     public function product_tab_content() {
-        echo '<div class="iwp-woo-v2-product-tab">';
-        echo '<h2>' . esc_html__('InstaWP Information', 'iwp-woo-v2') . '</h2>';
-        echo '<p>' . esc_html__('This product is enhanced by InstaWP WooCommerce Integration v2.', 'iwp-woo-v2') . '</p>';
-        echo '<p>' . esc_html__('For more information, visit:', 'iwp-woo-v2') . ' <a href="https://instawp.com" target="_blank">InstaWP.com</a></p>';
+        echo '<div class="instawp-integration-product-tab">';
+        // Removed branding information
         echo '</div>';
     }
 
@@ -232,21 +234,22 @@ class IWP_Woo_V2_Frontend {
         $atts = shortcode_atts(array(
             'type' => 'basic',
             'show_version' => 'no',
-        ), $atts, 'iwp_woo_v2_info');
+        ), $atts, 'iwp_info');
 
-        $output = '<div class="iwp-woo-v2-info-shortcode">';
+        $output = '<div class="instawp-integration-info-shortcode">';
         
         switch ($atts['type']) {
             case 'basic':
-                $output .= '<p>' . esc_html__('Powered by InstaWP WooCommerce Integration', 'iwp-woo-v2') . '</p>';
+                // Removed branding message
+                $output .= '';
                 break;
             case 'detailed':
-                $output .= '<div class="iwp-woo-v2-detailed-info">';
-                $output .= '<h3>' . esc_html__('InstaWP WooCommerce Integration', 'iwp-woo-v2') . '</h3>';
-                $output .= '<p>' . esc_html__('This site is powered by InstaWP WooCommerce Integration v2, providing enhanced functionality and performance.', 'iwp-woo-v2') . '</p>';
+                $output .= '<div class="instawp-integration-detailed-info">';
+                // Removed branding information
+                $output .= '';
                 
                 if ($atts['show_version'] === 'yes') {
-                    $output .= '<p><small>' . esc_html__('Version:', 'iwp-woo-v2') . ' ' . esc_html(IWP_WOO_V2_VERSION) . '</small></p>';
+                    $output .= '<p><small>' . esc_html__('Version:', 'iwp-wp-integration') . ' ' . esc_html(IWP_VERSION) . '</small></p>';
                 }
                 
                 $output .= '</div>';
@@ -334,8 +337,8 @@ class IWP_Woo_V2_Frontend {
      */
     public function display_message($message, $type = 'info') {
         $classes = array(
-            'iwp-woo-v2-message',
-            'iwp-woo-v2-message-' . $type
+            'instawp-integration-message',
+            'instawp-integration-message-' . $type
         );
 
         echo '<div class="' . esc_attr(implode(' ', $classes)) . '">';
@@ -349,34 +352,37 @@ class IWP_Woo_V2_Frontend {
      * @return bool
      */
     public function is_enabled() {
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         return isset($options['enabled']) && $options['enabled'] === 'yes';
     }
 
 
     /**
-     * Display InstaWP sites after order table
-     *
-     * @param WC_Order $order
-     */
-    public function display_order_instawp_sites_after_table($order) {
-        $this->display_order_sites($order->get_id(), 'order-details');
-    }
-
-    /**
-     * Display InstaWP sites on thank you page
+     * Display sites on thank you page (order-received)
      *
      * @param int $order_id
      */
-    public function display_thankyou_instawp_sites($order_id) {
+    public function display_order_sites_thankyou($order_id) {
         if (!$order_id) {
             return;
         }
         $this->display_order_sites($order_id, 'thank-you');
     }
+    
+    /**
+     * Display sites on order view page (my-account/view-order)
+     *
+     * @param int $order_id
+     */
+    public function display_order_sites_view($order_id) {
+        if (!$order_id) {
+            return;
+        }
+        $this->display_order_sites($order_id, 'order-view');
+    }
 
     /**
-     * Display InstaWP sites for a specific order
+     * Display sites for a specific order
      *
      * @param int $order_id
      * @param string $context
@@ -404,7 +410,12 @@ class IWP_Woo_V2_Frontend {
         }
 
         // Get site manager instance
-        $site_manager = new IWP_Woo_V2_Site_Manager();
+        if (!class_exists('IWP_Site_Manager')) {
+            require_once IWP_PLUGIN_PATH . 'includes/core/class-iwp-api-client.php';
+            require_once IWP_PLUGIN_PATH . 'includes/core/class-iwp-logger.php';
+            require_once IWP_PLUGIN_PATH . 'includes/core/class-iwp-site-manager.php';
+        }
+        $site_manager = new IWP_Site_Manager();
         $sites = $site_manager->get_order_sites($order_id);
 
         if (empty($sites)) {
@@ -437,34 +448,34 @@ class IWP_Woo_V2_Frontend {
                 case 'thank-you':
                     if ($has_created && !$has_upgraded) {
                         // Only creations
-                        $title = __('Your InstaWP Sites Are Ready!', 'iwp-woo-v2');
-                        $description = __('We\'ve created your InstaWP sites. Here are the details:', 'iwp-woo-v2');
+                        $title = __('Your Site Details', 'iwp-wp-integration');
+                        $description = __('Here are your site details:', 'iwp-wp-integration');
                     } else {
                         // Mixed or unknown
-                        $title = __('Your InstaWP Sites', 'iwp-woo-v2');
-                        $description = __('Here are your InstaWP site details:', 'iwp-woo-v2');
+                        $title = __('Your Sites', 'iwp-wp-integration');
+                        $description = __('Here are your site details:', 'iwp-wp-integration');
                     }
                     break;
                 case 'order-details':
-                    $title = __('InstaWP Sites', 'iwp-woo-v2');
+                    $title = __('Sites', 'iwp-wp-integration');
                     if ($has_created && !$has_upgraded) {
-                        $description = __('Sites created for this order:', 'iwp-woo-v2');
+                        $description = __('Sites created for this order:', 'iwp-wp-integration');
                     } else {
-                        $description = __('Sites processed for this order:', 'iwp-woo-v2');
+                        $description = __('Sites processed for this order:', 'iwp-wp-integration');
                     }
                     break;
                 default:
-                    $title = __('Your InstaWP Sites', 'iwp-woo-v2');
-                    $description = __('Sites associated with this order:', 'iwp-woo-v2');
+                    $title = __('Your Sites', 'iwp-wp-integration');
+                    $description = __('Sites associated with this order:', 'iwp-wp-integration');
                     break;
             }
 
-            echo '<div class="iwp-woo-v2-customer-sites iwp-woo-v2-context-' . esc_attr($context) . '">';
+            echo '<div class="instawp-integration-customer-sites instawp-integration-context-' . esc_attr($context) . '">';
             echo '<h2 class="iwp-sites-title">' . esc_html($title) . '</h2>';
             echo '<p class="iwp-sites-description">' . esc_html($description) . '</p>';
         } else {
             // For upgrade-only orders, just create the container without header
-            echo '<div class="iwp-woo-v2-customer-sites iwp-woo-v2-context-' . esc_attr($context) . ' iwp-no-header">';
+            echo '<div class="instawp-integration-customer-sites instawp-integration-context-' . esc_attr($context) . ' iwp-no-header">';
         }
 
         foreach ($sites as $site) {
@@ -472,7 +483,7 @@ class IWP_Woo_V2_Frontend {
         }
 
         // Add domain mapping modal if this is order details context
-        if ($context === 'order-details') {
+        if ($context === 'order-details' || $context === 'order-view' || $context === 'thank-you') {
             $this->render_domain_mapping_modal($order->get_id());
         }
 
@@ -507,19 +518,19 @@ class IWP_Woo_V2_Frontend {
 
         switch ($status) {
             case 'completed':
-                $status_text = __('Ready', 'iwp-woo-v2');
+                $status_text = __('Ready', 'iwp-wp-integration');
                 $status_icon = '✅';
                 break;
             case 'progress':
-                $status_text = __('Creating...', 'iwp-woo-v2');
+                $status_text = __('Creating...', 'iwp-wp-integration');
                 $status_icon = '🔄';
                 break;
             case 'failed':
-                $status_text = __('Failed', 'iwp-woo-v2');
+                $status_text = __('Failed', 'iwp-wp-integration');
                 $status_icon = '❌';
                 break;
             default:
-                $status_text = __('Unknown', 'iwp-woo-v2');
+                $status_text = __('Unknown', 'iwp-wp-integration');
                 $status_icon = '❓';
                 break;
         }
@@ -533,19 +544,19 @@ class IWP_Woo_V2_Frontend {
         // Show different title based on action
         if ($action === 'upgraded') {
             if ($site_name) {
-                echo esc_html(sprintf(__('Upgraded: %s', 'iwp-woo-v2'), $site_name));
+                echo esc_html(sprintf(__('Upgraded: %s', 'iwp-wp-integration'), $site_name));
             } elseif ($product_name) {
-                echo esc_html(sprintf(__('Upgraded: %s', 'iwp-woo-v2'), $product_name));
+                echo esc_html(sprintf(__('Upgraded: %s', 'iwp-wp-integration'), $product_name));
             } else {
-                echo esc_html(__('Site Upgraded', 'iwp-woo-v2'));
+                echo esc_html(__('Site Upgraded', 'iwp-wp-integration'));
             }
         } else {
             if ($site_name) {
-                echo esc_html(sprintf(__('Site: %s', 'iwp-woo-v2'), $site_name));
+                echo esc_html(sprintf(__('Site: %s', 'iwp-wp-integration'), $site_name));
             } elseif ($snapshot_slug) {
-                echo esc_html(sprintf(__('Site: %s', 'iwp-woo-v2'), $snapshot_slug));
+                echo esc_html(sprintf(__('Site: %s', 'iwp-wp-integration'), $snapshot_slug));
             } else {
-                echo esc_html(__('InstaWP Site', 'iwp-woo-v2'));
+                echo esc_html(__('Site', 'iwp-wp-integration'));
             }
         }
         
@@ -563,54 +574,54 @@ class IWP_Woo_V2_Frontend {
                 echo '<div class="iwp-upgrade-info">';
                 echo '<div class="iwp-upgrade-badge">';
                 echo '<span class="iwp-upgrade-icon">🔄</span>';
-                echo '<strong>' . __('Plan Upgraded', 'iwp-woo-v2') . '</strong>';
+                echo '<strong>' . __('Plan Upgraded', 'iwp-wp-integration') . '</strong>';
                 echo '</div>';
                 
                 if ($site_id) {
                     echo '<div class="iwp-site-meta-row">';
-                    echo '<strong>' . __('Site ID:', 'iwp-woo-v2') . '</strong> ' . esc_html($site_id);
+                    echo '<strong>' . __('Site ID:', 'iwp-wp-integration') . '</strong> ' . esc_html($site_id);
                     echo '</div>';
                 }
                 
                 if ($plan_id) {
                     echo '<div class="iwp-site-meta-row">';
-                    echo '<strong>' . __('New Plan:', 'iwp-woo-v2') . '</strong> ' . esc_html($plan_id);
+                    echo '<strong>' . __('New Plan:', 'iwp-wp-integration') . '</strong> ' . esc_html($plan_id);
                     echo '</div>';
                 }
                 echo '</div>';
             }
             
             echo '<div class="iwp-site-url">';
-            echo '<strong>' . __('Site URL:', 'iwp-woo-v2') . '</strong> ';
+            echo '<strong>' . __('Site URL:', 'iwp-wp-integration') . '</strong> ';
             echo '<a href="' . esc_url($wp_url) . '" target="_blank" rel="noopener">' . esc_html($wp_url) . '</a>';
             echo '</div>';
 
             if (!empty($wp_username)) {
                 echo '<div class="iwp-site-credentials">';
                 echo '<div class="iwp-credential-row">';
-                echo '<strong>' . __('Username:', 'iwp-woo-v2') . '</strong> ';
+                echo '<strong>' . __('Username:', 'iwp-wp-integration') . '</strong> ';
                 echo '<code class="iwp-credential-value">' . esc_html($wp_username) . '</code>';
-                echo '<button type="button" class="iwp-copy-btn" data-copy="' . esc_attr($wp_username) . '" title="' . esc_attr__('Copy to clipboard', 'iwp-woo-v2') . '">📋</button>';
+                echo '<button type="button" class="iwp-copy-btn" data-copy="' . esc_attr($wp_username) . '" title="' . esc_attr__('Copy to clipboard', 'iwp-wp-integration') . '">📋</button>';
                 echo '</div>';
 
                 if (!empty($wp_password)) {
                     echo '<div class="iwp-credential-row">';
-                    echo '<strong>' . __('Password:', 'iwp-woo-v2') . '</strong> ';
+                    echo '<strong>' . __('Password:', 'iwp-wp-integration') . '</strong> ';
                     echo '<code class="iwp-credential-value iwp-password-hidden" data-password="' . esc_attr($wp_password) . '">••••••••</code>';
-                    echo '<button type="button" class="iwp-show-password-btn" title="' . esc_attr__('Show/Hide password', 'iwp-woo-v2') . '">👁️</button>';
-                    echo '<button type="button" class="iwp-copy-btn" data-copy="' . esc_attr($wp_password) . '" title="' . esc_attr__('Copy to clipboard', 'iwp-woo-v2') . '">📋</button>';
+                    echo '<button type="button" class="iwp-show-password-btn" title="' . esc_attr__('Show/Hide password', 'iwp-wp-integration') . '">👁️</button>';
+                    echo '<button type="button" class="iwp-copy-btn" data-copy="' . esc_attr($wp_password) . '" title="' . esc_attr__('Copy to clipboard', 'iwp-wp-integration') . '">📋</button>';
                     echo '</div>';
                 }
                 echo '</div>';
             }
 
             echo '<div class="iwp-site-actions">';
-            echo '<a href="' . esc_url($wp_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-primary">' . __('Visit Site', 'iwp-woo-v2') . '</a>';
+            echo '<a href="' . esc_url($wp_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-primary">' . __('Visit Site', 'iwp-wp-integration') . '</a>';
             
             // Use magic login if s_hash is available, otherwise fall back to regular admin login
             if (!empty($s_hash)) {
                 $magic_login_url = 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($s_hash);
-                echo '<a href="' . esc_url($magic_login_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-secondary">' . __('Magic Login', 'iwp-woo-v2') . '</a>';
+                echo '<a href="' . esc_url($magic_login_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-secondary">' . __('Magic Login', 'iwp-wp-integration') . '</a>';
             } else {
                 // Fallback to regular admin login
                 $admin_url = '';
@@ -621,21 +632,21 @@ class IWP_Woo_V2_Frontend {
                 }
                 
                 if (!empty($admin_url)) {
-                    echo '<a href="' . esc_url($admin_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-secondary">' . __('Admin Login', 'iwp-woo-v2') . '</a>';
+                    echo '<a href="' . esc_url($admin_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-secondary">' . __('Admin Login', 'iwp-wp-integration') . '</a>';
                 }
             }
             
             // Add domain mapping button if site_id is available
-            if (!empty($site_id) && $context === 'order-details') {
-                echo '<button type="button" class="iwp-btn iwp-btn-tertiary iwp-map-domain-btn" data-site-id="' . esc_attr($site_id) . '" data-site-url="' . esc_attr($wp_url) . '">' . __('Map Domain', 'iwp-woo-v2') . '</button>';
+            if (!empty($site_id) && ($context === 'order-details' || $context === 'order-view' || $context === 'thank-you')) {
+                echo '<button type="button" class="iwp-btn iwp-btn-tertiary iwp-map-domain-btn" data-site-id="' . esc_attr($site_id) . '" data-site-url="' . esc_attr($wp_url) . '">' . __('Map Domain', 'iwp-wp-integration') . '</button>';
             }
             echo '</div>';
             echo '</div>';
 
         } elseif ($status === 'progress' || $status === 'creating') {
             echo '<div class="iwp-site-progress">';
-            echo '<p>' . __('Your site is being created. This usually takes a few minutes. Please refresh this page to check the latest status.', 'iwp-woo-v2') . '</p>';
-            echo '<button type="button" class="iwp-btn iwp-btn-secondary" onclick="location.reload()">' . __('Refresh Status', 'iwp-woo-v2') . '</button>';
+            echo '<p>' . __('Your site is being created. This usually takes a few minutes. Please refresh this page to check the latest status.', 'iwp-wp-integration') . '</p>';
+            echo '<button type="button" class="iwp-btn iwp-btn-secondary" onclick="location.reload()">' . __('Refresh Status', 'iwp-wp-integration') . '</button>';
             echo '</div>';
 
         } elseif ($status === 'completed' && $action === 'upgraded' && empty($wp_url)) {
@@ -643,35 +654,35 @@ class IWP_Woo_V2_Frontend {
             echo '<div class="iwp-upgrade-minimal">';
             echo '<div class="iwp-upgrade-badge">';
             echo '<span class="iwp-upgrade-icon">🔄</span>';
-            echo '<strong>' . __('Plan Successfully Upgraded', 'iwp-woo-v2') . '</strong>';
+            echo '<strong>' . __('Plan Successfully Upgraded', 'iwp-wp-integration') . '</strong>';
             echo '</div>';
             
             echo '<div class="iwp-upgrade-details">';
             if ($site_id) {
-                echo '<p><strong>' . __('Site ID:', 'iwp-woo-v2') . '</strong> ' . esc_html($site_id) . '</p>';
+                echo '<p><strong>' . __('Site ID:', 'iwp-wp-integration') . '</strong> ' . esc_html($site_id) . '</p>';
             }
             if ($plan_id) {
-                echo '<p><strong>' . __('New Plan:', 'iwp-woo-v2') . '</strong> ' . esc_html($plan_id) . '</p>';
+                echo '<p><strong>' . __('New Plan:', 'iwp-wp-integration') . '</strong> ' . esc_html($plan_id) . '</p>';
             }
             if ($product_name) {
-                echo '<p><strong>' . __('Product:', 'iwp-woo-v2') . '</strong> ' . esc_html($product_name) . '</p>';
+                echo '<p><strong>' . __('Product:', 'iwp-wp-integration') . '</strong> ' . esc_html($product_name) . '</p>';
             }
-            echo '<p>' . __('Your site plan has been successfully upgraded. The site continues to operate with the new plan features.', 'iwp-woo-v2') . '</p>';
+            echo '<p>' . __('Your site plan has been successfully upgraded. The site continues to operate with the new plan features.', 'iwp-wp-integration') . '</p>';
             echo '</div>';
             echo '</div>';
             
         } elseif ($status === 'failed') {
             echo '<div class="iwp-site-error">';
-            echo '<p>' . __('Sorry, there was an issue creating your site. Please contact support for assistance.', 'iwp-woo-v2') . '</p>';
+            echo '<p>' . __('Sorry, there was an issue creating your site. Please contact support for assistance.', 'iwp-wp-integration') . '</p>';
             echo '</div>';
         }
 
         if (!empty($created_at)) {
             echo '<div class="iwp-site-meta">';
             if ($action === 'upgraded') {
-                echo '<small>' . sprintf(__('Upgraded: %s', 'iwp-woo-v2'), date_i18n(get_option('date_format') . ' ' . get_option('time_format'), strtotime($created_at))) . '</small>';
+                echo '<small>' . sprintf(__('Upgraded: %s', 'iwp-wp-integration'), date_i18n(get_option('date_format') . ' ' . get_option('time_format'), strtotime($created_at))) . '</small>';
             } else {
-                echo '<small>' . sprintf(__('Created: %s', 'iwp-woo-v2'), date_i18n(get_option('date_format') . ' ' . get_option('time_format'), strtotime($created_at))) . '</small>';
+                echo '<small>' . sprintf(__('Created: %s', 'iwp-wp-integration'), date_i18n(get_option('date_format') . ' ' . get_option('time_format'), strtotime($created_at))) . '</small>';
             }
             echo '</div>';
         }
@@ -691,15 +702,15 @@ class IWP_Woo_V2_Frontend {
         <div id="iwp-domain-modal" class="iwp-modal" style="display: none;">
             <div class="iwp-modal-content">
                 <div class="iwp-modal-header">
-                    <h3><?php _e('Map Custom Domain', 'iwp-woo-v2'); ?></h3>
+                    <h3><?php _e('Map Custom Domain', 'iwp-wp-integration'); ?></h3>
                     <span class="iwp-modal-close">&times;</span>
                 </div>
                 <div class="iwp-modal-body">
                     <div class="iwp-domain-instructions">
-                        <p><?php _e('Create a CNAME record in your DNS settings:', 'iwp-woo-v2'); ?></p>
+                        <p><?php _e('Create a CNAME record in your DNS settings:', 'iwp-wp-integration'); ?></p>
                         <div class="iwp-cname-example">
                             <code>
-                                <span class="iwp-domain-placeholder"><?php _e('your-domain.com', 'iwp-woo-v2'); ?></span> → 
+                                <span class="iwp-domain-placeholder"><?php _e('your-domain.com', 'iwp-wp-integration'); ?></span> → 
                                 <span class="iwp-target-url"></span>
                             </code>
                         </div>
@@ -707,18 +718,18 @@ class IWP_Woo_V2_Frontend {
                     
                     <form id="iwp-domain-form">
                         <div class="iwp-form-group">
-                            <label for="iwp-domain-name"><?php _e('Domain Name:', 'iwp-woo-v2'); ?></label>
+                            <label for="iwp-domain-name"><?php _e('Domain Name:', 'iwp-wp-integration'); ?></label>
                             <input type="text" id="iwp-domain-name" name="domain_name" placeholder="example.com or www.example.com" required>
-                            <small><?php _e('Enter without http:// or https://', 'iwp-woo-v2'); ?></small>
+                            <small><?php _e('Enter without http:// or https://', 'iwp-wp-integration'); ?></small>
                         </div>
                         
                         <div class="iwp-form-group">
-                            <label for="iwp-domain-type"><?php _e('Domain Type:', 'iwp-woo-v2'); ?></label>
+                            <label for="iwp-domain-type"><?php _e('Domain Type:', 'iwp-wp-integration'); ?></label>
                             <select id="iwp-domain-type" name="domain_type">
-                                <option value="primary"><?php _e('Primary (main domain)', 'iwp-woo-v2'); ?></option>
-                                <option value="alias"><?php _e('Alias (redirects to primary)', 'iwp-woo-v2'); ?></option>
+                                <option value="primary"><?php _e('Primary (main domain)', 'iwp-wp-integration'); ?></option>
+                                <option value="alias"><?php _e('Alias (redirects to primary)', 'iwp-wp-integration'); ?></option>
                             </select>
-                            <small><?php _e('Use Primary for your main domain, Alias for www version', 'iwp-woo-v2'); ?></small>
+                            <small><?php _e('Use Primary for your main domain, Alias for www version', 'iwp-wp-integration'); ?></small>
                         </div>
                         
                         
@@ -727,8 +738,8 @@ class IWP_Woo_V2_Frontend {
                         <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('iwp_add_domain_nonce'); ?>">
                         
                         <div class="iwp-form-actions">
-                            <button type="button" class="iwp-btn iwp-btn-secondary iwp-modal-cancel"><?php _e('Cancel', 'iwp-woo-v2'); ?></button>
-                            <button type="submit" class="iwp-btn iwp-btn-primary"><?php _e('Map Domain', 'iwp-woo-v2'); ?></button>
+                            <button type="button" class="iwp-btn iwp-btn-secondary iwp-modal-cancel"><?php _e('Cancel', 'iwp-wp-integration'); ?></button>
+                            <button type="submit" class="iwp-btn iwp-btn-primary"><?php _e('Map Domain', 'iwp-wp-integration'); ?></button>
                         </div>
                     </form>
                     
@@ -742,13 +753,13 @@ class IWP_Woo_V2_Frontend {
         $mapped_domains = get_post_meta($order_id, '_iwp_mapped_domains', true);
         if (is_array($mapped_domains) && !empty($mapped_domains)) {
             echo '<div class="iwp-existing-domains">';
-            echo '<h4>' . __('Mapped Domains:', 'iwp-woo-v2') . '</h4>';
+            echo '<h4>' . __('Mapped Domains:', 'iwp-wp-integration') . '</h4>';
             echo '<div class="iwp-domains-list">';
             foreach ($mapped_domains as $domain) {
                 echo '<div class="iwp-domain-item">';
                 echo '<span class="iwp-domain-name">' . esc_html($domain['domain_name']) . '</span>';
                 echo '<span class="iwp-domain-type iwp-domain-type-' . esc_attr($domain['domain_type']) . '">' . esc_html(ucfirst($domain['domain_type'])) . '</span>';
-                echo '<small class="iwp-domain-date">' . sprintf(__('Added: %s', 'iwp-woo-v2'), date_i18n(get_option('date_format'), strtotime($domain['mapped_at']))) . '</small>';
+                echo '<small class="iwp-domain-date">' . sprintf(__('Added: %s', 'iwp-wp-integration'), date_i18n(get_option('date_format'), strtotime($domain['mapped_at']))) . '</small>';
                 echo '</div>';
             }
             echo '</div>';
@@ -757,14 +768,14 @@ class IWP_Woo_V2_Frontend {
     }
 
     /**
-     * Add InstaWP sites to order emails
+     * Add sites to order emails
      *
      * @param WC_Order $order
      * @param bool $sent_to_admin
      * @param bool $plain_text
      * @param WC_Email $email
      */
-    public function add_instawp_to_emails($order, $sent_to_admin, $plain_text, $email) {
+    public function add_sites_to_emails($order, $sent_to_admin, $plain_text, $email) {
         // Only add to customer emails, not admin emails
         if ($sent_to_admin) {
             return;
@@ -775,7 +786,7 @@ class IWP_Woo_V2_Frontend {
             return;
         }
 
-        $site_manager = new IWP_Woo_V2_Site_Manager();
+        $site_manager = new IWP_Site_Manager();
         $sites = $site_manager->get_order_sites($order->get_id());
 
         if (empty($sites)) {
@@ -783,7 +794,7 @@ class IWP_Woo_V2_Frontend {
         }
 
         if ($plain_text) {
-            echo "\n" . __('YOUR INSTAWP SITES', 'iwp-woo-v2') . "\n";
+            echo "\n" . __('YOUR SITES', 'iwp-wp-integration') . "\n";
             echo str_repeat('=', 50) . "\n\n";
 
             foreach ($sites as $site) {
@@ -794,31 +805,31 @@ class IWP_Woo_V2_Frontend {
                 $s_hash = $site['s_hash'] ?? '';
                 $snapshot_slug = $site['snapshot_slug'] ?? '';
 
-                echo sprintf(__('Site: %s', 'iwp-woo-v2'), $snapshot_slug ?: __('InstaWP Site', 'iwp-woo-v2')) . "\n";
-                echo sprintf(__('Status: %s', 'iwp-woo-v2'), ucfirst($status)) . "\n";
+                echo sprintf(__('Site: %s', 'iwp-wp-integration'), $snapshot_slug ?: __('Site', 'iwp-wp-integration')) . "\n";
+                echo sprintf(__('Status: %s', 'iwp-wp-integration'), ucfirst($status)) . "\n";
 
                 if ($status === 'completed' && !empty($wp_url)) {
-                    echo sprintf(__('URL: %s', 'iwp-woo-v2'), $wp_url) . "\n";
+                    echo sprintf(__('URL: %s', 'iwp-wp-integration'), $wp_url) . "\n";
                     if (!empty($wp_username)) {
-                        echo sprintf(__('Username: %s', 'iwp-woo-v2'), $wp_username) . "\n";
+                        echo sprintf(__('Username: %s', 'iwp-wp-integration'), $wp_username) . "\n";
                     }
                     if (!empty($wp_password)) {
-                        echo sprintf(__('Password: %s', 'iwp-woo-v2'), $wp_password) . "\n";
+                        echo sprintf(__('Password: %s', 'iwp-wp-integration'), $wp_password) . "\n";
                     }
                     // Use magic login if s_hash is available
                     if (!empty($s_hash)) {
-                        echo sprintf(__('Magic Login: %s', 'iwp-woo-v2'), 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($s_hash)) . "\n";
+                        echo sprintf(__('Magic Login: %s', 'iwp-wp-integration'), 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($s_hash)) . "\n";
                     } else {
-                        echo sprintf(__('Admin URL: %s', 'iwp-woo-v2'), trailingslashit($wp_url) . 'wp-admin') . "\n";
+                        echo sprintf(__('Admin URL: %s', 'iwp-wp-integration'), trailingslashit($wp_url) . 'wp-admin') . "\n";
                     }
                 } elseif ($status === 'progress') {
-                    echo __('Your site is being created. You will receive another email when it\'s ready.', 'iwp-woo-v2') . "\n";
+                    echo __('Your site is being created. You will receive another email when it\'s ready.', 'iwp-wp-integration') . "\n";
                 }
                 echo "\n" . str_repeat('-', 30) . "\n\n";
             }
         } else {
-            echo '<div class="iwp-woo-v2-email-sites" style="margin: 20px 0; padding: 20px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">';
-            echo '<h2 style="color: #333; margin-top: 0;">' . __('Your InstaWP Sites', 'iwp-woo-v2') . '</h2>';
+            echo '<div class="instawp-integration-email-sites" style="margin: 20px 0; padding: 20px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">';
+            echo '<h2 style="color: #333; margin-top: 0;">' . __('Your Sites', 'iwp-wp-integration') . '</h2>';
 
             foreach ($sites as $site) {
                 $status = $site['status'] ?? 'unknown';
@@ -829,28 +840,28 @@ class IWP_Woo_V2_Frontend {
                 $snapshot_slug = $site['snapshot_slug'] ?? '';
 
                 echo '<div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px; border-left: 4px solid #0073aa;">';
-                echo '<h3 style="margin-top: 0; color: #333;">' . esc_html($snapshot_slug ?: __('InstaWP Site', 'iwp-woo-v2')) . '</h3>';
+                echo '<h3 style="margin-top: 0; color: #333;">' . esc_html($snapshot_slug ?: __('Site', 'iwp-wp-integration')) . '</h3>';
 
                 if ($status === 'completed' && !empty($wp_url)) {
-                    echo '<p><strong>' . __('Site URL:', 'iwp-woo-v2') . '</strong> <a href="' . esc_url($wp_url) . '" target="_blank">' . esc_html($wp_url) . '</a></p>';
+                    echo '<p><strong>' . __('Site URL:', 'iwp-wp-integration') . '</strong> <a href="' . esc_url($wp_url) . '" target="_blank">' . esc_html($wp_url) . '</a></p>';
                     if (!empty($wp_username)) {
-                        echo '<p><strong>' . __('Username:', 'iwp-woo-v2') . '</strong> <code style="background: #f1f1f1; padding: 2px 4px;">' . esc_html($wp_username) . '</code></p>';
+                        echo '<p><strong>' . __('Username:', 'iwp-wp-integration') . '</strong> <code style="background: #f1f1f1; padding: 2px 4px;">' . esc_html($wp_username) . '</code></p>';
                     }
                     if (!empty($wp_password)) {
-                        echo '<p><strong>' . __('Password:', 'iwp-woo-v2') . '</strong> <code style="background: #f1f1f1; padding: 2px 4px;">' . esc_html($wp_password) . '</code></p>';
+                        echo '<p><strong>' . __('Password:', 'iwp-wp-integration') . '</strong> <code style="background: #f1f1f1; padding: 2px 4px;">' . esc_html($wp_password) . '</code></p>';
                     }
                     
                     // Use magic login if s_hash is available
                     if (!empty($s_hash)) {
                         $magic_login_url = 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($s_hash);
-                        echo '<p><a href="' . esc_url($magic_login_url) . '" target="_blank" style="background: #0073aa; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block;">' . __('Magic Login', 'iwp-woo-v2') . '</a></p>';
+                        echo '<p><a href="' . esc_url($magic_login_url) . '" target="_blank" style="background: #0073aa; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block;">' . __('Magic Login', 'iwp-wp-integration') . '</a></p>';
                     } else {
-                        echo '<p><a href="' . esc_url(trailingslashit($wp_url) . 'wp-admin') . '" target="_blank" style="background: #0073aa; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block;">' . __('Login to Admin', 'iwp-woo-v2') . '</a></p>';
+                        echo '<p><a href="' . esc_url(trailingslashit($wp_url) . 'wp-admin') . '" target="_blank" style="background: #0073aa; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block;">' . __('Login to Admin', 'iwp-wp-integration') . '</a></p>';
                     }
                 } elseif ($status === 'progress') {
-                    echo '<p style="color: #856404; background: #fff3cd; padding: 10px; border-radius: 4px;">' . __('Your site is being created. You will receive another email when it\'s ready.', 'iwp-woo-v2') . '</p>';
+                    echo '<p style="color: #856404; background: #fff3cd; padding: 10px; border-radius: 4px;">' . __('Your site is being created. You will receive another email when it\'s ready.', 'iwp-wp-integration') . '</p>';
                 } elseif ($status === 'failed') {
-                    echo '<p style="color: #721c24; background: #f8d7da; padding: 10px; border-radius: 4px;">' . __('There was an issue creating your site. Please contact support.', 'iwp-woo-v2') . '</p>';
+                    echo '<p style="color: #721c24; background: #f8d7da; padding: 10px; border-radius: 4px;">' . __('There was an issue creating your site. Please contact support.', 'iwp-wp-integration') . '</p>';
                 }
                 echo '</div>';
             }
@@ -859,15 +870,15 @@ class IWP_Woo_V2_Frontend {
     }
 
     /**
-     * Display customer's InstaWP sites on My Account dashboard
+     * Display customer's sites on My Account dashboard
      */
-    public function display_customer_instawp_sites() {
+    public function display_customer_sites() {
         $customer_id = get_current_user_id();
         if (!$customer_id) {
             return;
         }
 
-        // Get customer's orders with InstaWP sites
+        // Get customer's orders with sites
         $orders = wc_get_orders(array(
             'customer_id' => $customer_id,
             'limit' => -1,
@@ -884,7 +895,7 @@ class IWP_Woo_V2_Frontend {
             return;
         }
 
-        $site_manager = new IWP_Woo_V2_Site_Manager();
+        $site_manager = new IWP_Site_Manager();
         $all_sites = array();
 
         foreach ($orders as $order) {
@@ -902,9 +913,9 @@ class IWP_Woo_V2_Frontend {
             return;
         }
 
-        echo '<div class="iwp-woo-v2-dashboard-sites">';
-        echo '<h2>' . __('Your InstaWP Sites', 'iwp-woo-v2') . '</h2>';
-        echo '<p>' . sprintf(_n('You have %d InstaWP site:', 'You have %d InstaWP sites:', count($all_sites), 'iwp-woo-v2'), count($all_sites)) . '</p>';
+        echo '<div class="instawp-integration-dashboard-sites">';
+        echo '<h2>' . __('Your Sites', 'iwp-wp-integration') . '</h2>';
+        echo '<p>' . sprintf(_n('You have %d site:', 'You have %d sites:', count($all_sites), 'iwp-wp-integration'), count($all_sites)) . '</p>';
 
         echo '<div class="iwp-sites-grid">';
         foreach ($all_sites as $site) {
@@ -931,16 +942,16 @@ class IWP_Woo_V2_Frontend {
 
         echo '<div class="iwp-dashboard-site-card ' . esc_attr($status_class) . '">';
         echo '<div class="iwp-site-info">';
-        echo '<h4>' . esc_html($snapshot_slug ?: __('InstaWP Site', 'iwp-woo-v2')) . '</h4>';
-        echo '<p class="iwp-order-info">' . sprintf(__('From Order #%s', 'iwp-woo-v2'), $order_number) . '</p>';
+        echo '<h4>' . esc_html($snapshot_slug ?: __('Site', 'iwp-wp-integration')) . '</h4>';
+        echo '<p class="iwp-order-info">' . sprintf(__('From Order #%s', 'iwp-wp-integration'), $order_number) . '</p>';
         echo '</div>';
 
         echo '<div class="iwp-site-actions">';
         if ($status === 'completed' && !empty($wp_url)) {
-            echo '<a href="' . esc_url($wp_url) . '" target="_blank" class="iwp-btn iwp-btn-sm">' . __('Visit Site', 'iwp-woo-v2') . '</a>';
+            echo '<a href="' . esc_url($wp_url) . '" target="_blank" class="iwp-btn iwp-btn-sm">' . __('Visit Site', 'iwp-wp-integration') . '</a>';
         }
         if ($order_id) {
-            echo '<a href="' . esc_url(wc_get_endpoint_url('view-order', $order_id, wc_get_page_permalink('myaccount'))) . '" class="iwp-btn iwp-btn-sm iwp-btn-secondary">' . __('View Details', 'iwp-woo-v2') . '</a>';
+            echo '<a href="' . esc_url(wc_get_endpoint_url('view-order', $order_id, wc_get_page_permalink('myaccount'))) . '" class="iwp-btn iwp-btn-sm iwp-btn-secondary">' . __('View Details', 'iwp-wp-integration') . '</a>';
         }
         echo '</div>';
         echo '</div>';
@@ -951,7 +962,7 @@ class IWP_Woo_V2_Frontend {
      */
     public function handle_site_id_parameter() {
         // Check if site_id parameter functionality is enabled
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         if (!isset($options['use_site_id_parameter']) || $options['use_site_id_parameter'] !== 'yes') {
             return;
         }
@@ -987,7 +998,7 @@ class IWP_Woo_V2_Frontend {
      * @return int|null
      */
     public function get_stored_site_id() {
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         if (!isset($options['use_site_id_parameter']) || $options['use_site_id_parameter'] !== 'yes') {
             return null;
         }
@@ -1036,14 +1047,14 @@ class IWP_Woo_V2_Frontend {
             return;
         }
 
-        echo '<div class="iwp-woo-v2-notice iwp-woo-v2-site-id-notice" style="background: #e7f3ff; border-left: 4px solid #0073aa; padding: 15px; margin: 15px 0;">';
+        echo '<div class="instawp-integration-notice instawp-integration-site-id-notice" style="background: #e7f3ff; border-left: 4px solid #0073aa; padding: 15px; margin: 15px 0;">';
         echo '<p style="margin: 0; color: #333;">';
-        echo '<strong>' . esc_html__('Site Upgrade Mode Active', 'iwp-woo-v2') . '</strong><br>';
+        echo '<strong>' . esc_html__('Site Upgrade Mode Active', 'iwp-wp-integration') . '</strong><br>';
         echo sprintf(
-            esc_html__('You are upgrading site ID: %s. Products purchased will upgrade this existing site instead of creating a new one.', 'iwp-woo-v2'),
+            esc_html__('You are upgrading site ID: %s. Products purchased will upgrade this existing site instead of creating a new one.', 'iwp-wp-integration'),
             '<code>' . esc_html($site_id) . '</code>'
         );
-        echo ' <a href="' . esc_url(add_query_arg('iwp_clear_site_id', '1')) . '" style="color: #0073aa; text-decoration: underline;">' . esc_html__('Cancel upgrade mode', 'iwp-woo-v2') . '</a>';
+        echo ' <a href="' . esc_url(add_query_arg('iwp_clear_site_id', '1')) . '" style="color: #0073aa; text-decoration: underline;">' . esc_html__('Cancel upgrade mode', 'iwp-wp-integration') . '</a>';
         echo '</p>';
         echo '</div>';
 

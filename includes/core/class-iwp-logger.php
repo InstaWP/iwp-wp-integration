@@ -2,7 +2,7 @@
 /**
  * Logger Helper Class
  *
- * @package IWP_Woo_V2
+ * @package IWP
  * @since 2.0.0
  */
 
@@ -12,11 +12,11 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * IWP_Woo_V2_Logger class
+ * IWP_Logger class
  * 
  * Centralized logging with consistent formatting and context
  */
-class IWP_Woo_V2_Logger {
+class IWP_Logger {
 
     /**
      * Log levels
@@ -45,7 +45,7 @@ class IWP_Woo_V2_Logger {
      */
     private static function init() {
         if (self::$debug_enabled === null) {
-            $options = IWP_Woo_V2_Database::get_plugin_options();
+            $options = IWP_Database::get_plugin_options();
             self::$debug_enabled = isset($options['debug_mode']) && $options['debug_mode'] === 'yes';
             self::$log_level = isset($options['log_level']) ? $options['log_level'] : self::LEVEL_INFO;
         }
@@ -218,7 +218,7 @@ class IWP_Woo_V2_Logger {
         }
 
         // Also log to database for better tracking
-        IWP_Woo_V2_Database::log_activity('site_creation', $event, $site_data, $order_id);
+        IWP_Database::log_activity('site_creation', $event, $site_data, $order_id);
     }
 
     /**
@@ -239,7 +239,7 @@ class IWP_Woo_V2_Logger {
         self::warning($event, $context, $log_data);
         
         // Also use security helper for consistent security logging
-        IWP_Woo_V2_Security::log_security_event($event, $context_data);
+        IWP_Security::log_security_event($event, $context_data);
     }
 
     /**
@@ -293,7 +293,7 @@ class IWP_Woo_V2_Logger {
         }
 
         // Log to database
-        IWP_Woo_V2_Database::log_activity('order_processing', $event, $order_data, $order_id);
+        IWP_Database::log_activity('order_processing', $event, $order_data, $order_id);
     }
 
     /**
@@ -313,7 +313,7 @@ class IWP_Woo_V2_Logger {
         self::info($action, $context, $log_data);
         
         // Log to database
-        IWP_Woo_V2_Database::log_activity('admin_action', $action, $context_data);
+        IWP_Database::log_activity('admin_action', $action, $context_data);
     }
 
     /**

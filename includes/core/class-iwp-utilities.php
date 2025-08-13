@@ -2,7 +2,7 @@
 /**
  * Utilities class for IWP WooCommerce Integration v2
  *
- * @package IWP_Woo_V2
+ * @package IWP
  * @since 2.0.0
  */
 
@@ -12,9 +12,9 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * IWP_Woo_V2_Utilities class
+ * IWP_Utilities class
  */
-class IWP_Woo_V2_Utilities {
+class IWP_Utilities {
 
     /**
      * Log messages
@@ -37,7 +37,7 @@ class IWP_Woo_V2_Utilities {
      * @return mixed
      */
     public static function get_option($option_name, $default = null) {
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         return isset($options[$option_name]) ? $options[$option_name] : $default;
     }
 
@@ -49,9 +49,9 @@ class IWP_Woo_V2_Utilities {
      * @return bool
      */
     public static function update_option($option_name, $value) {
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         $options[$option_name] = $value;
-        return update_option('iwp_woo_v2_options', $options);
+        return update_option('iwp_options', $options);
     }
 
     /**
@@ -61,10 +61,10 @@ class IWP_Woo_V2_Utilities {
      * @return bool
      */
     public static function delete_option($option_name) {
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         if (isset($options[$option_name])) {
             unset($options[$option_name]);
-            return update_option('iwp_woo_v2_options', $options);
+            return update_option('iwp_options', $options);
         }
         return false;
     }
@@ -101,7 +101,7 @@ class IWP_Woo_V2_Utilities {
      * @return WC_Order|false
      */
     public static function get_order($order_id) {
-        return IWP_Woo_V2_HPOS::get_order($order_id);
+        return IWP_HPOS::get_order($order_id);
     }
 
     /**
@@ -111,7 +111,7 @@ class IWP_Woo_V2_Utilities {
      * @return WC_Order[]
      */
     public static function get_orders($args = array()) {
-        return IWP_Woo_V2_HPOS::get_orders($args);
+        return IWP_HPOS::get_orders($args);
     }
 
     /**
@@ -121,7 +121,7 @@ class IWP_Woo_V2_Utilities {
      * @return int
      */
     public static function get_order_count($args = array()) {
-        return IWP_Woo_V2_HPOS::get_order_count($args);
+        return IWP_HPOS::get_order_count($args);
     }
 
     /**
@@ -132,7 +132,7 @@ class IWP_Woo_V2_Utilities {
      * @return WC_Order[]
      */
     public static function get_orders_by_customer($customer_id, $args = array()) {
-        return IWP_Woo_V2_HPOS::get_orders_by_customer($customer_id, $args);
+        return IWP_HPOS::get_orders_by_customer($customer_id, $args);
     }
 
     /**
@@ -143,7 +143,7 @@ class IWP_Woo_V2_Utilities {
      * @return WC_Order[]
      */
     public static function get_orders_by_status($status, $args = array()) {
-        return IWP_Woo_V2_HPOS::get_orders_by_status($status, $args);
+        return IWP_HPOS::get_orders_by_status($status, $args);
     }
 
     /**
@@ -155,7 +155,7 @@ class IWP_Woo_V2_Utilities {
      * @return mixed
      */
     public static function get_order_meta($order_id, $key, $single = true) {
-        return IWP_Woo_V2_HPOS::get_order_meta($order_id, $key, $single);
+        return IWP_HPOS::get_order_meta($order_id, $key, $single);
     }
 
     /**
@@ -167,7 +167,7 @@ class IWP_Woo_V2_Utilities {
      * @return bool
      */
     public static function update_order_meta($order_id, $key, $value) {
-        return IWP_Woo_V2_HPOS::update_order_meta($order_id, $key, $value);
+        return IWP_HPOS::update_order_meta($order_id, $key, $value);
     }
 
     /**
@@ -178,7 +178,7 @@ class IWP_Woo_V2_Utilities {
      * @return bool
      */
     public static function delete_order_meta($order_id, $key) {
-        return IWP_Woo_V2_HPOS::delete_order_meta($order_id, $key);
+        return IWP_HPOS::delete_order_meta($order_id, $key);
     }
 
     /**
@@ -187,7 +187,7 @@ class IWP_Woo_V2_Utilities {
      * @return bool
      */
     public static function is_hpos_enabled() {
-        return IWP_Woo_V2_HPOS::is_hpos_enabled();
+        return IWP_HPOS::is_hpos_enabled();
     }
 
     /**
@@ -311,11 +311,11 @@ class IWP_Woo_V2_Utilities {
      */
     public static function locate_template($template_name, $template_path = '', $default_path = '') {
         if (!$template_path) {
-            $template_path = 'iwp-woo-v2/';
+            $template_path = 'iwp/';
         }
 
         if (!$default_path) {
-            $default_path = IWP_WOO_V2_PLUGIN_PATH . 'templates/';
+            $default_path = IWP_PLUGIN_PATH . 'templates/';
         }
 
         // Look within passed path within the theme
@@ -329,7 +329,7 @@ class IWP_Woo_V2_Utilities {
             $template = $default_path . $template_name;
         }
 
-        return apply_filters('iwp_woo_v2_locate_template', $template, $template_name, $template_path);
+        return apply_filters('iwp_locate_template', $template, $template_name, $template_path);
     }
 
     /**

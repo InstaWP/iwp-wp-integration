@@ -2,7 +2,7 @@
 /**
  * Form Helper Class
  *
- * @package IWP_Woo_V2
+ * @package IWP
  * @since 2.0.0
  */
 
@@ -12,11 +12,11 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * IWP_Woo_V2_Form_Helper class
+ * IWP_Form_Helper class
  * 
  * Centralized form rendering and HTML generation
  */
-class IWP_Woo_V2_Form_Helper {
+class IWP_Form_Helper {
 
     /**
      * Render form field
@@ -284,7 +284,7 @@ class IWP_Woo_V2_Form_Helper {
         // Card header
         $output .= '<div class="iwp-site-card-header">';
         $output .= '<h4 class="iwp-site-title">';
-        $output .= isset($site_data['name']) ? esc_html($site_data['name']) : __('InstaWP Site', 'instawp-integration');
+        $output .= isset($site_data['name']) ? esc_html($site_data['name']) : __('InstaWP Site', 'iwp-wp-integration');
         $output .= '</h4>';
         
         // Status badge
@@ -304,7 +304,7 @@ class IWP_Woo_V2_Form_Helper {
             if (!empty($site_data['wp_url']) || !empty($site_data['site_url'])) {
                 $site_url = !empty($site_data['wp_url']) ? $site_data['wp_url'] : $site_data['site_url'];
                 $output .= '<div class="iwp-site-detail">';
-                $output .= '<strong>' . __('Site URL:', 'instawp-integration') . '</strong> ';
+                $output .= '<strong>' . __('Site URL:', 'iwp-wp-integration') . '</strong> ';
                 $output .= '<a href="' . esc_url($site_url) . '" target="_blank" rel="noopener noreferrer">';
                 $output .= esc_html($site_url);
                 $output .= '</a>';
@@ -314,28 +314,28 @@ class IWP_Woo_V2_Form_Helper {
             // Admin credentials
             if (!empty($site_data['wp_username'])) {
                 $output .= '<div class="iwp-site-detail">';
-                $output .= '<strong>' . __('Admin Username:', 'instawp-integration') . '</strong> ';
+                $output .= '<strong>' . __('Admin Username:', 'iwp-wp-integration') . '</strong> ';
                 $output .= '<code class="iwp-copyable" data-copy="' . esc_attr($site_data['wp_username']) . '">';
                 $output .= esc_html($site_data['wp_username']);
                 $output .= '</code>';
                 $output .= ' <button type="button" class="iwp-copy-btn" data-copy="' . esc_attr($site_data['wp_username']) . '">';
-                $output .= __('Copy', 'instawp-integration');
+                $output .= __('Copy', 'iwp-wp-integration');
                 $output .= '</button>';
                 $output .= '</div>';
             }
             
             if (!empty($site_data['wp_password'])) {
                 $output .= '<div class="iwp-site-detail">';
-                $output .= '<strong>' . __('Admin Password:', 'instawp-integration') . '</strong> ';
+                $output .= '<strong>' . __('Admin Password:', 'iwp-wp-integration') . '</strong> ';
                 $output .= '<span class="iwp-password-field">';
                 $output .= '<code class="iwp-password iwp-password-hidden">••••••••</code>';
                 $output .= '<code class="iwp-password iwp-password-visible" style="display:none;">';
                 $output .= esc_html($site_data['wp_password']);
                 $output .= '</code>';
                 $output .= '</span>';
-                $output .= ' <button type="button" class="iwp-toggle-password">' . __('Show', 'instawp-integration') . '</button>';
+                $output .= ' <button type="button" class="iwp-toggle-password">' . __('Show', 'iwp-wp-integration') . '</button>';
                 $output .= ' <button type="button" class="iwp-copy-btn" data-copy="' . esc_attr($site_data['wp_password']) . '">';
-                $output .= __('Copy', 'instawp-integration');
+                $output .= __('Copy', 'iwp-wp-integration');
                 $output .= '</button>';
                 $output .= '</div>';
             }
@@ -343,7 +343,7 @@ class IWP_Woo_V2_Form_Helper {
             // Creation date
             if (!empty($site_data['created_at'])) {
                 $output .= '<div class="iwp-site-detail">';
-                $output .= '<strong>' . __('Created:', 'instawp-integration') . '</strong> ';
+                $output .= '<strong>' . __('Created:', 'iwp-wp-integration') . '</strong> ';
                 $output .= esc_html(date_i18n(get_option('date_format') . ' ' . get_option('time_format'), strtotime($site_data['created_at'])));
                 $output .= '</div>';
             }
@@ -359,7 +359,7 @@ class IWP_Woo_V2_Form_Helper {
             if (!empty($site_data['wp_url']) || !empty($site_data['site_url'])) {
                 $site_url = !empty($site_data['wp_url']) ? $site_data['wp_url'] : $site_data['site_url'];
                 $output .= '<a href="' . esc_url($site_url) . '" target="_blank" class="iwp-btn iwp-btn-primary">';
-                $output .= __('Visit Site', 'instawp-integration');
+                $output .= __('Visit Site', 'iwp-wp-integration');
                 $output .= '</a>';
             }
             
@@ -367,13 +367,13 @@ class IWP_Woo_V2_Form_Helper {
             if (!empty($site_data['s_hash'])) {
                 $magic_login_url = 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($site_data['s_hash']);
                 $output .= '<a href="' . esc_url($magic_login_url) . '" target="_blank" class="iwp-btn iwp-btn-secondary">';
-                $output .= __('Magic Login', 'instawp-integration');
+                $output .= __('Magic Login', 'iwp-wp-integration');
                 $output .= '</a>';
             } elseif (!empty($site_data['wp_url']) || !empty($site_data['site_url'])) {
                 $site_url = !empty($site_data['wp_url']) ? $site_data['wp_url'] : $site_data['site_url'];
                 $admin_url = rtrim($site_url, '/') . '/wp-admin';
                 $output .= '<a href="' . esc_url($admin_url) . '" target="_blank" class="iwp-btn iwp-btn-secondary">';
-                $output .= __('Admin Login', 'instawp-integration');
+                $output .= __('Admin Login', 'iwp-wp-integration');
                 $output .= '</a>';
             }
             
@@ -382,7 +382,7 @@ class IWP_Woo_V2_Form_Helper {
                 $output .= '<button type="button" class="iwp-btn iwp-btn-tertiary iwp-map-domain-btn" ';
                 $output .= 'data-site-id="' . esc_attr($site_data['site_id']) . '" ';
                 $output .= 'data-order-id="' . esc_attr($args['order_id']) . '">';
-                $output .= __('Map Domain', 'instawp-integration');
+                $output .= __('Map Domain', 'iwp-wp-integration');
                 $output .= '</button>';
             }
             
@@ -403,10 +403,10 @@ class IWP_Woo_V2_Form_Helper {
      */
     private static function get_status_text($status) {
         $status_texts = array(
-            'completed' => __('Ready', 'instawp-integration'),
-            'progress' => __('Creating...', 'instawp-integration'),
-            'failed' => __('Failed', 'instawp-integration'),
-            'pending' => __('Pending', 'instawp-integration')
+            'completed' => __('Ready', 'iwp-wp-integration'),
+            'progress' => __('Creating...', 'iwp-wp-integration'),
+            'failed' => __('Failed', 'iwp-wp-integration'),
+            'pending' => __('Pending', 'iwp-wp-integration')
         );
 
         return isset($status_texts[$status]) ? $status_texts[$status] : ucfirst($status);

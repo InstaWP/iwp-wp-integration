@@ -1,8 +1,8 @@
 <?php
 /**
- * InstaWP API Client for IWP WooCommerce Integration v2
+ * InstaWP API Client for InstaWP Integration
  *
- * @package IWP_Woo_V2
+ * @package IWP
  * @since 2.0.0
  */
 
@@ -12,9 +12,9 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * IWP_Woo_V2_API_Client class
+ * IWP_API_Client class
  */
-class IWP_Woo_V2_API_Client {
+class IWP_API_Client {
 
     /**
      * API base URL
@@ -38,11 +38,19 @@ class IWP_Woo_V2_API_Client {
     private $api_key;
 
     /**
+     * Selected team ID
+     *
+     * @var int|null
+     */
+    private $team_id;
+
+    /**
      * Constructor
      */
     public function __construct() {
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         $this->api_key = isset($options['api_key']) ? $options['api_key'] : '';
+        $this->team_id = isset($options['selected_team_id']) ? intval($options['selected_team_id']) : null;
     }
 
     /**
@@ -64,6 +72,24 @@ class IWP_Woo_V2_API_Client {
     }
 
     /**
+     * Set team ID
+     *
+     * @param int|null $team_id
+     */
+    public function set_team_id($team_id) {
+        $this->team_id = $team_id ? intval($team_id) : null;
+    }
+
+    /**
+     * Get team ID
+     *
+     * @return int|null
+     */
+    public function get_team_id() {
+        return $this->team_id;
+    }
+
+    /**
      * Make API request
      *
      * @param string $endpoint
@@ -72,14 +98,20 @@ class IWP_Woo_V2_API_Client {
      */
     private function make_request($endpoint, $args = array()) {
         if (empty($this->api_key)) {
-            IWP_Woo_V2_Logger::error('API key is empty', 'api-client');
+            IWP_Logger::error('API key is empty', 'api-client');
             return new WP_Error('no_api_key', __('API key is required', 'iwp-woo-v2'));
         }
 
         $url = rtrim($this->api_url, '/') . '/' . ltrim($endpoint, '/');
         
+        // Add team_id parameter if set
+        if ($this->team_id && strpos($endpoint, 'teams') === false) {
+            $separator = strpos($url, '?') !== false ? '&' : '?';
+            $url .= $separator . 'team_id=' . $this->team_id;
+        }
+        
         $default_args = array(
-            'timeout' => 30,
+            'timeout' => 60,
             'headers' => array(
                 'Authorization' => 'Bearer ' . $this->api_key,
                 'Content-Type' => 'application/json',
@@ -94,16 +126,16 @@ class IWP_Woo_V2_API_Client {
         if (isset($log_args['headers']['Authorization'])) {
             $log_args['headers']['Authorization'] = 'Bearer ' . $this->api_key;
         }
-        IWP_Woo_V2_Logger::debug('Making API request', 'api-client', array('url' => $url));
-        IWP_Woo_V2_Logger::debug('Request args', 'api-client', $log_args);
+        IWP_Logger::debug('Making API request', 'api-client', array('url' => $url));
+        IWP_Logger::debug('Request args', 'api-client', $log_args);
 
         $response = wp_remote_request($url, $args);
 
         // Log the response in errorlog
-        IWP_Woo_V2_Logger::debug('Raw API response received', 'api-client');
+        IWP_Logger::debug('Raw API response received', 'api-client');
 
         if (is_wp_error($response)) {
-            IWP_Woo_V2_Logger::error('API request failed with WP_Error', 'api-client', array('error' => $response->get_error_message()));
+            IWP_Logger::error('API request failed with WP_Error', 'api-client', array('error' => $response->get_error_message()));
             return $response;
         }
 
@@ -112,9 +144,9 @@ class IWP_Woo_V2_API_Client {
         $response_headers = wp_remote_retrieve_headers($response);
 
         // Log the response details
-        IWP_Woo_V2_Logger::debug('API response code', 'api-client', array('code' => $response_code));
+        IWP_Logger::debug('API response code', 'api-client', array('code' => $response_code));
         error_log('IWP WooCommerce V2: API response headers: ' . wp_json_encode($response_headers->getAll()));
-        IWP_Woo_V2_Logger::debug('API response body received', 'api-client');
+        IWP_Logger::debug('API response body received', 'api-client');
 
         if ($response_code < 200 || $response_code >= 300) {
             $error_message = sprintf(
@@ -128,14 +160,14 @@ class IWP_Woo_V2_API_Client {
                 $error_message .= ': ' . sanitize_text_field($body_data['message']);
             }
             
-            IWP_Woo_V2_Logger::error('API request failed', 'api-client', array('error' => $error_message));
+            IWP_Logger::error('API request failed', 'api-client', array('error' => $error_message));
             return new WP_Error('api_request_failed', $error_message);
         }
 
         $data = json_decode($response_body, true);
         
         if (json_last_error() !== JSON_ERROR_NONE) {
-            IWP_Woo_V2_Logger::error('JSON decode error', 'api-client', array('error' => json_last_error_msg()));
+            IWP_Logger::error('JSON decode error', 'api-client', array('error' => json_last_error_msg()));
             return new WP_Error('json_decode_error', __('Invalid JSON response', 'iwp-woo-v2'));
         }
 
@@ -149,29 +181,32 @@ class IWP_Woo_V2_API_Client {
      * @return array|WP_Error
      */
     public function get_snapshots() {
-        error_log('IWP WooCommerce V2: get_snapshots() called');
+        // Use team-specific cache key if team is selected
+        $cache_key = $this->team_id ? 'iwp_snapshots_team_' . $this->team_id : 'iwp_snapshots';
         
-        $cached_snapshots = get_transient('iwp_woo_v2_snapshots');
+        IWP_Logger::debug('get_snapshots() called', 'api-client', array('team_id' => $this->team_id, 'cache_key' => $cache_key));
+        
+        $cached_snapshots = get_transient($cache_key);
         
         if (false !== $cached_snapshots) {
-            error_log('IWP WooCommerce V2: Using cached snapshots data');
+            IWP_Logger::debug('Using cached snapshots data', 'api-client', array('cache_key' => $cache_key));
             return $cached_snapshots;
         }
 
-        error_log('IWP WooCommerce V2: No cached snapshots found, making API request');
+        IWP_Logger::debug('No cached snapshots found, making API request', 'api-client', array('cache_key' => $cache_key));
         $response = $this->make_request('snapshots', array(
             'method' => 'GET',
         ));
 
         if (is_wp_error($response)) {
-            error_log('IWP WooCommerce V2: get_snapshots() failed: ' . $response->get_error_message());
+            IWP_Logger::error('get_snapshots() failed', 'api-client', array('error' => $response->get_error_message()));
             return $response;
         }
 
         // Cache for configurable duration (default 15 minutes)
-        $cache_duration = apply_filters('iwp_woo_v2_snapshots_cache_duration', 15 * MINUTE_IN_SECONDS);
-        set_transient('iwp_woo_v2_snapshots', $response, $cache_duration);
-        error_log('IWP WooCommerce V2: Snapshots cached for ' . ($cache_duration / 60) . ' minutes');
+        $cache_duration = apply_filters('iwp_snapshots_cache_duration', 15 * MINUTE_IN_SECONDS);
+        set_transient($cache_key, $response, $cache_duration);
+        IWP_Logger::info('Snapshots cached', 'api-client', array('cache_key' => $cache_key, 'duration_minutes' => $cache_duration / 60));
 
         return $response;
     }
@@ -180,8 +215,15 @@ class IWP_Woo_V2_API_Client {
      * Clear snapshots cache
      */
     public function clear_snapshots_cache() {
-        delete_transient('iwp_woo_v2_snapshots');
-        error_log('IWP WooCommerce V2: Snapshots cache cleared');
+        // Clear team-specific cache if team is selected
+        if ($this->team_id) {
+            $cache_key = 'iwp_snapshots_team_' . $this->team_id;
+            delete_transient($cache_key);
+            IWP_Logger::debug('Team-specific snapshots cache cleared', 'api-client', array('cache_key' => $cache_key));
+        } else {
+            delete_transient('iwp_snapshots');
+            IWP_Logger::debug('Default snapshots cache cleared', 'api-client');
+        }
     }
 
     /**
@@ -211,27 +253,28 @@ class IWP_Woo_V2_API_Client {
      * @return array|WP_Error
      */
     public function get_plans() {
-        $cache_key = 'iwp_woo_v2_plans';
+        // Use team-specific cache key if team is selected
+        $cache_key = $this->team_id ? 'iwp_plans_team_' . $this->team_id : 'iwp_plans';
         $cached_plans = get_transient($cache_key);
         
         if ($cached_plans !== false) {
-            error_log('IWP WooCommerce V2: Returning cached plans data');
+            IWP_Logger::debug('Using cached plans data', 'api-client', array('cache_key' => $cache_key));
             return $cached_plans;
         }
 
-        error_log('IWP WooCommerce V2: Fetching plans from API');
+        IWP_Logger::debug('Fetching plans from API', 'api-client', array('cache_key' => $cache_key));
         
         $response = $this->make_request('get-plans?product_type=sites', array(
             'method' => 'GET',
         ));
 
         if (is_wp_error($response)) {
-            error_log('IWP WooCommerce V2: Failed to fetch plans: ' . $response->get_error_message());
+            IWP_Logger::error('Failed to fetch plans', 'api-client', array('error' => $response->get_error_message()));
             return $response;
         }
 
         // Cache for configurable duration (default 1 hour)
-        $cache_duration = apply_filters('iwp_woo_v2_plans_cache_duration', HOUR_IN_SECONDS);
+        $cache_duration = apply_filters('iwp_plans_cache_duration', HOUR_IN_SECONDS);
         set_transient($cache_key, $response, $cache_duration);
         
         // Count plans from numbered keys (0, 1, 2, etc.)
@@ -244,7 +287,7 @@ class IWP_Woo_V2_API_Client {
             }
         }
         
-        error_log('IWP WooCommerce V2: Successfully fetched ' . $plan_count . ' plans');
+        IWP_Logger::info('Successfully fetched plans', 'api-client', array('count' => $plan_count, 'cache_key' => $cache_key));
         return $response;
     }
 
@@ -263,6 +306,43 @@ class IWP_Woo_V2_API_Client {
             'method' => 'GET',
         ));
         
+        return $response;
+    }
+
+    /**
+     * Get teams
+     *
+     * @return array|WP_Error
+     */
+    public function get_teams() {
+        $cached_teams = get_transient('iwp_teams');
+        
+        if (false !== $cached_teams) {
+            IWP_Logger::debug('Using cached teams data', 'api-client');
+            return $cached_teams;
+        }
+
+        IWP_Logger::debug('Fetching teams from API', 'api-client');
+        
+        $response = $this->make_request('teams', array(
+            'method' => 'GET',
+        ));
+
+        if (is_wp_error($response)) {
+            IWP_Logger::error('Failed to fetch teams', 'api-client', array('error' => $response->get_error_message()));
+            return $response;
+        }
+
+        // Cache for configurable duration (default 1 hour)
+        $cache_duration = apply_filters('iwp_teams_cache_duration', HOUR_IN_SECONDS);
+        set_transient('iwp_teams', $response, $cache_duration);
+        
+        $team_count = 0;
+        if (isset($response['data']) && is_array($response['data'])) {
+            $team_count = count($response['data']);
+        }
+        
+        IWP_Logger::info('Successfully fetched teams', 'api-client', array('count' => $team_count));
         return $response;
     }
 
@@ -490,6 +570,112 @@ class IWP_Woo_V2_API_Client {
     }
 
     /**
+     * Disable demo helper plugin on a site
+     *
+     * @param int $site_id
+     * @param string $site_url Optional site URL (if not provided, will try to get from site details)
+     * @return array|WP_Error
+     */
+    public function disable_demo_helper($site_id, $site_url = '') {
+        if (empty($site_id) || !is_numeric($site_id)) {
+            return new WP_Error('invalid_site_id', __('Valid site ID is required', 'iwp-wp-integration'));
+        }
+
+        // If no site URL provided, try to get it from site details
+        if (empty($site_url)) {
+            $site_details = $this->get_site_details($site_id);
+            if (is_wp_error($site_details)) {
+                IWP_Logger::warning('Could not get site details for demo helper disable', 'api-client', array(
+                    'site_id' => $site_id,
+                    'error' => $site_details->get_error_message()
+                ));
+                return $site_details;
+            }
+            
+            $site_url = $site_details['data']['url'] ?? '';
+            if (empty($site_url)) {
+                return new WP_Error('no_site_url', __('Could not determine site URL for demo helper disable', 'iwp-wp-integration'));
+            }
+        }
+
+        // Construct the demo helper disable endpoint
+        $demo_helper_url = trailingslashit($site_url) . 'wp-json/iwp-demo-helper/v1/disable';
+
+        IWP_Logger::info('Disabling demo helper plugin', 'api-client', array(
+            'site_id' => $site_id,
+            'site_url' => $site_url,
+            'endpoint' => $demo_helper_url
+        ));
+
+        // Make the API call to the site's demo helper endpoint
+        $response = wp_remote_post($demo_helper_url, array(
+            'timeout' => 30,
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'User-Agent' => 'InstaWP-Integration/' . IWP_VERSION
+            ),
+            'body' => wp_json_encode(array(
+                'source' => 'instawp-integration',
+                'site_id' => $site_id,
+                'timestamp' => current_time('timestamp')
+            ))
+        ));
+
+        if (is_wp_error($response)) {
+            IWP_Logger::error('Failed to disable demo helper - network error', 'api-client', array(
+                'site_id' => $site_id,
+                'site_url' => $site_url,
+                'error' => $response->get_error_message()
+            ));
+            return $response;
+        }
+
+        $response_code = wp_remote_retrieve_response_code($response);
+        $response_body = wp_remote_retrieve_body($response);
+
+        if ($response_code === 200) {
+            IWP_Logger::info('Successfully disabled demo helper plugin', 'api-client', array(
+                'site_id' => $site_id,
+                'site_url' => $site_url,
+                'response' => $response_body
+            ));
+            
+            return array(
+                'success' => true,
+                'message' => 'Demo helper plugin disabled successfully',
+                'response_body' => $response_body
+            );
+        } elseif ($response_code === 404) {
+            // Plugin not installed or endpoint not found - this is expected and not an error
+            IWP_Logger::info('Demo helper plugin not found (expected)', 'api-client', array(
+                'site_id' => $site_id,
+                'site_url' => $site_url,
+                'response_code' => $response_code
+            ));
+            
+            return array(
+                'success' => true,
+                'message' => 'Demo helper plugin not installed (silently ignored)',
+                'response_body' => $response_body
+            );
+        } else {
+            // Other HTTP error codes
+            IWP_Logger::warning('Demo helper disable returned non-success code', 'api-client', array(
+                'site_id' => $site_id,
+                'site_url' => $site_url,
+                'response_code' => $response_code,
+                'response_body' => $response_body
+            ));
+            
+            return new WP_Error('demo_helper_error', sprintf(
+                __('Demo helper disable failed with code %d: %s', 'iwp-wp-integration'),
+                $response_code,
+                $response_body
+            ));
+        }
+    }
+
+    /**
      * Delete InstaWP site
      *
      * @param int|string $site_id
@@ -503,7 +689,7 @@ class IWP_Woo_V2_API_Client {
         // Support both numeric and hash site IDs
         $sanitized_site_id = is_numeric($site_id) ? intval($site_id) : sanitize_text_field($site_id);
 
-        IWP_Woo_V2_Logger::info('Deleting site', 'api-client', array('site_id' => $sanitized_site_id));
+        IWP_Logger::info('Deleting site', 'api-client', array('site_id' => $sanitized_site_id));
 
         $endpoint = 'sites/' . $sanitized_site_id;
         
@@ -512,14 +698,51 @@ class IWP_Woo_V2_API_Client {
         ));
 
         if (is_wp_error($response)) {
-            IWP_Woo_V2_Logger::error('Site deletion failed', 'api-client', array(
+            IWP_Logger::error('Site deletion failed', 'api-client', array(
                 'site_id' => $sanitized_site_id,
                 'error' => $response->get_error_message()
             ));
             return $response;
         }
 
-        IWP_Woo_V2_Logger::info('Site deletion successful', 'api-client', array('site_id' => $sanitized_site_id));
+        IWP_Logger::info('Site deletion successful', 'api-client', array('site_id' => $sanitized_site_id));
+        return $response;
+    }
+
+    /**
+     * Toggle site reservation status (permanent/temporary)
+     *
+     * @param int|string $site_id Site ID
+     * @return array|WP_Error
+     */
+    public function toggle_site_reservation($site_id) {
+        if (empty($site_id)) {
+            return new WP_Error('invalid_site_id', __('Site ID is required', 'iwp-wp-integration'));
+        }
+
+        // Support both numeric and hash site IDs
+        $sanitized_site_id = is_numeric($site_id) ? intval($site_id) : sanitize_text_field($site_id);
+
+        IWP_Logger::info('Toggling site reservation status', 'api-client', array('site_id' => $sanitized_site_id));
+
+        $endpoint = 'sites/' . $sanitized_site_id . '/reserve-toggle';
+        
+        $response = $this->make_request($endpoint, array(
+            'method' => 'POST'
+        ));
+
+        if (is_wp_error($response)) {
+            IWP_Logger::error('Site reservation toggle failed', 'api-client', array(
+                'site_id' => $sanitized_site_id,
+                'error' => $response->get_error_message()
+            ));
+            return $response;
+        }
+
+        IWP_Logger::info('Site reservation toggle successful', 'api-client', array(
+            'site_id' => $sanitized_site_id,
+            'new_status' => isset($response['is_reserved']) ? ($response['is_reserved'] ? 'permanent' : 'temporary') : 'unknown'
+        ));
         return $response;
     }
 
@@ -540,6 +763,62 @@ class IWP_Woo_V2_API_Client {
      */
     public function clear_templates_cache() {
         return $this->clear_snapshots_cache();
+    }
+
+    /**
+     * Update site configuration with post options
+     *
+     * @param string $site_id InstaWP site ID
+     * @param array $post_options Configuration options to apply after site creation
+     * @return array|WP_Error API response or error
+     */
+    public function update_site($site_id, $post_options = array()) {
+        if (empty($site_id)) {
+            return new WP_Error('missing_site_id', __('Site ID is required', 'iwp-woo-v2'));
+        }
+
+        if (empty($this->api_key)) {
+            return new WP_Error('no_api_key', __('API key not configured', 'iwp-woo-v2'));
+        }
+
+        $endpoint = 'sites/' . intval($site_id);
+        
+        $body = array();
+        
+        // Add post_options inside wordpress object structure per API spec
+        if (!empty($post_options)) {
+            $body['wordpress'] = array(
+                'post_options' => $post_options
+            );
+        }
+
+        IWP_Logger::info('Preparing site update request', 'api-client', array(
+            'site_id' => $site_id,
+            'endpoint' => $endpoint,
+            'post_options' => $post_options
+        ));
+
+        // Use the centralized make_request method with PATCH
+        $response = $this->make_request($endpoint, array(
+            'method' => 'PATCH',
+            'body' => wp_json_encode($body)
+        ));
+
+        if (is_wp_error($response)) {
+            IWP_Logger::error('Site update request failed', 'api-client', array(
+                'site_id' => $site_id,
+                'error' => $response->get_error_message()
+            ));
+            return $response;
+        }
+
+        IWP_Logger::info('Site updated successfully', 'api-client', array(
+            'site_id' => $site_id,
+            'post_options' => !empty($post_options),
+            'response_keys' => is_array($response) ? array_keys($response) : 'not_array'
+        ));
+
+        return $response;
     }
 
     /**
@@ -577,7 +856,7 @@ class IWP_Woo_V2_API_Client {
             return;
         }
 
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         $debug_mode = isset($options['debug_mode']) ? $options['debug_mode'] : 'no';
 
         if ($debug_mode !== 'yes') {

@@ -2,7 +2,7 @@
 /**
  * Order Processing for IWP WooCommerce Integration v2
  *
- * @package IWP_Woo_V2
+ * @package IWP
  * @since 2.0.0
  */
 
@@ -12,21 +12,21 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * IWP_Woo_V2_Order_Processor class
+ * IWP_Woo_Order_Processor class
  */
-class IWP_Woo_V2_Order_Processor {
+class IWP_Woo_Order_Processor {
 
     /**
      * API Client instance
      *
-     * @var IWP_Woo_V2_API_Client
+     * @var IWP_API_Client
      */
     private $api_client;
 
     /**
      * Product Integration instance
      *
-     * @var IWP_Woo_V2_Product_Integration
+     * @var IWP_Product_Integration
      */
     private $product_integration;
 
@@ -34,7 +34,15 @@ class IWP_Woo_V2_Order_Processor {
      * Constructor
      */
     public function __construct() {
-        $this->api_client = new IWP_Woo_V2_API_Client();
+        // Load required dependencies
+        if (!class_exists('IWP_API_Client')) {
+            require_once IWP_PLUGIN_PATH . 'includes/core/class-iwp-api-client.php';
+        }
+        if (!class_exists('IWP_Logger')) {
+            require_once IWP_PLUGIN_PATH . 'includes/core/class-iwp-logger.php';
+        }
+        
+        $this->api_client = new IWP_API_Client();
         $this->init_hooks();
     }
 
@@ -48,7 +56,7 @@ class IWP_Woo_V2_Order_Processor {
         // Process order when it's processing (for digital products)
         add_action('woocommerce_order_status_processing', array($this, 'process_processing_order'));
         
-        // Add order meta box to display InstaWP sites
+        // Add order meta box to display sites
         add_action('add_meta_boxes', array($this, 'add_order_meta_box'));
         
         // Add custom columns to orders list
@@ -59,7 +67,7 @@ class IWP_Woo_V2_Order_Processor {
     /**
      * Set product integration instance
      *
-     * @param IWP_Woo_V2_Product_Integration $product_integration
+     * @param IWP_Product_Integration $product_integration
      */
     public function set_product_integration($product_integration) {
         $this->product_integration = $product_integration;
@@ -86,7 +94,7 @@ class IWP_Woo_V2_Order_Processor {
     }
 
     /**
-     * Process order for InstaWP site creation
+     * Process order for site creation
      *
      * @param int $order_id
      * @param string $status
@@ -107,7 +115,7 @@ class IWP_Woo_V2_Order_Processor {
         }
 
         // Check if auto-create is enabled globally
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         $auto_create_enabled = isset($options['auto_create_sites_on_purchase']) ? $options['auto_create_sites_on_purchase'] : 'yes';
         
         if ($auto_create_enabled !== 'yes') {
@@ -119,7 +127,10 @@ class IWP_Woo_V2_Order_Processor {
         $errors = array();
 
         // Check if site_id upgrade mode is active
-        $frontend = new IWP_Woo_V2_Frontend();
+        if (!class_exists('IWP_Frontend')) {
+            require_once IWP_PLUGIN_PATH . 'includes/frontend/class-iwp-frontend.php';
+        }
+        $frontend = new IWP_Frontend();
         $upgrade_site_id = $frontend->get_stored_site_id();
         
         if ($upgrade_site_id) {
@@ -135,7 +146,7 @@ class IWP_Woo_V2_Order_Processor {
                 continue;
             }
 
-            // Check if this product has an InstaWP snapshot or plan
+            // Check if this product has a snapshot or plan
             $snapshot_slug = get_post_meta($product->get_id(), '_iwp_selected_snapshot', true);
             $plan_id = get_post_meta($product->get_id(), '_iwp_selected_plan', true);
             
@@ -212,7 +223,10 @@ class IWP_Woo_V2_Order_Processor {
         $order->add_order_note($note, 1); // 1 = customer visible
 
         // Always clear stored site_id after processing order (whether upgrade happened or not)
-        $frontend = new IWP_Woo_V2_Frontend();
+        if (!class_exists('IWP_Frontend')) {
+            require_once IWP_PLUGIN_PATH . 'includes/frontend/class-iwp-frontend.php';
+        }
+        $frontend = new IWP_Frontend();
         $frontend->clear_stored_site_id();
         error_log('IWP WooCommerce V2: Cleared stored site_id after order processing');
 
@@ -231,7 +245,7 @@ class IWP_Woo_V2_Order_Processor {
      */
     private function create_site_for_product($order, $product, $snapshot_slug, $item, $plan_id = '') {
         // Get API key from settings
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         $api_key = isset($options['api_key']) ? $options['api_key'] : '';
         
         if (empty($api_key)) {
@@ -267,6 +281,23 @@ class IWP_Woo_V2_Order_Processor {
             'customer_id' => $order->get_customer_id()
         );
         
+        // Add subscription reference if this order is related to a subscription
+        if (function_exists('wcs_order_contains_subscription') && function_exists('wcs_get_subscriptions_for_order')) {
+            if (wcs_order_contains_subscription($order->get_id(), 'parent')) {
+                $subscriptions = wcs_get_subscriptions_for_order($order->get_id(), array('order_type' => 'parent'));
+                if (!empty($subscriptions)) {
+                    $subscription = reset($subscriptions);
+                    $site_data['subscription_id'] = $subscription->get_id();
+                }
+            } elseif (wcs_order_contains_subscription($order->get_id(), 'renewal')) {
+                $subscriptions = wcs_get_subscriptions_for_order($order->get_id(), array('order_type' => 'renewal'));
+                if (!empty($subscriptions)) {
+                    $subscription = reset($subscriptions);
+                    $site_data['subscription_id'] = $subscription->get_id();
+                }
+            }
+        }
+        
         // Add expiry settings to site data
         if ($expiry_type === 'temporary' && !empty($expiry_hours)) {
             $site_data['expiry_hours'] = intval($expiry_hours);
@@ -277,7 +308,10 @@ class IWP_Woo_V2_Order_Processor {
         }
 
         // Use site manager to create site with progress tracking
-        $site_manager = new IWP_Woo_V2_Site_Manager();
+        if (!class_exists('IWP_Site_Manager')) {
+            require_once IWP_PLUGIN_PATH . 'includes/core/class-iwp-site-manager.php';
+        }
+        $site_manager = new IWP_Site_Manager();
         $result = $site_manager->create_site_with_tracking(
             $snapshot_slug, 
             $site_data, 
@@ -312,7 +346,7 @@ class IWP_Woo_V2_Order_Processor {
      */
     private function upgrade_site_plan($order, $product, $site_id, $plan_id, $item) {
         // Get API key from settings
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         $api_key = isset($options['api_key']) ? $options['api_key'] : '';
         
         if (empty($api_key)) {
@@ -328,7 +362,62 @@ class IWP_Woo_V2_Order_Processor {
             return $result;
         }
 
-        // Prepare response data
+        // Plan upgrade successful - now disable demo helper plugin
+        error_log('IWP WooCommerce V2: Plan upgrade successful, attempting to disable demo helper plugin');
+        $demo_disable_result = $this->api_client->disable_demo_helper($site_id);
+        
+        if (is_wp_error($demo_disable_result)) {
+            error_log('IWP WooCommerce V2: Failed to disable demo helper: ' . $demo_disable_result->get_error_message());
+            // Don't fail the upgrade if demo helper disable fails - just log it
+        } else {
+            error_log('IWP WooCommerce V2: Demo helper disable result: ' . $demo_disable_result['message']);
+        }
+
+        // Extract site details from upgrade response if available
+        $upgrade_site_data = array(
+            'order_id' => $order->get_id(),
+            'product_id' => $product->get_id(),
+            'customer_id' => $order->get_customer_id(),
+            'upgrade_response' => $result
+        );
+
+        // Try to extract site details from the API response
+        if (is_array($result) && isset($result['data'])) {
+            $site_details = $result['data'];
+            
+            // Get site details to update database
+            if (isset($site_details['site_details']) && is_array($site_details['site_details'])) {
+                $details = $site_details['site_details'];
+                if (isset($details['data']) && is_array($details['data'])) {
+                    $site_info = $details['data'];
+                    
+                    if (isset($site_info['url'])) {
+                        $upgrade_site_data['site_url'] = $site_info['url'];
+                    }
+                    if (isset($site_info['wp_username'])) {
+                        $upgrade_site_data['wp_username'] = $site_info['wp_username'];
+                    }
+                    if (isset($site_info['wp_password'])) {
+                        $upgrade_site_data['wp_password'] = $site_info['wp_password'];
+                    }
+                    if (isset($site_info['s_hash'])) {
+                        $upgrade_site_data['s_hash'] = $site_info['s_hash'];
+                    }
+                }
+            }
+        }
+
+        // Update the database with the plan change
+        IWP_Sites_Model::init();
+        $db_update_result = IWP_Sites_Model::update_plan($site_id, $plan_id, $upgrade_site_data);
+        
+        if (!$db_update_result) {
+            error_log('IWP WooCommerce V2: Failed to update site plan in database for site_id: ' . $site_id);
+        } else {
+            error_log('IWP WooCommerce V2: Successfully updated site plan in database for site_id: ' . $site_id);
+        }
+
+        // Prepare response data for order processing
         $upgrade_data = array(
             'site_id' => $site_id,
             'plan_id' => $plan_id,
@@ -338,6 +427,17 @@ class IWP_Woo_V2_Order_Processor {
             'customer_id' => $order->get_customer_id(),
             'upgrade_response' => $result
         );
+
+        // Add site details to response if we got them
+        if (isset($upgrade_site_data['site_url'])) {
+            $upgrade_data['site_url'] = $upgrade_site_data['site_url'];
+        }
+        if (isset($upgrade_site_data['wp_username'])) {
+            $upgrade_data['wp_username'] = $upgrade_site_data['wp_username'];
+        }
+        if (isset($upgrade_site_data['s_hash'])) {
+            $upgrade_data['s_hash'] = $upgrade_site_data['s_hash'];
+        }
 
         // Add this to order meta as well
         $existing_upgrades = get_post_meta($order->get_id(), '_iwp_site_upgrades', true);
@@ -358,7 +458,7 @@ class IWP_Woo_V2_Order_Processor {
      * @return string
      */
     private function generate_order_note($sites_created, $errors) {
-        $note = __('InstaWP Processing Results:', 'iwp-woo-v2') . "\n\n";
+        $note = __('Processing Results:', 'iwp-woo-v2') . "\n\n";
         
         if (!empty($sites_created)) {
             $created_sites = array_filter($sites_created, function($site) {
@@ -434,7 +534,7 @@ class IWP_Woo_V2_Order_Processor {
     public function add_order_meta_box() {
         add_meta_box(
             'iwp-order-sites',
-            __('InstaWP Sites', 'iwp-woo-v2'),
+            __('Sites', 'iwp-woo-v2'),
             array($this, 'render_order_meta_box'),
             'shop_order',
             'side',
@@ -453,7 +553,7 @@ class IWP_Woo_V2_Order_Processor {
         $errors = get_post_meta($order_id, '_iwp_creation_errors', true);
         $processed = get_post_meta($order_id, '_iwp_processed', true);
         
-        // Check if order has InstaWP-enabled products
+        // Check if order has site-enabled products
         $order = wc_get_order($order_id);
         $has_instawp_products = false;
         
@@ -469,19 +569,19 @@ class IWP_Woo_V2_Order_Processor {
         }
         
         if (!$has_instawp_products) {
-            echo '<p>' . __('No InstaWP-enabled products in this order.', 'iwp-woo-v2') . '</p>';
+            echo '<p>' . __('No site-enabled products in this order.', 'iwp-woo-v2') . '</p>';
             return;
         }
         
         if (!$processed) {
             // Check if auto-create is disabled globally
-            $options = get_option('iwp_woo_v2_options', array());
+            $options = get_option('iwp_options', array());
             $auto_create_enabled = isset($options['auto_create_sites_on_purchase']) ? $options['auto_create_sites_on_purchase'] : 'yes';
             
             if ($auto_create_enabled !== 'yes') {
                 // Show Setup Site button
                 echo '<div style="margin-bottom: 15px;">';
-                echo '<p>' . __('Auto-create is disabled. Click the button below to manually create InstaWP sites for this order.', 'iwp-woo-v2') . '</p>';
+                echo '<p>' . __('Auto-create is disabled. Click the button below to manually create sites for this order.', 'iwp-woo-v2') . '</p>';
                 echo '<button type="button" id="iwp-setup-sites-btn" class="button button-primary" data-order-id="' . esc_attr($order_id) . '">';
                 echo __('Setup Sites', 'iwp-woo-v2');
                 echo '</button>';
@@ -532,7 +632,7 @@ class IWP_Woo_V2_Order_Processor {
                 });
                 </script>';
             } else {
-                echo '<p>' . __('Order not yet processed for InstaWP site creation. Sites will be created automatically when the order is completed.', 'iwp-woo-v2') . '</p>';
+                echo '<p>' . __('Order not yet processed for site creation. Sites will be created automatically when the order is completed.', 'iwp-woo-v2') . '</p>';
             }
             return;
         }
@@ -564,7 +664,7 @@ class IWP_Woo_V2_Order_Processor {
         }
         
         if (empty($sites_created) && empty($errors)) {
-            echo '<p>' . __('No InstaWP sites were created for this order.', 'iwp-woo-v2') . '</p>';
+            echo '<p>' . __('No sites were created for this order.', 'iwp-woo-v2') . '</p>';
         }
     }
 
@@ -580,9 +680,9 @@ class IWP_Woo_V2_Order_Processor {
         foreach ($columns as $key => $column) {
             $new_columns[$key] = $column;
             
-            // Add InstaWP column after order status
+            // Add Sites column after order status
             if ('order_status' === $key) {
-                $new_columns['iwp_sites'] = __('InstaWP Sites', 'iwp-woo-v2');
+                $new_columns['iwp_sites'] = __('Sites', 'iwp-woo-v2');
             }
         }
         
@@ -631,7 +731,7 @@ class IWP_Woo_V2_Order_Processor {
         if ($processed) {
             return array(
                 'success' => false,
-                'message' => __('Order has already been processed for InstaWP sites.', 'iwp-woo-v2')
+                'message' => __('Order has already been processed for site creation.', 'iwp-woo-v2')
             );
         }
 
@@ -673,7 +773,7 @@ class IWP_Woo_V2_Order_Processor {
         } else {
             return array(
                 'success' => false,
-                'message' => __('No InstaWP-enabled products found in this order.', 'iwp-woo-v2')
+                'message' => __('No site-enabled products found in this order.', 'iwp-woo-v2')
             );
         }
     }
@@ -703,7 +803,10 @@ class IWP_Woo_V2_Order_Processor {
         $errors = array();
 
         // Check if site_id upgrade mode is active
-        $frontend = new IWP_Woo_V2_Frontend();
+        if (!class_exists('IWP_Frontend')) {
+            require_once IWP_PLUGIN_PATH . 'includes/frontend/class-iwp-frontend.php';
+        }
+        $frontend = new IWP_Frontend();
         $upgrade_site_id = $frontend->get_stored_site_id();
         
         if ($upgrade_site_id) {
@@ -788,12 +891,15 @@ class IWP_Woo_V2_Order_Processor {
         // Add order note
         $note = $this->generate_order_note($sites_created, $errors);
         if ($status === 'manual') {
-            $note = __('Manually created InstaWP sites:', 'iwp-woo-v2') . "\n\n" . $note;
+            $note = __('Manually created sites:', 'iwp-woo-v2') . "\n\n" . $note;
         }
         $order->add_order_note($note, 1); // 1 = customer visible
 
         // Always clear stored site_id after processing order (whether upgrade happened or not)
-        $frontend = new IWP_Woo_V2_Frontend();
+        if (!class_exists('IWP_Frontend')) {
+            require_once IWP_PLUGIN_PATH . 'includes/frontend/class-iwp-frontend.php';
+        }
+        $frontend = new IWP_Frontend();
         $frontend->clear_stored_site_id();
         error_log('IWP WooCommerce V2: Cleared stored site_id after order processing');
 

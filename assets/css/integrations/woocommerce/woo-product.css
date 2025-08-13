@@ -1,7 +1,7 @@
 /**
- * Admin Product CSS for IWP WooCommerce Integration v2
+ * Admin Product CSS for InstaWP WooCommerce Integration
  *
- * @package IWP_Woo_V2
+ * @package IWP
  * @since 2.0.0
  */
 
@@ -22,20 +22,26 @@
 }
 
 /* Site Expiry Settings Styles */
-._iwp_site_expiry_type_field .wrap {
-    display: flex;
-    gap: 15px;
+#iwp_instawp_product_data ._iwp_site_expiry_type_field .wrap {
+    display: flex !important;
+    gap: 30px !important;
     align-items: center;
+    flex-wrap: wrap;
+    margin: 0 !important;
 }
 
-._iwp_site_expiry_type_field label {
-    display: flex;
+#iwp_instawp_product_data ._iwp_site_expiry_type_field .wrap label {
+    display: flex !important;
     align-items: center;
     font-weight: normal;
+    white-space: nowrap;
+    margin: 0 !important;
+    margin-right: 0 !important;
 }
 
-._iwp_site_expiry_type_field input[type="radio"] {
-    margin-right: 5px;
+#iwp_instawp_product_data ._iwp_site_expiry_type_field input[type="radio"] {
+    margin-right: 8px !important;
+    margin-left: 0 !important;
 }
 
 ._iwp_site_expiry_hours_field {
@@ -126,6 +132,17 @@
     
     #_iwp_selected_template {
         min-width: 100%;
+    }
+    
+    /* Site Expiry Radio Buttons on Mobile */
+    ._iwp_site_expiry_type_field .wrap {
+        gap: 20px;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    ._iwp_site_expiry_type_field label {
+        margin-bottom: 5px;
     }
 }
 

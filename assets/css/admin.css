@@ -1,12 +1,12 @@
 /**
- * Admin styles for IWP WooCommerce Integration v2
+ * Admin styles for InstaWP Integration
  *
- * @package IWP_Woo_V2
+ * @package IWP
  * @since 2.0.0
  */
 
 /* Admin Settings Page */
-.iwp-woo-v2-info {
+.iwp-info {
     margin-top: 30px;
     padding: 20px;
     background: #f9f9f9;
@@ -14,13 +14,13 @@
     border-radius: 5px;
 }
 
-.iwp-woo-v2-info h2 {
+.iwp-info h2 {
     margin-top: 0;
     color: #333;
     font-size: 18px;
 }
 
-.iwp-woo-v2-info p {
+.iwp-info p {
     margin-bottom: 10px;
     color: #666;
 }
@@ -54,7 +54,7 @@
 }
 
 /* Notices */
-.iwp-woo-v2-notice {
+.iwp-notice {
     padding: 10px 15px;
     margin: 5px 0 15px;
     border-left: 4px solid #00a0d2;
@@ -62,20 +62,20 @@
     box-shadow: 0 1px 1px 0 rgba(0,0,0,.1);
 }
 
-.iwp-woo-v2-notice.notice-success {
+.iwp-notice.notice-success {
     border-left-color: #46b450;
 }
 
-.iwp-woo-v2-notice.notice-error {
+.iwp-notice.notice-error {
     border-left-color: #dc3232;
 }
 
-.iwp-woo-v2-notice.notice-warning {
+.iwp-notice.notice-warning {
     border-left-color: #ffb900;
 }
 
 /* Buttons */
-.iwp-woo-v2-button {
+.iwp-button {
     display: inline-block;
     padding: 8px 15px;
     margin: 5px;
@@ -86,31 +86,31 @@
     transition: background-color 0.3s;
 }
 
-.iwp-woo-v2-button:hover {
+.iwp-button:hover {
     background: #005a87;
     color: #fff;
 }
 
-.iwp-woo-v2-button.secondary {
+.iwp-button.secondary {
     background: #666;
 }
 
-.iwp-woo-v2-button.secondary:hover {
+.iwp-button.secondary:hover {
     background: #444;
 }
 
 /* Loading Spinner */
-.iwp-woo-v2-loading {
+.iwp-loading {
     display: inline-block;
     width: 20px;
     height: 20px;
     border: 3px solid #f3f3f3;
     border-top: 3px solid #0073aa;
     border-radius: 50%;
-    animation: iwp-woo-v2-spin 1s linear infinite;
+    animation: iwp-spin 1s linear infinite;
 }
 
-@keyframes iwp-woo-v2-spin {
+@keyframes iwp-spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
@@ -129,30 +129,30 @@
         font-weight: bold;
     }
     
-    .iwp-woo-v2-info {
+    .iwp-info {
         padding: 15px;
     }
 }
 
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
-    .iwp-woo-v2-info {
+    .iwp-info {
         background: #1e1e1e;
         border-color: #333;
         color: #fff;
     }
     
-    .iwp-woo-v2-info h2 {
+    .iwp-info h2 {
         color: #fff;
     }
     
-    .iwp-woo-v2-info p {
+    .iwp-info p {
         color: #ccc;
     }
 }
 
 /* Readonly Sections */
-.iwp-woo-v2-readonly-sections {
+.iwp-readonly-sections {
     margin-top: 30px;
     padding: 20px;
     background: #f8f9fa;
@@ -160,7 +160,7 @@
     border-radius: 5px;
 }
 
-.iwp-woo-v2-readonly-sections h2 {
+.iwp-readonly-sections h2 {
     margin-top: 0;
     margin-bottom: 10px;
     color: #2c3e50;
@@ -169,7 +169,7 @@
     padding-bottom: 10px;
 }
 
-.iwp-woo-v2-readonly-sections .description {
+.iwp-readonly-sections .description {
     margin-bottom: 20px;
     color: #7f8c8d;
     font-style: italic;
@@ -197,11 +197,574 @@
 }
 
 /* Distinguish readonly sections from editable form */
-.iwp-woo-v2-readonly-sections .iwp-settings-section {
+
+/* Tab Navigation */
+.iwp-admin-tabs {
+    margin-bottom: 0;
+    border-bottom: 1px solid #ccd0d4;
+    background: #fff;
+}
+
+.iwp-admin-tabs .nav-tab {
+    background: #f1f1f1;
+    border: 1px solid #ccd0d4;
+    border-bottom: none;
+    color: #50575e;
+    text-decoration: none;
+    display: inline-block;
+    padding: 12px 16px;
+    margin: 0 0 -1px 0;
+    position: relative;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
+    transition: all 0.2s ease;
+}
+
+.iwp-admin-tabs .nav-tab:hover {
+    background: #f9f9f9;
+    color: #135e96;
+}
+
+.iwp-admin-tabs .nav-tab.nav-tab-active {
+    background: #fff;
+    border-bottom-color: #fff;
+    color: #000;
+    z-index: 1;
+}
+
+.iwp-admin-tabs .nav-tab:focus {
+    box-shadow: 0 0 0 2px #2271b1;
+    outline: none;
+}
+
+/* Tab Content */
+.iwp-tab-content {
+    display: none;
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-top: none;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.iwp-tab-content.active {
+    display: block;
+}
+
+.iwp-tab-content h2:first-child {
+    margin-top: 0;
+}
+
+/* Tab-specific styling */
+.iwp-tab-content .tab-section {
+    margin-bottom: 30px;
+    padding: 0;
+}
+
+.iwp-tab-content .tab-section:last-child {
+    margin-bottom: 0;
+}
+
+.iwp-tab-content .tab-section h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1d2327;
+    margin: 0 0 15px 0;
+    padding: 0 0 8px 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+/* Form sections within tabs */
+.iwp-tab-content .form-section {
+    margin-bottom: 25px;
+    padding: 20px;
+    background: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+}
+
+.iwp-tab-content .form-section:last-child {
+    margin-bottom: 0;
+}
+
+.iwp-tab-content .form-section h4 {
+    margin: 0 0 15px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #2c3338;
+}
+
+/* Loading states for tab content */
+.iwp-tab-content .loading {
+    text-align: center;
+    padding: 40px;
+    color: #646970;
+}
+
+.iwp-tab-content .loading::before {
+    content: '';
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #f3f4f5;
+    border-top: 2px solid #0073aa;
+    border-radius: 50%;
+    animation: iwp-spin 1s linear infinite;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
+/* Responsive tab design */
+@media (max-width: 768px) {
+    .iwp-admin-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        margin-bottom: 0;
+    }
+    
+    .iwp-admin-tabs .nav-tab {
+        flex: 1;
+        text-align: center;
+        padding: 10px 8px;
+        font-size: 12px;
+        margin: 0;
+        border-radius: 0;
+    }
+    
+    .iwp-admin-tabs .nav-tab:first-child {
+        border-top-left-radius: 5px;
+    }
+    
+    .iwp-admin-tabs .nav-tab:last-child {
+        border-top-right-radius: 5px;
+    }
+    
+    .iwp-tab-content {
+        padding: 15px;
+        border-radius: 0 0 5px 5px;
+    }
+}
+
+@media (max-width: 480px) {
+    .iwp-admin-tabs {
+        flex-direction: column;
+    }
+    
+    .iwp-admin-tabs .nav-tab {
+        border-radius: 0;
+        border-bottom: none;
+        margin-bottom: -1px;
+    }
+    
+    .iwp-admin-tabs .nav-tab.nav-tab-active {
+        border-right-color: #fff;
+        background: linear-gradient(to right, #0073aa 4px, #fff 4px);
+    }
+    
+    .iwp-admin-tabs .nav-tab:first-child {
+        border-top-left-radius: 5px;
+        border-top-right-radius: 5px;
+    }
+    
+    .iwp-admin-tabs .nav-tab:last-child {
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+    
+    .iwp-tab-content {
+        border-top: 1px solid #ccd0d4;
+        border-radius: 0 0 5px 5px;
+    }
+}
+
+/* Tab content animations */
+.iwp-tab-content {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.iwp-tab-content.active {
+    opacity: 1;
+    transform: translateY(0);
+    display: block !important;
+}
+
+/* Tab badges/indicators */
+.iwp-admin-tabs .nav-tab .badge {
+    background: #d63638;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-left: 5px;
+    line-height: 1;
+}
+
+.iwp-admin-tabs .nav-tab.nav-tab-active .badge {
+    background: #00a32a;
+}
+
+/* Focus styles for accessibility */
+.iwp-admin-tabs .nav-tab:focus-visible {
+    outline: 2px solid #2271b1;
+    outline-offset: -2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .iwp-admin-tabs .nav-tab {
+        border-color: #000;
+    }
+    
+    .iwp-admin-tabs .nav-tab.nav-tab-active {
+        background: #fff;
+        color: #000;
+        border-color: #000;
+    }
+    
+    .iwp-tab-content {
+        border-color: #000;
+    }
+}
+
+/* Keyboard navigation indicators */
+.iwp-admin-tabs .nav-tab:focus-visible {
+    box-shadow: 0 0 0 2px #2271b1, inset 0 0 0 1px #fff;
+    outline: none;
+    z-index: 2;
+}
+
+/* Enhanced loading states */
+.iwp-tab-content.loading {
+    position: relative;
+    pointer-events: none;
+}
+
+.iwp-tab-content.loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+.iwp-tab-content.loading::before {
+    content: '';
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f4f5;
+    border-top: 4px solid #0073aa;
+    border-radius: 50%;
+    animation: iwp-spin 1s linear infinite;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 11;
+}
+
+/* Unsaved changes indicator */
+.iwp-admin-tabs .nav-tab.has-changes {
     position: relative;
 }
 
-.iwp-woo-v2-readonly-sections .iwp-settings-section::before {
+.iwp-admin-tabs .nav-tab.has-changes::after {
+    content: '●';
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    color: #d63638;
+    font-size: 12px;
+    line-height: 1;
+}
+
+.iwp-admin-tabs .nav-tab.nav-tab-active.has-changes::after {
+    color: #b32d2e;
+}
+
+/* Form change tracking */
+.iwp-form-changed {
+    border-left: 4px solid #ffb900;
+    padding-left: 16px;
+    margin-left: -20px;
+    background: rgba(255, 185, 0, 0.05);
+    transition: all 0.3s ease;
+}
+
+/* Save notification */
+.iwp-save-notification {
+    position: fixed;
+    top: 32px;
+    right: 20px;
+    background: #46b450;
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    z-index: 1000;
+    font-weight: 600;
+}
+
+.iwp-save-notification.show {
+    transform: translateX(0);
+}
+
+.iwp-save-notification.error {
+    background: #dc3232;
+}
+
+/* Tab help tooltips */
+.iwp-tab-help {
+    position: relative;
+    display: inline-block;
+    margin-left: 8px;
+    cursor: help;
+}
+
+.iwp-tab-help::before {
+    content: '?';
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    background: #0073aa;
+    color: #fff;
+    border-radius: 50%;
+    text-align: center;
+    font-size: 11px;
+    font-weight: bold;
+    line-height: 16px;
+}
+
+.iwp-tab-help:hover::before {
+    background: #005a87;
+}
+
+.iwp-tab-help-content {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1d2327;
+    color: #fff;
+    padding: 10px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s, visibility 0.2s;
+    z-index: 1000;
+    margin-bottom: 5px;
+}
+
+.iwp-tab-help-content::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: #1d2327;
+}
+
+.iwp-tab-help:hover .iwp-tab-help-content {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Preloader for heavy content */
+.iwp-tab-preloader {
+    display: none;
+    text-align: center;
+    padding: 20px;
+    color: #646970;
+    font-style: italic;
+}
+
+.iwp-tab-preloader.active {
+    display: block;
+}
+
+/* Success/Error states for form sections */
+.iwp-section-success {
+    border-left: 4px solid #46b450;
+    background: rgba(70, 180, 80, 0.05);
+}
+
+.iwp-section-error {
+    border-left: 4px solid #dc3232;
+    background: rgba(220, 50, 50, 0.05);
+}
+
+/* Enhanced button states */
+.iwp-button:disabled,
+.iwp-button.disabled {
+    background: #ccc;
+    color: #999;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.iwp-button.loading {
+    position: relative;
+    color: transparent;
+    pointer-events: none;
+}
+
+.iwp-button.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 16px;
+    height: 16px;
+    border: 2px solid transparent;
+    border-top: 2px solid #fff;
+    border-radius: 50%;
+    animation: iwp-spin 1s linear infinite;
+}
+
+/* Final polish - Enhanced visual feedback */
+.iwp-admin-tabs .nav-tab {
+    transition: all 0.2s ease-in-out;
+}
+
+.iwp-admin-tabs .nav-tab:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.iwp-admin-tabs .nav-tab.nav-tab-active {
+    transform: none;
+    box-shadow: none;
+}
+
+/* Enhanced tab content appearance */
+.iwp-tab-content {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border-radius: 0 0 5px 5px;
+}
+
+/* Professional form styling within tabs */
+.iwp-tab-content .form-table {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.iwp-tab-content .form-table th {
+    background: #f8f9fa;
+    border-bottom: 1px solid #e0e0e0;
+    font-weight: 600;
+}
+
+.iwp-tab-content .form-table td {
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.iwp-tab-content .form-table tr:last-child td,
+.iwp-tab-content .form-table tr:last-child th {
+    border-bottom: none;
+}
+
+/* Enhanced submit button styling */
+.iwp-tab-content .button-primary {
+    background: linear-gradient(135deg, #0073aa 0%, #005a87 100%);
+    border: none;
+    border-radius: 5px;
+    padding: 10px 20px;
+    font-weight: 600;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+}
+
+.iwp-tab-content .button-primary:hover {
+    background: linear-gradient(135deg, #005a87 0%, #004a6b 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 115, 170, 0.3);
+}
+
+.iwp-tab-content .button-primary:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(0, 115, 170, 0.3);
+}
+
+/* Tab section headers */
+.iwp-tab-content .tab-section h3 {
+    position: relative;
+    padding-left: 20px;
+}
+
+.iwp-tab-content .tab-section h3::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 20px;
+    background: linear-gradient(135deg, #0073aa, #00a0d2);
+    border-radius: 2px;
+}
+
+/* Status indicators */
+.iwp-status-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+.iwp-status-indicator.success {
+    background: #46b450;
+    animation: pulse-success 2s infinite;
+}
+
+.iwp-status-indicator.error {
+    background: #dc3232;
+    animation: pulse-error 2s infinite;
+}
+
+.iwp-status-indicator.warning {
+    background: #ffb900;
+    animation: pulse-warning 2s infinite;
+}
+
+@keyframes pulse-success {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+@keyframes pulse-error {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+@keyframes pulse-warning {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+.iwp-readonly-sections .iwp-settings-section {
+    position: relative;
+}
+
+.iwp-readonly-sections .iwp-settings-section::before {
     content: "Read Only";
     position: absolute;
     top: 10px;
@@ -213,4 +776,44 @@
     font-size: 11px;
     font-weight: bold;
     text-transform: uppercase;
+}
+
+/* Sites List Table Upgrade Indicators */
+.iwp-upgrade-badge {
+    color: #28a745;
+    font-weight: bold;
+    font-size: 16px;
+    cursor: help;
+}
+
+.iwp-upgrade-badge:hover {
+    color: #218838;
+}
+
+.widefat .iwp-status {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.iwp-status-completed {
+    background: #d4edda;
+    color: #155724;
+}
+
+.iwp-status-progress {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.iwp-status-failed {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.iwp-status-unknown {
+    background: #e2e3e5;
+    color: #6c757d;
 }

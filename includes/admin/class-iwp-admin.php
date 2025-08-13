@@ -2,7 +2,7 @@
 /**
  * Admin class for IWP WooCommerce Integration v2
  *
- * @package IWP_Woo_V2
+ * @package IWP
  * @since 2.0.0
  */
 
@@ -12,14 +12,14 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * IWP_Woo_V2_Admin class
+ * IWP_Admin class
  */
-class IWP_Woo_V2_Admin {
+class IWP_Admin {
 
     /**
      * API Client instance
      *
-     * @var IWP_Woo_V2_API_Client
+     * @var IWP_API_Client
      */
     private $api_client;
 
@@ -27,7 +27,7 @@ class IWP_Woo_V2_Admin {
      * Constructor
      */
     public function __construct() {
-        $this->api_client = new IWP_Woo_V2_API_Client();
+        $this->api_client = new IWP_API_Client();
         $this->init_hooks();
     }
 
@@ -39,12 +39,12 @@ class IWP_Woo_V2_Admin {
         add_action('admin_init', array($this, 'init_settings'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
         add_action('admin_notices', array($this, 'admin_notices'));
-        add_filter('plugin_action_links_' . IWP_WOO_V2_PLUGIN_BASENAME, array($this, 'plugin_action_links'));
+        add_filter('plugin_action_links_' . IWP_PLUGIN_BASENAME, array($this, 'plugin_action_links'));
         add_filter('plugin_row_meta', array($this, 'plugin_row_meta'), 10, 2);
-        add_action('wp_ajax_iwp_woo_v2_refresh_templates', array($this, 'ajax_refresh_templates'));
+        add_action('wp_ajax_iwp_refresh_templates', array($this, 'ajax_refresh_templates'));
         add_action('wp_ajax_iwp_refresh_product_templates', array($this, 'ajax_refresh_product_templates'));
         add_action('wp_ajax_iwp_get_template_preview', array($this, 'ajax_get_template_preview'));
-        add_action('wp_ajax_iwp_woo_v2_refresh_plans', array($this, 'ajax_refresh_plans'));
+        add_action('wp_ajax_iwp_refresh_plans', array($this, 'ajax_refresh_plans'));
         add_action('wp_ajax_iwp_refresh_product_plans', array($this, 'ajax_refresh_product_plans'));
         add_action('wp_ajax_iwp_clear_transients', array($this, 'ajax_clear_transients'));
         add_action('wp_ajax_iwp_warm_cache', array($this, 'ajax_warm_cache'));
@@ -61,7 +61,8 @@ class IWP_Woo_V2_Admin {
         // Testing AJAX handlers
         add_action('wp_ajax_iwp_test_create_site', array($this, 'ajax_test_create_site'));
         add_action('wp_ajax_iwp_test_check_status', array($this, 'ajax_test_check_status'));
-        add_action('wp_ajax_iwp_woo_v2_check_pending_sites', array($this, 'ajax_force_cron_check'));
+        add_action('wp_ajax_iwp_check_pending_sites', array($this, 'ajax_force_cron_check'));
+        add_action('wp_ajax_iwp_test_site_update', array($this, 'ajax_test_site_update'));
     }
 
     /**
@@ -79,7 +80,7 @@ class IWP_Woo_V2_Admin {
         
         // Use properly sized SVG icon optimized for WordPress admin sidebar
         // Force use of local SVG to avoid sizing issues with external logo
-        $use_external_logo = apply_filters('iwp_woo_v2_use_external_logo', false);
+        $use_external_logo = apply_filters('iwp_use_external_logo', false);
         
         if ($use_external_logo) {
             return $logo_url;
@@ -101,33 +102,33 @@ class IWP_Woo_V2_Admin {
     public function add_admin_menu() {
         // Add top-level InstaWP menu
         add_menu_page(
-            esc_html__('InstaWP', 'instawp-integration'),
-            esc_html__('InstaWP', 'instawp-integration'),
-            'manage_options',
-            'instawp-integration',
-            array($this, 'admin_page'),
+            esc_html__('InstaWP Sites', 'iwp-wp-integration'),
+            esc_html__('InstaWP', 'iwp-wp-integration'),
+            'manage_woocommerce',
+            'instawp-sites',
+            array($this, 'sites_page'),
             $this->get_instawp_menu_icon(),
             30
         );
 
-        // Add Settings submenu
+        // Rename the first submenu item to "Sites" instead of "InstaWP"
         add_submenu_page(
-            'instawp-integration',
-            esc_html__('InstaWP Settings', 'instawp-integration'),
-            esc_html__('Settings', 'instawp-integration'),
-            'manage_options',
-            'instawp-integration',
-            array($this, 'admin_page')
-        );
-
-        // Add Sites submenu
-        add_submenu_page(
-            'instawp-integration',
-            esc_html__('InstaWP Sites', 'instawp-integration'),
-            esc_html__('Sites', 'instawp-integration'),
+            'instawp-sites',
+            esc_html__('InstaWP Sites', 'iwp-wp-integration'),
+            esc_html__('Sites', 'iwp-wp-integration'),
             'manage_woocommerce',
             'instawp-sites',
             array($this, 'sites_page')
+        );
+
+        // Add Settings submenu
+        add_submenu_page(
+            'instawp-sites',
+            esc_html__('InstaWP Settings', 'iwp-wp-integration'),
+            esc_html__('Settings', 'iwp-wp-integration'),
+            'manage_options',
+            'instawp-settings',
+            array($this, 'admin_page')
         );
     }
 
@@ -136,29 +137,29 @@ class IWP_Woo_V2_Admin {
      */
     public function init_settings() {
         register_setting(
-            'iwp_woo_v2_settings',
-            'iwp_woo_v2_options',
+            'iwp_settings',
+            'iwp_options',
             array($this, 'validate_settings')
         );
 
         add_settings_section(
-            'iwp_woo_v2_api',
-            esc_html__('InstaWP API Settings', 'instawp-integration'),
+            'iwp_api',
+            esc_html__('InstaWP API Settings', 'iwp-wp-integration'),
             array($this, 'api_settings_callback'),
-            'iwp_woo_v2_settings'
+            'iwp_settings'
         );
 
         add_settings_field(
             'api_key',
-            esc_html__('API Key', 'instawp-integration'),
+            esc_html__('API Key', 'iwp-wp-integration'),
             array($this, 'text_field_callback'),
-            'iwp_woo_v2_settings',
-            'iwp_woo_v2_api',
+            'iwp_settings',
+            'iwp_api',
             array(
                 'label_for' => 'api_key',
                 'type' => 'password',
                 'description' => sprintf(
-                    esc_html__('Enter your API key for authentication. %sGet your API key here%s', 'instawp-integration'),
+                    esc_html__('Enter your API key for authentication. %sGet your API key here%s', 'iwp-wp-integration'),
                     '<a href="https://app.instawp.io/user/api-tokens" target="_blank" rel="noopener noreferrer">',
                     '</a>'
                 )
@@ -166,104 +167,104 @@ class IWP_Woo_V2_Admin {
         );
 
         add_settings_section(
-            'iwp_woo_v2_general',
-            esc_html__('General Settings', 'instawp-integration'),
+            'iwp_general',
+            esc_html__('General Settings', 'iwp-wp-integration'),
             array($this, 'general_settings_callback'),
-            'iwp_woo_v2_settings'
+            'iwp_settings'
         );
 
         add_settings_field(
             'enabled',
-            esc_html__('Enable Integration', 'instawp-integration'),
+            esc_html__('Enable Integration', 'iwp-wp-integration'),
             array($this, 'checkbox_field_callback'),
-            'iwp_woo_v2_settings',
-            'iwp_woo_v2_general',
+            'iwp_settings',
+            'iwp_general',
             array(
                 'label_for' => 'enabled',
-                'description' => esc_html__('Enable the InstaWP WooCommerce integration.', 'instawp-integration')
+                'description' => esc_html__('Enable the InstaWP WooCommerce integration.', 'iwp-wp-integration')
             )
         );
 
         add_settings_field(
             'debug_mode',
-            esc_html__('Debug Mode', 'instawp-integration'),
+            esc_html__('Debug Mode', 'iwp-wp-integration'),
             array($this, 'checkbox_field_callback'),
-            'iwp_woo_v2_settings',
-            'iwp_woo_v2_general',
+            'iwp_settings',
+            'iwp_general',
             array(
                 'label_for' => 'debug_mode',
-                'description' => esc_html__('Enable debug mode for troubleshooting.', 'instawp-integration')
+                'description' => esc_html__('Enable debug mode for troubleshooting.', 'iwp-wp-integration')
             )
         );
 
         add_settings_field(
             'log_level',
-            esc_html__('Log Level', 'instawp-integration'),
+            esc_html__('Log Level', 'iwp-wp-integration'),
             array($this, 'select_field_callback'),
-            'iwp_woo_v2_settings',
-            'iwp_woo_v2_general',
+            'iwp_settings',
+            'iwp_general',
             array(
                 'label_for' => 'log_level',
                 'options' => array(
-                    'debug' => esc_html__('Debug', 'instawp-integration'),
-                    'info' => esc_html__('Info', 'instawp-integration'),
-                    'warning' => esc_html__('Warning', 'instawp-integration'),
-                    'error' => esc_html__('Error', 'instawp-integration'),
+                    'debug' => esc_html__('Debug', 'iwp-wp-integration'),
+                    'info' => esc_html__('Info', 'iwp-wp-integration'),
+                    'warning' => esc_html__('Warning', 'iwp-wp-integration'),
+                    'error' => esc_html__('Error', 'iwp-wp-integration'),
                 ),
-                'description' => esc_html__('Select the log level for the plugin.', 'instawp-integration')
+                'description' => esc_html__('Select the log level for the plugin.', 'iwp-wp-integration')
             )
         );
 
         add_settings_field(
             'auto_create_sites_on_purchase',
-            esc_html__('Auto-Create Sites on Purchase', 'instawp-integration'),
+            esc_html__('Auto-Create Sites on Purchase', 'iwp-wp-integration'),
             array($this, 'checkbox_field_callback'),
-            'iwp_woo_v2_settings',
-            'iwp_woo_v2_general',
+            'iwp_settings',
+            'iwp_general',
             array(
                 'label_for' => 'auto_create_sites_on_purchase',
-                'description' => esc_html__('Automatically create InstaWP sites when orders are completed. When disabled, admins will see a "Setup Site" button in order details to manually create sites.', 'instawp-integration')
+                'description' => esc_html__('Automatically create InstaWP sites when orders are completed. When disabled, admins will see a "Setup Site" button in order details to manually create sites.', 'iwp-wp-integration')
             )
         );
 
         add_settings_field(
             'use_site_id_parameter',
-            esc_html__('Use site_id Parameter', 'instawp-integration'),
+            esc_html__('Use site_id Parameter', 'iwp-wp-integration'),
             array($this, 'checkbox_field_callback'),
-            'iwp_woo_v2_settings',
-            'iwp_woo_v2_general',
+            'iwp_settings',
+            'iwp_general',
             array(
                 'label_for' => 'use_site_id_parameter',
-                'description' => esc_html__('Use site_id when provided to change plan instead of creating a new site. When enabled, customers can visit shop with ?site_id=123 to upgrade an existing site instead of creating new one.', 'instawp-integration')
+                'description' => esc_html__('Use site_id when provided to change plan instead of creating a new site. When enabled, customers can visit shop with ?site_id=123 to upgrade an existing site instead of creating new one.', 'iwp-wp-integration')
             )
         );
 
         add_settings_section(
-            'iwp_woo_v2_snapshots',
-            esc_html__('InstaWP Snapshots', 'instawp-integration'),
+            'iwp_snapshots',
+            esc_html__('InstaWP Snapshots', 'iwp-wp-integration'),
             array($this, 'snapshots_section_callback'),
-            'iwp_woo_v2_settings'
+            'iwp_settings'
         );
 
         add_settings_section(
-            'iwp_woo_v2_plans',
-            esc_html__('InstaWP Plans', 'instawp-integration'),
+            'iwp_plans',
+            esc_html__('InstaWP Plans', 'iwp-wp-integration'),
             array($this, 'plans_section_callback'),
-            'iwp_woo_v2_settings'
+            'iwp_settings'
         );
 
         add_settings_section(
-            'iwp_woo_v2_cache',
-            esc_html__('Cache Management', 'instawp-integration'),
+            'iwp_cache',
+            esc_html__('Cache Management', 'iwp-wp-integration'),
             array($this, 'cache_section_callback'),
-            'iwp_woo_v2_settings'
+            'iwp_settings'
         );
 
         add_settings_section(
-            'iwp_woo_v2_shortcode',
-            esc_html__('Shortcode Documentation', 'instawp-integration'),
+            'iwp_shortcode',
+            esc_html__('Shortcode Documentation', 'iwp-wp-integration'),
             array($this, 'shortcode_section_callback'),
-            'iwp_woo_v2_settings'
+            'iwp_settings'
         );
     }
 
@@ -275,42 +276,46 @@ class IWP_Woo_V2_Admin {
     public function enqueue_admin_scripts($hook) {
         // Check for the correct admin page hooks
         $allowed_hooks = array(
-            'toplevel_page_instawp-integration',
-            'instawp_page_instawp-sites',
-            'tools_page_instawp-integration' // Legacy fallback
+            'toplevel_page_instawp-sites',
+            'instawp_page_instawp-settings', 
+            'tools_page_instawp-integration', // Legacy fallback
         );
         
-        if (!in_array($hook, $allowed_hooks)) {
+        // Debug: log the current hook to help troubleshoot
+        error_log('IWP Admin Scripts - Current hook: ' . $hook);
+        
+        // Allow scripts on any InstaWP page or if it contains 'instawp'
+        if (!in_array($hook, $allowed_hooks) && strpos($hook, 'instawp') === false) {
             return;
         }
 
         wp_enqueue_script(
             'instawp-integration-admin',
-            IWP_WOO_V2_PLUGIN_URL . 'assets/js/admin.js',
+            IWP_PLUGIN_URL . 'assets/js/admin.js',
             array('jquery'),
-            IWP_WOO_V2_VERSION,
+            IWP_VERSION . '.' . time(), // Cache busting with timestamp
             true
         );
 
         wp_enqueue_style(
             'instawp-integration-admin',
-            IWP_WOO_V2_PLUGIN_URL . 'assets/css/admin.css',
+            IWP_PLUGIN_URL . 'assets/css/admin.css',
             array(),
-            IWP_WOO_V2_VERSION
+            IWP_VERSION . '.' . time() // Cache busting with timestamp
         );
 
         wp_localize_script(
             'instawp-integration-admin',
-            'iwp_woo_v2_admin',
+            'iwp_admin',
             array(
                 'ajax_url' => admin_url('admin-ajax.php'),
-                'nonce' => wp_create_nonce('iwp_woo_v2_admin_nonce'),
+                'nonce' => wp_create_nonce('iwp_admin_nonce'),
                 'orders_url' => admin_url('edit.php?post_type=shop_order'),
                 'site_url' => home_url(),
                 'strings' => array(
-                    'confirm_reset' => esc_html__('Are you sure you want to reset all settings?', 'instawp-integration'),
-                    'settings_saved' => esc_html__('Settings saved successfully.', 'instawp-integration'),
-                    'error_occurred' => esc_html__('An error occurred. Please try again.', 'instawp-integration'),
+                    'confirm_reset' => esc_html__('Are you sure you want to reset all settings?', 'iwp-wp-integration'),
+                    'settings_saved' => esc_html__('Settings saved successfully.', 'iwp-wp-integration'),
+                    'error_occurred' => esc_html__('An error occurred. Please try again.', 'iwp-wp-integration'),
                 ),
             )
         );
@@ -322,14 +327,14 @@ class IWP_Woo_V2_Admin {
     public function admin_notices() {
         $screen = get_current_screen();
         
-        if ($screen->id !== 'woocommerce_page_instawp-integration') {
+        if ($screen->id !== 'instawp_page_instawp-settings' && $screen->id !== 'toplevel_page_instawp-sites') {
             return;
         }
 
         if (isset($_GET['settings-updated']) && $_GET['settings-updated'] === 'true') {
             ?>
             <div class="notice notice-success is-dismissible">
-                <p><?php esc_html_e('Settings saved successfully.', 'instawp-integration'); ?></p>
+                <p><?php esc_html_e('Settings saved successfully.', 'iwp-wp-integration'); ?></p>
             </div>
             <?php
         }
@@ -343,7 +348,7 @@ class IWP_Woo_V2_Admin {
      */
     public function plugin_action_links($links) {
         $action_links = array(
-            'settings' => '<a href="' . admin_url('admin.php?page=instawp-integration') . '">' . esc_html__('Settings', 'instawp-integration') . '</a>',
+            'settings' => '<a href="' . admin_url('admin.php?page=instawp-settings') . '">' . esc_html__('Settings', 'iwp-wp-integration') . '</a>',
         );
 
         return array_merge($action_links, $links);
@@ -357,10 +362,10 @@ class IWP_Woo_V2_Admin {
      * @return array
      */
     public function plugin_row_meta($links, $file) {
-        if (IWP_WOO_V2_PLUGIN_BASENAME === $file) {
+        if (IWP_PLUGIN_BASENAME === $file) {
             $meta_links = array(
-                'docs' => '<a href="https://instawp.com/docs" target="_blank">' . esc_html__('Documentation', 'instawp-integration') . '</a>',
-                'support' => '<a href="https://instawp.com/support" target="_blank">' . esc_html__('Support', 'instawp-integration') . '</a>',
+                'docs' => '<a href="https://instawp.com/docs" target="_blank">' . esc_html__('Documentation', 'iwp-wp-integration') . '</a>',
+                'support' => '<a href="https://instawp.com/support" target="_blank">' . esc_html__('Support', 'iwp-wp-integration') . '</a>',
             );
 
             $links = array_merge($links, $meta_links);
@@ -374,183 +379,304 @@ class IWP_Woo_V2_Admin {
      */
     public function admin_page() {
         ?>
+        <style>
+        /* Emergency CSS fallback */
+        .iwp-admin-tabs { 
+            border-bottom: 1px solid #ccd0d4; 
+            margin-bottom: 0;
+        }
+        .iwp-admin-tabs .nav-tab { 
+            display: inline-block; 
+            padding: 12px 16px; 
+            margin-right: 5px;
+            text-decoration: none;
+            border: 1px solid #ccd0d4;
+            background: #f1f1f1;
+            color: #50575e;
+        }
+        .iwp-admin-tabs .nav-tab.nav-tab-active,
+        .iwp-admin-tabs .nav-tab:first-child { 
+            background: #fff; 
+            border-bottom-color: #fff;
+            color: #000;
+        }
+        .iwp-tab-content { 
+            display: none; 
+            border: 1px solid #ccd0d4; 
+            border-top: none; 
+            padding: 20px; 
+            background: #fff;
+        }
+        .iwp-tab-content.active,
+        .iwp-tab-content:first-of-type { 
+            display: block; 
+        }
+        </style>
+        
         <div class="wrap">
-            <h1><?php esc_html_e('InstaWP Integration', 'instawp-integration'); ?></h1>
+            <h1><?php esc_html_e('InstaWP Integration Settings', 'iwp-wp-integration'); ?></h1>
             
-            <form method="post" action="options.php">
-                <?php
-                settings_fields('iwp_woo_v2_settings');
-                
-                // Render General Settings section
-                $this->render_settings_section('iwp_woo_v2_settings', 'iwp_woo_v2_general');
-                
-                // Render API Settings section
-                $this->render_settings_section('iwp_woo_v2_settings', 'iwp_woo_v2_api');
-                
-                // Submit button after API settings
-                submit_button();
-                ?>
-            </form>
+            <!-- Tab Navigation -->
+            <div class="iwp-admin-tabs">
+                <a href="#general-settings" class="nav-tab nav-tab-active"><?php esc_html_e('General Settings', 'iwp-wp-integration'); ?></a>
+                <a href="#instawp-data" class="nav-tab"><?php esc_html_e('InstaWP Data', 'iwp-wp-integration'); ?></a>
+                <a href="#testing" class="nav-tab"><?php esc_html_e('Testing & Development', 'iwp-wp-integration'); ?></a>
+                <a href="#documentation" class="nav-tab"><?php esc_html_e('Documentation', 'iwp-wp-integration'); ?></a>
+            </div>
             
+            <!-- Tab 1: General Settings -->
+            <div id="general-settings" class="iwp-tab-content active">
+                <?php $this->render_general_settings_tab(); ?>
+            </div>
+            
+            <!-- Tab 2: InstaWP Data -->
+            <div id="instawp-data" class="iwp-tab-content">
+                <?php $this->render_instawp_data_tab(); ?>
+            </div>
+            
+            <!-- Tab 3: Testing & Development -->
+            <div id="testing" class="iwp-tab-content">
+                <?php $this->render_testing_tab(); ?>
+            </div>
+            
+            <!-- Tab 4: Documentation -->
+            <div id="documentation" class="iwp-tab-content">
+                <?php $this->render_documentation_tab(); ?>
+            </div>
+            
+        </div>
+        
+        <script>
+        // Emergency JavaScript fallback
+        jQuery(document).ready(function($) {
+            $('.iwp-admin-tabs .nav-tab').on('click', function(e) {
+                e.preventDefault();
+                var tabId = $(this).attr('href').substring(1);
+                
+                // Update active tab
+                $('.iwp-admin-tabs .nav-tab').removeClass('nav-tab-active');
+                $(this).addClass('nav-tab-active');
+                
+                // Update active content
+                $('.iwp-tab-content').removeClass('active').hide();
+                $('#' + tabId).addClass('active').show();
+                
+                // Save to localStorage
+                localStorage.setItem('iwp_active_tab', tabId);
+            });
+            
+            // Restore saved tab
+            var savedTab = localStorage.getItem('iwp_active_tab');
+            if (savedTab && $('#' + savedTab).length) {
+                $('.iwp-admin-tabs .nav-tab[href="#' + savedTab + '"]').click();
+            }
+        });
+        </script>
+        <?php
+    }
+
+    /**
+     * Render General Settings tab content
+     */
+    private function render_general_settings_tab() {
+        ?>
+        <form method="post" action="options.php" id="iwp-settings-form">
             <?php
-            // Render remaining sections outside the form (read-only display)
-            echo '<div class="instawp-integration-readonly-sections">';
-            echo '<h2>' . esc_html__('InstaWP Data', 'instawp-integration') . '</h2>';
-            echo '<p class="description">' . esc_html__('The sections below display cached data from InstaWP API. Use the refresh buttons to update the data.', 'instawp-integration') . '</p>';
+            settings_fields('iwp_settings');
             
-            // Render Snapshots section
-            $this->render_settings_section('iwp_woo_v2_settings', 'iwp_woo_v2_snapshots');
-            
-            // Render Plans section
-            $this->render_settings_section('iwp_woo_v2_settings', 'iwp_woo_v2_plans');
-            
-            // Render Cache Management section
-            $this->render_settings_section('iwp_woo_v2_settings', 'iwp_woo_v2_cache');
-            
+            // API Settings Section
+            echo '<div class="tab-section">';
+            echo '<h3>' . esc_html__('InstaWP API Configuration', 'iwp-wp-integration') . '</h3>';
+            $this->render_settings_section('iwp_settings', 'iwp_api');
             echo '</div>';
             
-            // Render Shortcode Documentation section
-            echo '<div class="instawp-integration-shortcode-docs-section" style="margin-top: 30px;">';
-            echo '<h2>' . esc_html__('Shortcode Documentation', 'instawp-integration') . '</h2>';
-            $this->render_settings_section('iwp_woo_v2_settings', 'iwp_woo_v2_shortcode');
+            // General Settings Section  
+            echo '<div class="tab-section">';
+            echo '<h3>' . esc_html__('Integration Settings', 'iwp-wp-integration') . '</h3>';
+            $this->render_settings_section('iwp_settings', 'iwp_general');
             echo '</div>';
+            
+            submit_button(__('Save Settings', 'iwp-wp-integration'), 'primary', 'submit', false);
             ?>
+        </form>
+        <?php
+    }
+
+    /**
+     * Render InstaWP Data tab content
+     */
+    private function render_instawp_data_tab() {
+        ?>
+        <div class="tab-section">
+            <h3><?php esc_html_e('Cached Data Management', 'iwp-wp-integration'); ?></h3>
+            <p class="description"><?php esc_html_e('The sections below display cached data from InstaWP API. Use the refresh buttons to update the data.', 'iwp-wp-integration'); ?></p>
             
-            <!-- Test Order Creation Section -->
-            <div class="instawp-integration-test-section" style="margin: 20px 0; padding: 20px; background: #f9f9f9; border: 1px solid #ddd;">
-                <h2><?php esc_html_e('Test Order Creation', 'instawp-integration'); ?></h2>
-                <?php if (class_exists('WooCommerce')) : ?>
-                    <p class="description"><?php esc_html_e('Create test orders to verify InstaWP site creation functionality without manual checkout.', 'instawp-integration'); ?></p>
-                <?php else : ?>
-                    <p class="description" style="color: #d63638;"><?php esc_html_e('WooCommerce is required to use this feature. Please install and activate WooCommerce to create test orders.', 'instawp-integration'); ?></p>
-                    <?php return; ?>
-                <?php endif; ?>
-                
-                <table class="form-table">
-                    <tr>
-                        <th scope="row"><?php esc_html_e('Select Product', 'instawp-integration'); ?></th>
-                        <td>
-                            <select id="iwp-test-product-select" style="min-width: 300px;">
-                                <option value=""><?php esc_html_e('Choose a product...', 'instawp-integration'); ?></option>
-                                <?php
-                                // Get all products with InstaWP snapshots configured
-                                $products = get_posts(array(
-                                    'post_type' => 'product',
-                                    'post_status' => 'publish',
-                                    'numberposts' => -1,
-                                    'meta_query' => array(
-                                        array(
-                                            'key' => '_iwp_selected_snapshot',
-                                            'compare' => 'EXISTS'
-                                        )
-                                    )
-                                ));
-                                
-                                foreach ($products as $product_post) {
-                                    $product = wc_get_product($product_post->ID);
-                                    if ($product) {
-                                        $snapshot_slug = get_post_meta($product_post->ID, '_iwp_selected_snapshot', true);
-                                        if (!empty($snapshot_slug)) {
-                                            echo '<option value="' . esc_attr($product_post->ID) . '" data-snapshot="' . esc_attr($snapshot_slug) . '">';
-                                            echo esc_html($product->get_name()) . ' (Snapshot: ' . esc_html($snapshot_slug) . ')';
-                                            echo '</option>';
-                                        }
-                                    }
-                                }
-                                ?>
-                            </select>
-                            <p class="description"><?php esc_html_e('Only products with InstaWP snapshots configured are shown.', 'instawp-integration'); ?></p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><?php esc_html_e('Customer', 'instawp-integration'); ?></th>
-                        <td>
-                            <div style="margin-bottom: 15px;">
-                                <label style="display: block; margin-bottom: 5px;">
-                                    <input type="radio" name="iwp-customer-type" value="existing" checked style="margin-right: 5px;" />
-                                    <?php esc_html_e('Use Existing User', 'instawp-integration'); ?>
-                                </label>
-                                <select id="iwp-test-customer-select" style="min-width: 300px;">
-                                    <option value=""><?php esc_html_e('Choose a user...', 'instawp-integration'); ?></option>
+            <div class="form-section">
+                <h4><?php esc_html_e('InstaWP Snapshots', 'iwp-wp-integration'); ?></h4>
+                <div id="iwp-snapshots-list">
+                    <?php $this->render_settings_section('iwp_settings', 'iwp_snapshots'); ?>
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <h4><?php esc_html_e('InstaWP Plans', 'iwp-wp-integration'); ?></h4>
+                <div id="iwp-plans-list">
+                    <?php $this->render_settings_section('iwp_settings', 'iwp_plans'); ?>
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <h4><?php esc_html_e('Cache Management', 'iwp-wp-integration'); ?></h4>
+                <?php $this->render_settings_section('iwp_settings', 'iwp_cache'); ?>
+            </div>
+        </div>
+        <?php
+    }
+
+    /**
+     * Render Testing & Development tab content
+     */
+    private function render_testing_tab() {
+        ?>
+        <div class="tab-section">
+            <h3><?php esc_html_e('Development Tools', 'iwp-wp-integration'); ?></h3>
+            <p class="description"><?php esc_html_e('Tools for testing and debugging InstaWP integration functionality.', 'iwp-wp-integration'); ?></p>
+            
+            <?php if (class_exists('WooCommerce')) : ?>
+                <div class="form-section">
+                    <h4><?php esc_html_e('Test Order Creation', 'iwp-wp-integration'); ?></h4>
+                    <p class="description"><?php esc_html_e('Create test orders to verify InstaWP site creation functionality without manual checkout.', 'iwp-wp-integration'); ?></p>
+                    
+                    <table class="form-table">
+                        <tr>
+                            <th scope="row"><?php esc_html_e('Select Product', 'iwp-wp-integration'); ?></th>
+                            <td>
+                                <select id="iwp-test-product-select" style="min-width: 300px;">
+                                    <option value=""><?php esc_html_e('Choose a product...', 'iwp-wp-integration'); ?></option>
                                     <?php
-                                    // Get all users
-                                    $users = get_users(array(
-                                        'number' => 50, // Limit for performance
-                                        'orderby' => 'display_name',
-                                        'order' => 'ASC'
+                                    // Get all products with InstaWP snapshots configured
+                                    $products = get_posts(array(
+                                        'post_type' => 'product',
+                                        'post_status' => 'publish',
+                                        'numberposts' => -1,
+                                        'meta_query' => array(
+                                            array(
+                                                'key' => '_iwp_selected_snapshot',
+                                                'compare' => 'EXISTS'
+                                            )
+                                        )
                                     ));
                                     
-                                    foreach ($users as $user) {
-                                        $user_info = sprintf(
-                                            '%s (%s) - %s',
-                                            $user->display_name,
-                                            $user->user_login,
-                                            $user->user_email
-                                        );
-                                        echo '<option value="' . esc_attr($user->ID) . '">' . esc_html($user_info) . '</option>';
+                                    foreach ($products as $product_post) {
+                                        $product = wc_get_product($product_post->ID);
+                                        if ($product) {
+                                            $snapshot_slug = get_post_meta($product_post->ID, '_iwp_selected_snapshot', true);
+                                            if (!empty($snapshot_slug)) {
+                                                echo '<option value="' . esc_attr($product_post->ID) . '" data-snapshot="' . esc_attr($snapshot_slug) . '">';
+                                                echo esc_html($product->get_name()) . ' (Snapshot: ' . esc_html($snapshot_slug) . ')';
+                                                echo '</option>';
+                                            }
+                                        }
                                     }
                                     ?>
                                 </select>
-                            </div>
-                            
-                            <div style="margin-bottom: 15px;">
-                                <label style="display: block; margin-bottom: 5px;">
-                                    <input type="radio" name="iwp-customer-type" value="guest" style="margin-right: 5px;" />
-                                    <?php esc_html_e('Guest Checkout', 'instawp-integration'); ?>
-                                </label>
-                                <div id="iwp-guest-details" style="margin-left: 20px; display: none;">
-                                    <input type="text" id="iwp-test-customer-first-name" placeholder="<?php esc_attr_e('First Name', 'instawp-integration'); ?>" value="Test" style="width: 150px; margin-right: 10px;" />
-                                    <input type="text" id="iwp-test-customer-last-name" placeholder="<?php esc_attr_e('Last Name', 'instawp-integration'); ?>" value="Customer" style="width: 150px; margin-right: 10px;" />
-                                    <input type="email" id="iwp-test-customer-email" placeholder="<?php esc_attr_e('Email', 'instawp-integration'); ?>" value="test@example.com" style="width: 200px;" />
+                                <p class="description"><?php esc_html_e('Only products with InstaWP snapshots configured are shown.', 'iwp-wp-integration'); ?></p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><?php esc_html_e('Customer', 'iwp-wp-integration'); ?></th>
+                            <td>
+                                <div style="margin-bottom: 15px;">
+                                    <label style="display: block; margin-bottom: 5px;">
+                                        <input type="radio" name="iwp-customer-type" value="existing" checked style="margin-right: 5px;" />
+                                        <?php esc_html_e('Use Existing User', 'iwp-wp-integration'); ?>
+                                    </label>
+                                    <select id="iwp-test-customer-select" style="min-width: 300px;">
+                                        <option value=""><?php esc_html_e('Choose a user...', 'iwp-wp-integration'); ?></option>
+                                        <?php
+                                        // Get all users
+                                        $users = get_users(array(
+                                            'number' => 50, // Limit for performance
+                                            'orderby' => 'display_name',
+                                            'order' => 'ASC'
+                                        ));
+                                        
+                                        foreach ($users as $user) {
+                                            $user_info = sprintf(
+                                                '%s (%s) - %s',
+                                                $user->display_name,
+                                                $user->user_login,
+                                                $user->user_email
+                                            );
+                                            echo '<option value="' . esc_attr($user->ID) . '">' . esc_html($user_info) . '</option>';
+                                        }
+                                        ?>
+                                    </select>
                                 </div>
-                            </div>
-                            
-                            <div style="margin-bottom: 15px;">
-                                <label style="display: block; margin-bottom: 5px;">
-                                    <input type="radio" name="iwp-customer-type" value="new" style="margin-right: 5px;" />
-                                    <?php esc_html_e('Create New User', 'instawp-integration'); ?>
-                                </label>
-                                <div id="iwp-new-user-details" style="margin-left: 20px; display: none;">
-                                    <input type="text" id="iwp-new-user-username" placeholder="<?php esc_attr_e('Username', 'instawp-integration'); ?>" value="" style="width: 150px; margin-right: 10px;" />
-                                    <input type="text" id="iwp-new-user-first-name" placeholder="<?php esc_attr_e('First Name', 'instawp-integration'); ?>" value="Test" style="width: 150px; margin-right: 10px;" />
-                                    <input type="text" id="iwp-new-user-last-name" placeholder="<?php esc_attr_e('Last Name', 'instawp-integration'); ?>" value="User" style="width: 150px; margin-right: 10px;" />
-                                    <input type="email" id="iwp-new-user-email" placeholder="<?php esc_attr_e('Email', 'instawp-integration'); ?>" value="" style="width: 200px;" />
-                                    <p class="description"><?php esc_html_e('A random password will be generated and emailed to the user.', 'instawp-integration'); ?></p>
+                                
+                                <div style="margin-bottom: 15px;">
+                                    <label style="display: block; margin-bottom: 5px;">
+                                        <input type="radio" name="iwp-customer-type" value="guest" style="margin-right: 5px;" />
+                                        <?php esc_html_e('Guest Checkout', 'iwp-wp-integration'); ?>
+                                    </label>
+                                    <div id="iwp-guest-details" style="margin-left: 20px; display: none;">
+                                        <input type="text" id="iwp-test-customer-first-name" placeholder="<?php esc_attr_e('First Name', 'iwp-wp-integration'); ?>" value="Test" style="width: 150px; margin-right: 10px;" />
+                                        <input type="text" id="iwp-test-customer-last-name" placeholder="<?php esc_attr_e('Last Name', 'iwp-wp-integration'); ?>" value="Customer" style="width: 150px; margin-right: 10px;" />
+                                        <input type="email" id="iwp-test-customer-email" placeholder="<?php esc_attr_e('Email', 'iwp-wp-integration'); ?>" value="test@example.com" style="width: 200px;" />
+                                    </div>
                                 </div>
-                            </div>
-                            
-                            <p class="description"><?php esc_html_e('Choose how to handle the customer for this test order.', 'instawp-integration'); ?></p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"></th>
-                        <td>
-                            <button type="button" id="iwp-create-test-order" class="button button-primary">
-                                <?php esc_html_e('Create Test Order', 'instawp-integration'); ?>
-                            </button>
-                            <span id="iwp-test-order-status" style="margin-left: 10px;"></span>
-                        </td>
-                    </tr>
-                </table>
-                
-                <div id="iwp-test-order-results" style="margin-top: 15px;"></div>
-            </div>
+                                
+                                <div style="margin-bottom: 15px;">
+                                    <label style="display: block; margin-bottom: 5px;">
+                                        <input type="radio" name="iwp-customer-type" value="new" style="margin-right: 5px;" />
+                                        <?php esc_html_e('Create New User', 'iwp-wp-integration'); ?>
+                                    </label>
+                                    <div id="iwp-new-user-details" style="margin-left: 20px; display: none;">
+                                        <input type="text" id="iwp-new-user-username" placeholder="<?php esc_attr_e('Username', 'iwp-wp-integration'); ?>" value="" style="width: 150px; margin-right: 10px;" />
+                                        <input type="text" id="iwp-new-user-first-name" placeholder="<?php esc_attr_e('First Name', 'iwp-wp-integration'); ?>" value="Test" style="width: 150px; margin-right: 10px;" />
+                                        <input type="text" id="iwp-new-user-last-name" placeholder="<?php esc_attr_e('Last Name', 'iwp-wp-integration'); ?>" value="User" style="width: 150px; margin-right: 10px;" />
+                                        <input type="email" id="iwp-new-user-email" placeholder="<?php esc_attr_e('Email', 'iwp-wp-integration'); ?>" value="" style="width: 200px;" />
+                                        <p class="description"><?php esc_html_e('A random password will be generated and emailed to the user.', 'iwp-wp-integration'); ?></p>
+                                    </div>
+                                </div>
+                                
+                                <p class="description"><?php esc_html_e('Choose how to handle the customer for this test order.', 'iwp-wp-integration'); ?></p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row"></th>
+                            <td>
+                                <button type="button" id="iwp-create-test-order" class="button button-primary">
+                                    <?php esc_html_e('Create Test Order', 'iwp-wp-integration'); ?>
+                                </button>
+                                <span id="iwp-test-order-status" style="margin-left: 10px;"></span>
+                            </td>
+                        </tr>
+                    </table>
+                    
+                    <div id="iwp-test-order-results" style="margin-top: 15px;"></div>
+                </div>
+            <?php else : ?>
+                <div class="form-section">
+                    <h4><?php esc_html_e('Test Order Creation', 'iwp-wp-integration'); ?></h4>
+                    <p class="description" style="color: #d63638;"><?php esc_html_e('WooCommerce is required to use this feature. Please install and activate WooCommerce to create test orders.', 'iwp-wp-integration'); ?></p>
+                </div>
+            <?php endif; ?>
             
-            <!-- Site Creation Testing Section -->
-            <div class="instawp-integration-testing-section" style="margin: 20px 0; padding: 20px; background: #f0f8ff; border: 1px solid #0073aa; border-radius: 4px;">
-                <h2><?php esc_html_e('Site Creation Testing', 'instawp-integration'); ?></h2>
-                <p class="description"><?php esc_html_e('Test site creation and status checking functionality directly from the admin panel.', 'instawp-integration'); ?></p>
+            <div class="form-section">
+                <h4><?php esc_html_e('Site Creation Testing', 'iwp-wp-integration'); ?></h4>
+                <p class="description"><?php esc_html_e('Test site creation and status checking functionality directly from the admin panel.', 'iwp-wp-integration'); ?></p>
                 
                 <table class="form-table">
                     <tr>
-                        <th scope="row"><?php esc_html_e('Quick Site Creation Test', 'instawp-integration'); ?></th>
+                        <th scope="row"><?php esc_html_e('Quick Site Creation Test', 'iwp-wp-integration'); ?></th>
                         <td>
                             <div style="margin-bottom: 10px;">
                                 <select id="iwp-test-snapshot-select" style="min-width: 300px;">
-                                    <option value=""><?php esc_html_e('Select a snapshot...', 'instawp-integration'); ?></option>
+                                    <option value=""><?php esc_html_e('Select a snapshot...', 'iwp-wp-integration'); ?></option>
                                     <?php
                                     // Get available snapshots for testing
-                                    $snapshots = IWP_Woo_V2_Service::get_snapshots();
+                                    $snapshots = IWP_Service::get_snapshots();
                                     if (!is_wp_error($snapshots) && isset($snapshots['data']) && is_array($snapshots['data'])) {
                                         foreach ($snapshots['data'] as $snapshot) {
                                             $slug = esc_attr($snapshot['slug'] ?? '');
@@ -564,46 +690,43 @@ class IWP_Woo_V2_Admin {
                                 </select>
                             </div>
                             <div style="margin-bottom: 10px;">
-                                <input type="text" id="iwp-test-site-name" placeholder="<?php esc_attr_e('Test Site Name', 'instawp-integration'); ?>" value="Test Site <?php echo date('H:i:s'); ?>" style="width: 300px;" />
+                                <input type="text" id="iwp-test-site-name" placeholder="<?php esc_attr_e('Test Site Name', 'iwp-wp-integration'); ?>" value="Test Site <?php echo date('H:i:s'); ?>" style="width: 300px;" />
                             </div>
                             <div style="margin-bottom: 10px;">
                                 <label>
                                     <input type="checkbox" id="iwp-add-to-sites-table" checked />
-                                    <?php esc_html_e('Add test site to Sites management table', 'instawp-integration'); ?>
+                                    <?php esc_html_e('Add test site to Sites management table', 'iwp-wp-integration'); ?>
                                 </label>
-                                <p class="description"><?php esc_html_e('When checked, the test site will appear in the Sites management interface. Uncheck to create test sites without cluttering the Sites list.', 'instawp-integration'); ?></p>
+                                <p class="description"><?php esc_html_e('When checked, the test site will appear in the Sites management interface. Uncheck to create test sites without cluttering the Sites list.', 'iwp-wp-integration'); ?></p>
                             </div>
                             <button type="button" id="iwp-test-create-site" class="button button-primary">
-                                <?php esc_html_e('Create Test Site', 'instawp-integration'); ?>
+                                <?php esc_html_e('Create Test Site', 'iwp-wp-integration'); ?>
                             </button>
                             <span id="iwp-test-create-status" style="margin-left: 10px;"></span>
                         </td>
                     </tr>
                     <tr>
-                        <th scope="row"><?php esc_html_e('Status Checking', 'instawp-integration'); ?></th>
+                        <th scope="row"><?php esc_html_e('Status Management', 'iwp-wp-integration'); ?></th>
                         <td>
                             <button type="button" id="iwp-check-pending-sites" class="button button-secondary">
-                                <?php esc_html_e('Check All Pending Sites', 'instawp-integration'); ?>
+                                <?php esc_html_e('Check Pending Sites', 'iwp-wp-integration'); ?>
                             </button>
                             <button type="button" id="iwp-refresh-site-status" class="button button-primary" style="margin-left: 10px;">
-                                <?php esc_html_e('Refresh Site Status', 'instawp-integration'); ?>
-                            </button>
-                            <button type="button" id="iwp-force-cron-check" class="button button-secondary" style="margin-left: 10px;">
-                                <?php esc_html_e('Force Cron Check', 'instawp-integration'); ?>
+                                <?php esc_html_e('Refresh Site Status', 'iwp-wp-integration'); ?>
                             </button>
                             <div id="iwp-status-check-results" style="margin-top: 15px;"></div>
                         </td>
                     </tr>
                     <tr>
-                        <th scope="row"><?php esc_html_e('Database Status', 'instawp-integration'); ?></th>
+                        <th scope="row"><?php esc_html_e('Database Status', 'iwp-wp-integration'); ?></th>
                         <td>
                             <div id="iwp-db-status">
                                 <?php
-                                $total_sites = IWP_Woo_V2_Sites_Model::get_total_count();
-                                $pending_sites = IWP_Woo_V2_Sites_Model::get_total_count(array('status' => 'creating'));
-                                $progress_sites = IWP_Woo_V2_Sites_Model::get_total_count(array('status' => 'progress'));
-                                $completed_sites = IWP_Woo_V2_Sites_Model::get_total_count(array('status' => 'completed'));
-                                $failed_sites = IWP_Woo_V2_Sites_Model::get_total_count(array('status' => 'failed'));
+                                $total_sites = IWP_Sites_Model::get_total_count();
+                                $pending_sites = IWP_Sites_Model::get_total_count(array('status' => 'creating'));
+                                $progress_sites = IWP_Sites_Model::get_total_count(array('status' => 'progress'));
+                                $completed_sites = IWP_Sites_Model::get_total_count(array('status' => 'completed'));
+                                $failed_sites = IWP_Sites_Model::get_total_count(array('status' => 'failed'));
                                 
                                 echo '<p><strong>Total Sites:</strong> ' . $total_sites . '</p>';
                                 echo '<p><strong>Creating:</strong> ' . $pending_sites . ' | ';
@@ -613,220 +736,81 @@ class IWP_Woo_V2_Admin {
                                 ?>
                             </div>
                             <button type="button" id="iwp-refresh-db-status" class="button button-secondary">
-                                <?php esc_html_e('Refresh Status', 'instawp-integration'); ?>
+                                <?php esc_html_e('Refresh Status', 'iwp-wp-integration'); ?>
                             </button>
                         </td>
                     </tr>
                 </table>
                 
                 <div id="iwp-testing-results" style="margin-top: 15px; padding: 10px; background: #fff; border: 1px solid #ddd; border-radius: 3px; display: none;">
-                    <h4><?php esc_html_e('Test Results', 'instawp-integration'); ?></h4>
+                    <h4><?php esc_html_e('Test Results', 'iwp-wp-integration'); ?></h4>
                     <div id="iwp-testing-log"></div>
                 </div>
             </div>
-            
-            <div class="instawp-integration-info">
-                <h2><?php esc_html_e('Plugin Information', 'instawp-integration'); ?></h2>
-                <p><?php esc_html_e('Version:', 'instawp-integration'); ?> <?php echo esc_html(IWP_WOO_V2_VERSION); ?></p>
-                <p><?php esc_html_e('WooCommerce Version:', 'instawp-integration'); ?> <?php echo esc_html(WC()->version); ?></p>
-                <p>
-                    <?php esc_html_e('HPOS Status:', 'instawp-integration'); ?> 
-                    <span style="color: <?php echo IWP_Woo_V2_HPOS::is_hpos_enabled() ? 'green' : 'orange'; ?>">
-                        <?php echo IWP_Woo_V2_HPOS::is_hpos_enabled() ? esc_html__('Enabled', 'instawp-integration') : esc_html__('Disabled', 'instawp-integration'); ?>
-                    </span>
-                    <?php if (IWP_Woo_V2_HPOS::is_hpos_enabled()) : ?>
-                        <small><?php esc_html_e('(High Performance Order Storage is active)', 'instawp-integration'); ?></small>
-                    <?php else : ?>
-                        <small><?php esc_html_e('(Using legacy post-based order storage)', 'instawp-integration'); ?></small>
+
+            <div class="form-section">
+                <h4><?php esc_html_e('Plugin Information', 'iwp-wp-integration'); ?></h4>
+                <table class="form-table">
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Plugin Version', 'iwp-wp-integration'); ?></th>
+                        <td><?php echo esc_html(IWP_VERSION); ?></td>
+                    </tr>
+                    <?php if (class_exists('WooCommerce')) : ?>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('WooCommerce Version', 'iwp-wp-integration'); ?></th>
+                        <td><?php echo esc_html(WC()->version); ?></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('HPOS Status', 'iwp-wp-integration'); ?></th>
+                        <td>
+                            <span style="color: <?php echo class_exists('IWP_HPOS') && IWP_HPOS::is_hpos_enabled() ? 'green' : 'orange'; ?>">
+                                <?php echo class_exists('IWP_HPOS') && IWP_HPOS::is_hpos_enabled() ? esc_html__('Enabled', 'iwp-wp-integration') : esc_html__('Disabled', 'iwp-wp-integration'); ?>
+                            </span>
+                            <?php if (class_exists('IWP_HPOS') && IWP_HPOS::is_hpos_enabled()) : ?>
+                                <small><?php esc_html_e('(High Performance Order Storage is active)', 'iwp-wp-integration'); ?></small>
+                            <?php else : ?>
+                                <small><?php esc_html_e('(Using legacy post-based order storage)', 'iwp-wp-integration'); ?></small>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
                     <?php endif; ?>
-                </p>
-                <p>
-                    <a href="<?php echo esc_url(admin_url('admin.php?page=instawp-integration&action=reset_settings')); ?>" 
-                       class="button button-secondary" 
-                       onclick="return confirm('<?php esc_attr_e('Are you sure you want to reset all settings?', 'instawp-integration'); ?>')">
-                        <?php esc_html_e('Reset Settings', 'instawp-integration'); ?>
-                    </a>
-                </p>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Actions', 'iwp-wp-integration'); ?></th>
+                        <td>
+                            <a href="<?php echo esc_url(admin_url('admin.php?page=instawp-settings&action=reset_settings')); ?>" 
+                               class="button button-secondary" 
+                               onclick="return confirm('<?php esc_attr_e('Are you sure you want to reset all settings?', 'iwp-wp-integration'); ?>')">
+                                <?php esc_html_e('Reset Settings', 'iwp-wp-integration'); ?>
+                            </a>
+                        </td>
+                    </tr>
+                </table>
             </div>
-            
-            <script>
-            jQuery(document).ready(function($) {
-                // Test site creation
-                $('#iwp-test-create-site').on('click', function(e) {
-                    e.preventDefault();
-                    
-                    var $btn = $(this);
-                    var $status = $('#iwp-test-create-status');
-                    var $results = $('#iwp-testing-results');
-                    var $log = $('#iwp-testing-log');
-                    
-                    var snapshotSlug = $('#iwp-test-snapshot-select').val();
-                    var siteName = $('#iwp-test-site-name').val();
-                    var addToSitesTable = $('#iwp-add-to-sites-table').is(':checked');
-                    
-                    if (!snapshotSlug) {
-                        alert('<?php echo esc_js(__('Please select a snapshot', 'instawp-integration')); ?>');
-                        return;
-                    }
-                    
-                    if (!siteName) {
-                        alert('<?php echo esc_js(__('Please enter a site name', 'instawp-integration')); ?>');
-                        return;
-                    }
-                    
-                    // Show loading state
-                    $btn.prop('disabled', true).text('<?php echo esc_js(__('Creating Site...', 'instawp-integration')); ?>');
-                    $status.html('<span style="color: #0073aa;">Creating test site...</span>');
-                    $results.show();
-                    $log.html('<p><strong>[' + new Date().toLocaleTimeString() + ']</strong> Starting site creation test...</p>');
-                    
-                    // Make AJAX request
-                    $.ajax({
-                        url: ajaxurl,
-                        type: 'POST',
-                        data: {
-                            action: 'iwp_test_create_site',
-                            snapshot_slug: snapshotSlug,
-                            site_name: siteName,
-                            add_to_sites_table: addToSitesTable,
-                            nonce: '<?php echo wp_create_nonce('iwp_woo_v2_admin_nonce'); ?>'
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                $status.html('<span style="color: #46b450;">✓ Site creation initiated</span>');
-                                $log.append('<p><strong>[' + new Date().toLocaleTimeString() + ']</strong> <span style="color: #46b450;">SUCCESS:</span> ' + response.data.message + '</p>');
-                                
-                                if (response.data.site_id) {
-                                    $log.append('<p><strong>Site ID:</strong> ' + response.data.site_id + '</p>');
-                                }
-                                if (response.data.task_id) {
-                                    $log.append('<p><strong>Task ID:</strong> ' + response.data.task_id + '</p>');
-                                    $log.append('<p><em>Use "Check All Pending Sites" to monitor progress</em></p>');
-                                }
-                                if (response.data.site_url) {
-                                    $log.append('<p><strong>Site URL:</strong> <a href="' + response.data.site_url + '" target="_blank">' + response.data.site_url + '</a></p>');
-                                }
-                                
-                                if (typeof response.data.added_to_sites_table !== 'undefined') {
-                                    $log.append('<p><strong>Added to Sites table:</strong> ' + (response.data.added_to_sites_table ? 'Yes' : 'No') + '</p>');
-                                }
-                                
-                                // Refresh database status only if we added to the sites table
-                                if (response.data.added_to_sites_table) {
-                                    setTimeout(function() {
-                                        $('#iwp-refresh-db-status').trigger('click');
-                                    }, 1000);
-                                }
-                            } else {
-                                $status.html('<span style="color: #dc3232;">✗ Site creation failed</span>');
-                                $log.append('<p><strong>[' + new Date().toLocaleTimeString() + ']</strong> <span style="color: #dc3232;">ERROR:</span> ' + (response.data.message || 'Unknown error') + '</p>');
-                            }
-                        },
-                        error: function() {
-                            $status.html('<span style="color: #dc3232;">✗ Network error</span>');
-                            $log.append('<p><strong>[' + new Date().toLocaleTimeString() + ']</strong> <span style="color: #dc3232;">ERROR:</span> Network error occurred</p>');
-                        },
-                        complete: function() {
-                            $btn.prop('disabled', false).text('<?php echo esc_js(__('Create Test Site', 'instawp-integration')); ?>');
-                        }
-                    });
-                });
-                
-                // Check pending sites
-                $('#iwp-check-pending-sites').on('click', function(e) {
-                    e.preventDefault();
-                    
-                    var $btn = $(this);
-                    var $results = $('#iwp-status-check-results');
-                    
-                    $btn.prop('disabled', true).text('<?php echo esc_js(__('Checking...', 'instawp-integration')); ?>');
-                    $results.html('<p>Checking all pending sites...</p>');
-                    
-                    $.ajax({
-                        url: ajaxurl,
-                        type: 'POST',
-                        data: {
-                            action: 'iwp_test_check_status',
-                            nonce: '<?php echo wp_create_nonce('iwp_woo_v2_admin_nonce'); ?>'
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                var html = '<div style="background: #fff; padding: 10px; border: 1px solid #ddd; border-radius: 3px;">';
-                                html += '<h4>Status Check Results</h4>';
-                                html += '<p><strong>Sites Checked:</strong> ' + response.data.checked_count + '</p>';
-                                html += '<p><strong>Sites Updated:</strong> ' + response.data.updated_count + '</p>';
-                                
-                                if (response.data.results && response.data.results.length > 0) {
-                                    html += '<h5>Individual Results:</h5>';
-                                    response.data.results.forEach(function(result) {
-                                        html += '<p><strong>Site ' + result.site_id + ':</strong> ' + result.old_status + ' → ' + result.new_status + '</p>';
-                                    });
-                                }
-                                
-                                html += '</div>';
-                                $results.html(html);
-                                
-                                // Refresh database status
-                                setTimeout(function() {
-                                    $('#iwp-refresh-db-status').trigger('click');
-                                }, 1000);
-                            } else {
-                                $results.html('<p style="color: #dc3232;">Error: ' + (response.data.message || 'Unknown error') + '</p>');
-                            }
-                        },
-                        error: function() {
-                            $results.html('<p style="color: #dc3232;">Network error occurred</p>');
-                        },
-                        complete: function() {
-                            $btn.prop('disabled', false).text('<?php echo esc_js(__('Check All Pending Sites', 'instawp-integration')); ?>');
-                        }
-                    });
-                });
-                
-                // Force cron check
-                $('#iwp-force-cron-check').on('click', function(e) {
-                    e.preventDefault();
-                    
-                    var $btn = $(this);
-                    $btn.prop('disabled', true).text('<?php echo esc_js(__('Running...', 'instawp-integration')); ?>');
-                    
-                    // Trigger the cron job manually
-                    $.ajax({
-                        url: ajaxurl,
-                        type: 'POST',
-                        data: {
-                            action: 'iwp_woo_v2_check_pending_sites',
-                            nonce: '<?php echo wp_create_nonce('iwp_woo_v2_admin_nonce'); ?>'
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                alert('✓ ' + response.data.message);
-                            } else {
-                                alert('✗ Error: ' + (response.data.message || 'Unknown error'));
-                            }
-                            // Refresh database status
-                            $('#iwp-refresh-db-status').trigger('click');
-                        },
-                        error: function() {
-                            alert('✗ Network error occurred during cron check');
-                        },
-                        complete: function() {
-                            $btn.prop('disabled', false).text('<?php echo esc_js(__('Force Cron Check', 'instawp-integration')); ?>');
-                        }
-                    });
-                });
-                
-                // Refresh database status
-                $('#iwp-refresh-db-status').on('click', function(e) {
-                    e.preventDefault();
-                    
-                    var $btn = $(this);
-                    $btn.prop('disabled', true).text('<?php echo esc_js(__('Refreshing...', 'instawp-integration')); ?>');
-                    
-                    location.reload();
-                });
-            });
-            </script>
+        </div>
+        <?php
+    }
+
+    /**
+     * Render Documentation tab content
+     */
+    private function render_documentation_tab() {
+        ?>
+        <div class="tab-section">
+            <h3><?php esc_html_e('Shortcode Documentation', 'iwp-wp-integration'); ?></h3>
+            <?php $this->render_settings_section('iwp_settings', 'iwp_shortcode'); ?>
+        </div>
+        
+        <div class="tab-section">
+            <h3><?php esc_html_e('API References', 'iwp-wp-integration'); ?></h3>
+            <div class="form-section">
+                <h4><?php esc_html_e('Useful Links', 'iwp-wp-integration'); ?></h4>
+                <ul>
+                    <li><a href="https://app.instawp.io/user/api-tokens" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Get API Key', 'iwp-wp-integration'); ?></a></li>
+                    <li><a href="https://instawp.com/docs" target="_blank" rel="noopener noreferrer"><?php esc_html_e('InstaWP Documentation', 'iwp-wp-integration'); ?></a></li>
+                    <li><a href="https://instawp.com/support" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Support', 'iwp-wp-integration'); ?></a></li>
+                </ul>
+            </div>
+        </div>
         </div>
         <?php
     }
@@ -835,43 +819,43 @@ class IWP_Woo_V2_Admin {
      * General settings section callback
      */
     public function general_settings_callback() {
-        echo '<p>' . esc_html__('Configure the general settings for the InstaWP WooCommerce integration.', 'instawp-integration') . '</p>';
+        echo '<p>' . esc_html__('Configure the general settings for the InstaWP WooCommerce integration.', 'iwp-wp-integration') . '</p>';
     }
 
     /**
      * API settings section callback
      */
     public function api_settings_callback() {
-        echo '<p>' . esc_html__('Configure the API settings for InstaWP', 'instawp-integration') . '</p>';
+        echo '<p>' . esc_html__('Configure the API settings for InstaWP', 'iwp-wp-integration') . '</p>';
     }
 
     /**
      * Snapshots section callback
      */
     public function snapshots_section_callback() {
-        IWP_Woo_V2_Logger::debug('snapshots_section_callback() called from admin interface', 'admin');
+        IWP_Logger::debug('snapshots_section_callback() called from admin interface', 'admin');
         
-        echo '<p>' . esc_html__('Available InstaWP snapshots from your account.', 'instawp-integration') . '</p>';
+        echo '<p>' . esc_html__('Available InstaWP snapshots from your account.', 'iwp-wp-integration') . '</p>';
         
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         $api_key = isset($options['api_key']) ? $options['api_key'] : '';
         
         if (empty($api_key)) {
-            IWP_Woo_V2_Logger::warning('No API key found in options', 'admin');
-            echo '<div class="notice notice-warning inline"><p>' . esc_html__('Please enter your API key above to view snapshots.', 'instawp-integration') . '</p></div>';
+            IWP_Logger::warning('No API key found in options', 'admin');
+            echo '<div class="notice notice-warning inline"><p>' . esc_html__('Please enter your API key above to view snapshots.', 'iwp-wp-integration') . '</p></div>';
             return;
         }
 
-        IWP_Woo_V2_Logger::info('Fetching snapshots via centralized service', 'admin');
-        $snapshots = IWP_Woo_V2_Service::get_snapshots();
+        IWP_Logger::info('Fetching snapshots via centralized service', 'admin');
+        $snapshots = IWP_Service::get_snapshots();
         
         if (is_wp_error($snapshots)) {
-            IWP_Woo_V2_Logger::error('Snapshots fetch failed in admin', 'admin', array('error' => $snapshots->get_error_message()));
-            echo '<div class="notice notice-error inline"><p>' . esc_html__('Error fetching snapshots: ', 'instawp-integration') . esc_html($snapshots->get_error_message()) . '</p></div>';
+            IWP_Logger::error('Snapshots fetch failed in admin', 'admin', array('error' => $snapshots->get_error_message()));
+            echo '<div class="notice notice-error inline"><p>' . esc_html__('Error fetching snapshots: ', 'iwp-wp-integration') . esc_html($snapshots->get_error_message()) . '</p></div>';
             return;
         }
 
-        IWP_Woo_V2_Logger::info('Snapshots fetched successfully in admin interface', 'admin');
+        IWP_Logger::info('Snapshots fetched successfully in admin interface', 'admin');
         error_log('IWP WooCommerce V2: Snapshots data structure: ' . wp_json_encode(array_keys($snapshots['data'])));
         if (isset($snapshots['data']) && is_array($snapshots['data'])) {
             error_log('IWP WooCommerce V2: Number of snapshots found: ' . count($snapshots['data']));
@@ -879,8 +863,8 @@ class IWP_Woo_V2_Admin {
 
         echo '<div class="iwp-snapshots-container">';
         echo '<div class="iwp-snapshots-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">';
-        echo '<h4>' . esc_html__('Snapshots', 'instawp-integration') . '</h4>';
-        echo '<button type="button" class="button button-secondary" id="iwp-refresh-snapshots">' . esc_html__('Refresh Snapshots', 'instawp-integration') . '</button>';
+        echo '<h4>' . esc_html__('Snapshots', 'iwp-wp-integration') . '</h4>';
+        echo '<button type="button" class="button button-secondary" id="iwp-refresh-snapshots">' . esc_html__('Refresh Snapshots', 'iwp-wp-integration') . '</button>';
         echo '</div>';
 
         if (!empty($snapshots) && isset($snapshots['data']) && is_array($snapshots['data'])) {
@@ -888,7 +872,7 @@ class IWP_Woo_V2_Admin {
             
             foreach ($snapshots['data'] as $snapshot) {
                 $snapshot_slug = isset($snapshot['slug']) ? sanitize_text_field($snapshot['slug']) : '';
-                $snapshot_name = isset($snapshot['name']) ? sanitize_text_field($snapshot['name']) : __('Untitled Snapshot', 'instawp-integration');
+                $snapshot_name = isset($snapshot['name']) ? sanitize_text_field($snapshot['name']) : __('Untitled Snapshot', 'iwp-wp-integration');
                 $snapshot_description = isset($snapshot['description']) ? sanitize_text_field($snapshot['description']) : '';
                 $snapshot_image = isset($snapshot['image']) ? esc_url($snapshot['image']) : '';
                 $created_at = isset($snapshot['created_at']) ? sanitize_text_field($snapshot['created_at']) : '';
@@ -919,7 +903,7 @@ class IWP_Woo_V2_Admin {
             
             echo '</div>';
         } else {
-            echo '<p>' . esc_html__('No snapshots found.', 'instawp-integration') . '</p>';
+            echo '<p>' . esc_html__('No snapshots found.', 'iwp-wp-integration') . '</p>';
         }
         
         echo '</div>';
@@ -929,25 +913,25 @@ class IWP_Woo_V2_Admin {
      * Plans section callback
      */
     public function plans_section_callback() {
-        IWP_Woo_V2_Logger::debug('plans_section_callback() called from admin interface', 'admin');
+        IWP_Logger::debug('plans_section_callback() called from admin interface', 'admin');
         
-        echo '<p>' . esc_html__('Available InstaWP plans from your account.', 'instawp-integration') . '</p>';
+        echo '<p>' . esc_html__('Available InstaWP plans from your account.', 'iwp-wp-integration') . '</p>';
         
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         $api_key = isset($options['api_key']) ? $options['api_key'] : '';
         
         if (empty($api_key)) {
-            IWP_Woo_V2_Logger::warning('No API key found in options', 'admin');
-            echo '<div class="notice notice-warning inline"><p>' . esc_html__('Please enter your API key above to view plans.', 'instawp-integration') . '</p></div>';
+            IWP_Logger::warning('No API key found in options', 'admin');
+            echo '<div class="notice notice-warning inline"><p>' . esc_html__('Please enter your API key above to view plans.', 'iwp-wp-integration') . '</p></div>';
             return;
         }
 
         error_log('IWP WooCommerce V2: Fetching plans via centralized service');
-        $plans = IWP_Woo_V2_Service::get_plans();
+        $plans = IWP_Service::get_plans();
         
         if (is_wp_error($plans)) {
             error_log('IWP WooCommerce V2: Plans fetch failed in admin: ' . $plans->get_error_message());
-            echo '<div class="notice notice-error inline"><p>' . esc_html__('Error fetching plans: ', 'instawp-integration') . esc_html($plans->get_error_message()) . '</p></div>';
+            echo '<div class="notice notice-error inline"><p>' . esc_html__('Error fetching plans: ', 'iwp-wp-integration') . esc_html($plans->get_error_message()) . '</p></div>';
             return;
         }
 
@@ -966,8 +950,8 @@ class IWP_Woo_V2_Admin {
 
         echo '<div class="iwp-plans-container">';
         echo '<div class="iwp-plans-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">';
-        echo '<h4>' . esc_html__('Plans', 'instawp-integration') . '</h4>';
-        echo '<button type="button" class="button button-secondary" id="iwp-refresh-plans">' . esc_html__('Refresh Plans', 'instawp-integration') . '</button>';
+        echo '<h4>' . esc_html__('Plans', 'iwp-wp-integration') . '</h4>';
+        echo '<button type="button" class="button button-secondary" id="iwp-refresh-plans">' . esc_html__('Refresh Plans', 'iwp-wp-integration') . '</button>';
         echo '</div>';
 
         if ($plan_count > 0) {
@@ -978,7 +962,7 @@ class IWP_Woo_V2_Admin {
                     continue;
                 }
                 $plan_id = isset($plan['id']) ? sanitize_text_field($plan['id']) : '';
-                $plan_name = isset($plan['display_name']) ? sanitize_text_field($plan['display_name']) : (isset($plan['name']) ? sanitize_text_field($plan['name']) : __('Untitled Plan', 'instawp-integration'));
+                $plan_name = isset($plan['display_name']) ? sanitize_text_field($plan['display_name']) : (isset($plan['name']) ? sanitize_text_field($plan['name']) : __('Untitled Plan', 'iwp-wp-integration'));
                 $plan_description = isset($plan['short_description']) ? sanitize_text_field($plan['short_description']) : '';
                 // Note: The API response doesn't include price/currency, so we'll skip those for now
                 $plan_internal_name = isset($plan['name']) ? sanitize_text_field($plan['name']) : '';
@@ -1003,7 +987,7 @@ class IWP_Woo_V2_Admin {
             
             echo '</div>';
         } else {
-            echo '<p>' . esc_html__('No plans found.', 'instawp-integration') . '</p>';
+            echo '<p>' . esc_html__('No plans found.', 'iwp-wp-integration') . '</p>';
         }
         
         echo '</div>';
@@ -1022,51 +1006,51 @@ class IWP_Woo_V2_Admin {
      * Cache management section callback
      */
     public function cache_section_callback() {
-        echo '<p>' . esc_html__('Manage cached data for InstaWP integration.', 'instawp-integration') . '</p>';
+        echo '<p>' . esc_html__('Manage cached data for InstaWP integration.', 'iwp-wp-integration') . '</p>';
         
         echo '<div class="iwp-cache-container">';
         echo '<div class="iwp-cache-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">';
-        echo '<h4>' . esc_html__('Cache Management', 'instawp-integration') . '</h4>';
+        echo '<h4>' . esc_html__('Cache Management', 'iwp-wp-integration') . '</h4>';
         echo '<div class="iwp-cache-actions">';
-        echo '<button type="button" class="button button-secondary" id="iwp-warm-cache" style="margin-right: 5px;">' . esc_html__('Warm Up Cache', 'instawp-integration') . '</button>';
-        echo '<button type="button" class="button button-secondary" id="iwp-clear-transients">' . esc_html__('Clear All Cache', 'instawp-integration') . '</button>';
+        echo '<button type="button" class="button button-secondary" id="iwp-warm-cache" style="margin-right: 5px;">' . esc_html__('Warm Up Cache', 'iwp-wp-integration') . '</button>';
+        echo '<button type="button" class="button button-secondary" id="iwp-clear-transients">' . esc_html__('Clear All Cache', 'iwp-wp-integration') . '</button>';
         echo '</div>';
         echo '</div>';
         
         echo '<div class="iwp-cache-info" style="background: #f9f9f9; padding: 15px; border-radius: 4px; border-left: 4px solid #0073aa;">';
-        echo '<p><strong>' . esc_html__('Cached Data:', 'instawp-integration') . '</strong></p>';
+        echo '<p><strong>' . esc_html__('Cached Data:', 'iwp-wp-integration') . '</strong></p>';
         
         // Get detailed cache status from centralized service
-        $cache_status = IWP_Woo_V2_Service::get_cache_status();
-        $cache_stats = IWP_Woo_V2_Service::get_cache_stats();
+        $cache_status = IWP_Service::get_cache_status();
+        $cache_stats = IWP_Service::get_cache_stats();
         
         echo '<div class="iwp-cache-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">';
         
         // Snapshots cache info
         echo '<div class="iwp-cache-item">';
-        echo '<h4 style="margin: 0 0 8px 0;">' . esc_html__('Snapshots Cache', 'instawp-integration') . '</h4>';
+        echo '<h4 style="margin: 0 0 8px 0;">' . esc_html__('Snapshots Cache', 'iwp-wp-integration') . '</h4>';
         if ($cache_status['snapshots']) {
-            echo '<div style="color: #46b450;">✓ ' . sprintf(esc_html__('%d items cached', 'instawp-integration'), $cache_status['snapshots_count']) . '</div>';
+            echo '<div style="color: #46b450;">✓ ' . sprintf(esc_html__('%d items cached', 'iwp-wp-integration'), $cache_status['snapshots_count']) . '</div>';
             if ($cache_status['snapshots_expires']) {
                 $expires_in = $cache_status['snapshots_expires'] - time();
-                echo '<div style="font-size: 12px; color: #666;">' . sprintf(esc_html__('Expires in %s', 'instawp-integration'), human_time_diff(time(), $cache_status['snapshots_expires'])) . '</div>';
+                echo '<div style="font-size: 12px; color: #666;">' . sprintf(esc_html__('Expires in %s', 'iwp-wp-integration'), human_time_diff(time(), $cache_status['snapshots_expires'])) . '</div>';
             }
         } else {
-            echo '<div style="color: #dc3232;">✗ ' . esc_html__('No cache', 'instawp-integration') . '</div>';
+            echo '<div style="color: #dc3232;">✗ ' . esc_html__('No cache', 'iwp-wp-integration') . '</div>';
         }
         echo '</div>';
         
         // Plans cache info
         echo '<div class="iwp-cache-item">';
-        echo '<h4 style="margin: 0 0 8px 0;">' . esc_html__('Plans Cache', 'instawp-integration') . '</h4>';
+        echo '<h4 style="margin: 0 0 8px 0;">' . esc_html__('Plans Cache', 'iwp-wp-integration') . '</h4>';
         if ($cache_status['plans']) {
-            echo '<div style="color: #46b450;">✓ ' . sprintf(esc_html__('%d items cached', 'instawp-integration'), $cache_status['plans_count']) . '</div>';
+            echo '<div style="color: #46b450;">✓ ' . sprintf(esc_html__('%d items cached', 'iwp-wp-integration'), $cache_status['plans_count']) . '</div>';
             if ($cache_status['plans_expires']) {
                 $expires_in = $cache_status['plans_expires'] - time();
-                echo '<div style="font-size: 12px; color: #666;">' . sprintf(esc_html__('Expires in %s', 'instawp-integration'), human_time_diff(time(), $cache_status['plans_expires'])) . '</div>';
+                echo '<div style="font-size: 12px; color: #666;">' . sprintf(esc_html__('Expires in %s', 'iwp-wp-integration'), human_time_diff(time(), $cache_status['plans_expires'])) . '</div>';
             }
         } else {
-            echo '<div style="color: #dc3232;">✗ ' . esc_html__('No cache', 'instawp-integration') . '</div>';
+            echo '<div style="color: #dc3232;">✗ ' . esc_html__('No cache', 'iwp-wp-integration') . '</div>';
         }
         echo '</div>';
         
@@ -1074,14 +1058,14 @@ class IWP_Woo_V2_Admin {
         
         // Cache statistics
         echo '<div class="iwp-cache-stats" style="background: #fff; padding: 10px; border-radius: 3px; margin-bottom: 10px;">';
-        echo '<strong>' . esc_html__('Cache Statistics:', 'instawp-integration') . '</strong><br>';
-        echo sprintf(esc_html__('Total Items: %d', 'instawp-integration'), $cache_stats['total_cached_items']) . ' | ';
-        echo sprintf(esc_html__('Memory Usage: %s', 'instawp-integration'), size_format($cache_stats['memory_usage'])) . ' | ';
-        echo sprintf(esc_html__('Hit Ratio: %d%%', 'instawp-integration'), round($cache_stats['cache_hit_ratio'] * 100));
+        echo '<strong>' . esc_html__('Cache Statistics:', 'iwp-wp-integration') . '</strong><br>';
+        echo sprintf(esc_html__('Total Items: %d', 'iwp-wp-integration'), $cache_stats['total_cached_items']) . ' | ';
+        echo sprintf(esc_html__('Memory Usage: %s', 'iwp-wp-integration'), size_format($cache_stats['memory_usage'])) . ' | ';
+        echo sprintf(esc_html__('Hit Ratio: %d%%', 'iwp-wp-integration'), round($cache_stats['cache_hit_ratio'] * 100));
         echo '</div>';
         
         echo '<p style="font-size: 12px; color: #666; margin-top: 10px;">';
-        echo esc_html__('Snapshots cache for 15 minutes, Plans cache for 1 hour. Use refresh buttons to update manually.', 'instawp-integration');
+        echo esc_html__('Snapshots cache for 15 minutes, Plans cache for 1 hour. Use refresh buttons to update manually.', 'iwp-wp-integration');
         echo '</p>';
         echo '</div>';
         
@@ -1092,73 +1076,73 @@ class IWP_Woo_V2_Admin {
      * Shortcode documentation section callback
      */
     public function shortcode_section_callback() {
-        echo '<p>' . esc_html__('The iwp_site_creator shortcode allows you to create an InstaWP site creation form anywhere on your site.', 'instawp-integration') . '</p>';
+        echo '<p>' . esc_html__('The iwp_site_creator shortcode allows you to create an InstaWP site creation form anywhere on your site.', 'iwp-wp-integration') . '</p>';
         
         echo '<div class="iwp-shortcode-docs" style="background: #f9f9f9; padding: 20px; border-radius: 4px; border-left: 4px solid #0073aa; margin-top: 15px;">';
         
         // Basic Usage
-        echo '<h4>' . esc_html__('Basic Usage', 'instawp-integration') . '</h4>';
+        echo '<h4>' . esc_html__('Basic Usage', 'iwp-wp-integration') . '</h4>';
         echo '<code style="background: #fff; padding: 8px; border: 1px solid #ddd; border-radius: 3px; display: block; margin-bottom: 15px;">';
         echo '[iwp_site_creator snapshot_slug="your-snapshot-slug"]';
         echo '</code>';
         
         // Parameters
-        echo '<h4>' . esc_html__('Parameters', 'instawp-integration') . '</h4>';
+        echo '<h4>' . esc_html__('Parameters', 'iwp-wp-integration') . '</h4>';
         echo '<table class="form-table" style="background: #fff; margin-bottom: 15px;">';
         
         echo '<tr>';
         echo '<th scope="row" style="padding: 10px;"><strong>snapshot_slug</strong></th>';
-        echo '<td style="padding: 10px;">' . esc_html__('(Required) The slug of the InstaWP snapshot to use for site creation.', 'instawp-integration') . '</td>';
+        echo '<td style="padding: 10px;">' . esc_html__('(Required) The slug of the InstaWP snapshot to use for site creation.', 'iwp-wp-integration') . '</td>';
         echo '</tr>';
         
         echo '<tr>';
         echo '<th scope="row" style="padding: 10px;"><strong>email</strong></th>';
-        echo '<td style="padding: 10px;">' . esc_html__('(Optional) Pre-fill the email field with this value.', 'instawp-integration') . '</td>';
+        echo '<td style="padding: 10px;">' . esc_html__('(Optional) Pre-fill the email field with this value.', 'iwp-wp-integration') . '</td>';
         echo '</tr>';
         
         echo '<tr>';
         echo '<th scope="row" style="padding: 10px;"><strong>name</strong></th>';
-        echo '<td style="padding: 10px;">' . esc_html__('(Optional) Pre-fill the site name field with this value.', 'instawp-integration') . '</td>';
+        echo '<td style="padding: 10px;">' . esc_html__('(Optional) Pre-fill the site name field with this value.', 'iwp-wp-integration') . '</td>';
         echo '</tr>';
         
         echo '<tr>';
         echo '<th scope="row" style="padding: 10px;"><strong>expiry_hours</strong></th>';
-        echo '<td style="padding: 10px;">' . esc_html__('(Optional) Number of hours until the site expires. If set, the site will be temporary (is_reserved=false). If not set, the site will be permanent (is_reserved=true).', 'instawp-integration') . '</td>';
+        echo '<td style="padding: 10px;">' . esc_html__('(Optional) Number of hours until the site expires. If set, the site will be temporary (is_reserved=false). If not set, the site will be permanent (is_reserved=true).', 'iwp-wp-integration') . '</td>';
         echo '</tr>';
         
         echo '<tr>';
         echo '<th scope="row" style="padding: 10px;"><strong>sandbox</strong></th>';
-        echo '<td style="padding: 10px;">' . esc_html__('(Optional) Set to "true" to create a sandbox/shared site. This sends is_shared:true to the API.', 'instawp-integration') . '</td>';
+        echo '<td style="padding: 10px;">' . esc_html__('(Optional) Set to "true" to create a sandbox/shared site. This sends is_shared:true to the API.', 'iwp-wp-integration') . '</td>';
         echo '</tr>';
         
         echo '</table>';
         
         // Examples
-        echo '<h4>' . esc_html__('Examples', 'instawp-integration') . '</h4>';
+        echo '<h4>' . esc_html__('Examples', 'iwp-wp-integration') . '</h4>';
         
-        echo '<h5>' . esc_html__('Basic form:', 'instawp-integration') . '</h5>';
+        echo '<h5>' . esc_html__('Basic form:', 'iwp-wp-integration') . '</h5>';
         echo '<code style="background: #fff; padding: 8px; border: 1px solid #ddd; border-radius: 3px; display: block; margin-bottom: 10px;">';
         echo '[iwp_site_creator snapshot_slug="wordpress-blog"]';
         echo '</code>';
         
-        echo '<h5>' . esc_html__('Pre-filled form:', 'instawp-integration') . '</h5>';
+        echo '<h5>' . esc_html__('Pre-filled form:', 'iwp-wp-integration') . '</h5>';
         echo '<code style="background: #fff; padding: 8px; border: 1px solid #ddd; border-radius: 3px; display: block; margin-bottom: 10px;">';
         echo '[iwp_site_creator snapshot_slug="ecommerce-store" email="customer@example.com" name="My Store"]';
         echo '</code>';
         
-        echo '<h5>' . esc_html__('Temporary site (24 hours):', 'instawp-integration') . '</h5>';
+        echo '<h5>' . esc_html__('Temporary site (24 hours):', 'iwp-wp-integration') . '</h5>';
         echo '<code style="background: #fff; padding: 8px; border: 1px solid #ddd; border-radius: 3px; display: block; margin-bottom: 10px;">';
         echo '[iwp_site_creator snapshot_slug="demo-site" expiry_hours="24"]';
         echo '</code>';
         
-        echo '<h5>' . esc_html__('Sandbox site:', 'instawp-integration') . '</h5>';
+        echo '<h5>' . esc_html__('Sandbox site:', 'iwp-wp-integration') . '</h5>';
         echo '<code style="background: #fff; padding: 8px; border: 1px solid #ddd; border-radius: 3px; display: block; margin-bottom: 15px;">';
         echo '[iwp_site_creator snapshot_slug="sandbox-demo" sandbox="true"]';
         echo '</code>';
         
         // Styling
-        echo '<h4>' . esc_html__('Styling', 'instawp-integration') . '</h4>';
-        echo '<p>' . esc_html__('The shortcode generates an unstyled form with CSS classes for theme customization:', 'instawp-integration') . '</p>';
+        echo '<h4>' . esc_html__('Styling', 'iwp-wp-integration') . '</h4>';
+        echo '<p>' . esc_html__('The shortcode generates an unstyled form with CSS classes for theme customization:', 'iwp-wp-integration') . '</p>';
         
         echo '<ul style="margin-left: 20px;">';
         echo '<li><code>.iwp-site-creator-container</code> - Main container</li>';
@@ -1170,14 +1154,14 @@ class IWP_Woo_V2_Admin {
         echo '</ul>';
         
         // Features
-        echo '<h4>' . esc_html__('Features', 'instawp-integration') . '</h4>';
+        echo '<h4>' . esc_html__('Features', 'iwp-wp-integration') . '</h4>';
         echo '<ul style="margin-left: 20px;">';
-        echo '<li>' . esc_html__('Real-time site creation status tracking', 'instawp-integration') . '</li>';
-        echo '<li>' . esc_html__('Copy-to-clipboard functionality for credentials', 'instawp-integration') . '</li>';
-        echo '<li>' . esc_html__('Password show/hide toggle', 'instawp-integration') . '</li>';
-        echo '<li>' . esc_html__('Mobile-responsive design', 'instawp-integration') . '</li>';
-        echo '<li>' . esc_html__('Form validation and error handling', 'instawp-integration') . '</li>';
-        echo '<li>' . esc_html__('Support for both pool sites and task-based creation', 'instawp-integration') . '</li>';
+        echo '<li>' . esc_html__('Real-time site creation status tracking', 'iwp-wp-integration') . '</li>';
+        echo '<li>' . esc_html__('Copy-to-clipboard functionality for credentials', 'iwp-wp-integration') . '</li>';
+        echo '<li>' . esc_html__('Password show/hide toggle', 'iwp-wp-integration') . '</li>';
+        echo '<li>' . esc_html__('Mobile-responsive design', 'iwp-wp-integration') . '</li>';
+        echo '<li>' . esc_html__('Form validation and error handling', 'iwp-wp-integration') . '</li>';
+        echo '<li>' . esc_html__('Support for both pool sites and task-based creation', 'iwp-wp-integration') . '</li>';
         echo '</ul>';
         
         echo '</div>';
@@ -1189,12 +1173,12 @@ class IWP_Woo_V2_Admin {
      * @param array $args Field arguments
      */
     public function checkbox_field_callback($args) {
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         $value = isset($options[$args['label_for']]) ? $options[$args['label_for']] : 'no';
         ?>
         <input type="checkbox" 
                id="<?php echo esc_attr($args['label_for']); ?>" 
-               name="iwp_woo_v2_options[<?php echo esc_attr($args['label_for']); ?>]" 
+               name="iwp_options[<?php echo esc_attr($args['label_for']); ?>]" 
                value="yes" 
                <?php checked('yes', $value); ?> />
         <?php if (isset($args['description'])) : ?>
@@ -1209,13 +1193,13 @@ class IWP_Woo_V2_Admin {
      * @param array $args Field arguments
      */
     public function text_field_callback($args) {
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         $value = isset($options[$args['label_for']]) ? $options[$args['label_for']] : '';
         $type = isset($args['type']) ? $args['type'] : 'text';
         ?>
         <input type="<?php echo esc_attr($type); ?>" 
                id="<?php echo esc_attr($args['label_for']); ?>" 
-               name="iwp_woo_v2_options[<?php echo esc_attr($args['label_for']); ?>]" 
+               name="iwp_options[<?php echo esc_attr($args['label_for']); ?>]" 
                value="<?php echo esc_attr($value); ?>" 
                class="regular-text" />
         <?php if (isset($args['description'])) : ?>
@@ -1230,11 +1214,11 @@ class IWP_Woo_V2_Admin {
      * @param array $args Field arguments
      */
     public function select_field_callback($args) {
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         $value = isset($options[$args['label_for']]) ? $options[$args['label_for']] : '';
         ?>
         <select id="<?php echo esc_attr($args['label_for']); ?>" 
-                name="iwp_woo_v2_options[<?php echo esc_attr($args['label_for']); ?>]">
+                name="iwp_options[<?php echo esc_attr($args['label_for']); ?>]">
             <?php foreach ($args['options'] as $option_value => $option_label) : ?>
                 <option value="<?php echo esc_attr($option_value); ?>" <?php selected($option_value, $value); ?>>
                     <?php echo esc_html($option_label); ?>
@@ -1261,31 +1245,31 @@ class IWP_Woo_V2_Admin {
         if ($action === 'delete') {
             // Verify nonce
             if (!wp_verify_nonce($_GET['_wpnonce'], 'delete_site_' . $site_id)) {
-                wp_die(__('Security check failed', 'instawp-integration'));
+                wp_die(__('Security check failed', 'iwp-wp-integration'));
             }
 
             // Check permissions
             if (!current_user_can('manage_woocommerce')) {
-                wp_die(__('You do not have sufficient permissions to perform this action.', 'instawp-integration'));
+                wp_die(__('You do not have sufficient permissions to perform this action.', 'iwp-wp-integration'));
             }
 
             // Delete the site
             try {
                 // Get API client
-                $options = get_option('iwp_woo_v2_options', array());
+                $options = get_option('iwp_options', array());
                 $api_key = $options['api_key'] ?? '';
                 
                 if (!empty($api_key)) {
-                    $api_client = new IWP_Woo_V2_API_Client();
+                    $api_client = new IWP_API_Client();
                     $api_client->set_api_key($api_key);
                     $api_client->delete_site($site_id);
                 }
 
                 // Remove from database
-                IWP_Woo_V2_Sites_Model::delete($site_id);
+                IWP_Sites_Model::delete($site_id);
 
                 // Log the deletion
-                IWP_Woo_V2_Logger::info('Site deleted via row action', 'admin', array(
+                IWP_Logger::info('Site deleted via row action', 'admin', array(
                     'site_id' => $site_id,
                     'user_id' => get_current_user_id()
                 ));
@@ -1293,7 +1277,7 @@ class IWP_Woo_V2_Admin {
                 // Show success message and redirect
                 add_action('admin_notices', function() {
                     echo '<div class="notice notice-success is-dismissible"><p>' . 
-                         esc_html__('Site deleted successfully.', 'instawp-integration') . 
+                         esc_html__('Site deleted successfully.', 'iwp-wp-integration') . 
                          '</p></div>';
                 });
 
@@ -1301,7 +1285,7 @@ class IWP_Woo_V2_Admin {
                 // Show error message
                 add_action('admin_notices', function() use ($e) {
                     echo '<div class="notice notice-error is-dismissible"><p>' . 
-                         sprintf(esc_html__('Failed to delete site: %s', 'instawp-integration'), esc_html($e->getMessage())) . 
+                         sprintf(esc_html__('Failed to delete site: %s', 'iwp-wp-integration'), esc_html($e->getMessage())) . 
                          '</p></div>';
                 });
             }
@@ -1316,23 +1300,23 @@ class IWP_Woo_V2_Admin {
         $this->handle_sites_page_actions();
         
         // Include the sites list table class
-        if (!class_exists('IWP_Woo_V2_Sites_List_Table')) {
-            require_once IWP_WOO_V2_PLUGIN_PATH . 'includes/admin/class-iwp-woo-v2-sites-list-table.php';
+        if (!class_exists('IWP_Sites_List_Table')) {
+            require_once IWP_PLUGIN_PATH . 'includes/admin/class-iwp-sites-list-table.php';
         }
         
         ?>
         <div class="wrap">
-            <h1><?php esc_html_e('InstaWP Sites', 'instawp-integration'); ?>
-                <a href="#" class="page-title-action" id="iwp-refresh-sites"><?php esc_html_e('Refresh', 'instawp-integration'); ?></a>
+            <h1><?php esc_html_e('InstaWP Sites', 'iwp-wp-integration'); ?>
+                <a href="#" class="page-title-action" id="iwp-refresh-sites"><?php esc_html_e('Refresh', 'iwp-wp-integration'); ?></a>
             </h1>
             
             <p class="description">
-                <?php esc_html_e('Manage all InstaWP sites created through WooCommerce orders, shortcodes, or other integrations.', 'instawp-integration'); ?>
+                <?php esc_html_e('Manage all InstaWP sites created through WooCommerce orders, shortcodes, or other integrations.', 'iwp-wp-integration'); ?>
             </p>
 
             <?php
             // Display sites table
-            $sites_table = new IWP_Woo_V2_Sites_List_Table();
+            $sites_table = new IWP_Sites_List_Table();
             $sites_table->prepare_items();
             ?>
             
@@ -1406,12 +1390,12 @@ class IWP_Woo_V2_Admin {
                 var password = $btn.data('password');
                 var $hidden = $btn.prev('.iwp-password-hidden');
                 
-                if ($btn.text() === '<?php echo esc_js(__('Show', 'instawp-integration')); ?>') {
+                if ($btn.text() === '<?php echo esc_js(__('Show', 'iwp-wp-integration')); ?>') {
                     $hidden.text(password);
-                    $btn.text('<?php echo esc_js(__('Hide', 'instawp-integration')); ?>');
+                    $btn.text('<?php echo esc_js(__('Hide', 'iwp-wp-integration')); ?>');
                 } else {
                     $hidden.text('••••••••');
-                    $btn.text('<?php echo esc_js(__('Show', 'instawp-integration')); ?>');
+                    $btn.text('<?php echo esc_js(__('Show', 'iwp-wp-integration')); ?>');
                 }
             });
             
@@ -1430,20 +1414,20 @@ class IWP_Woo_V2_Admin {
                 var siteUrl = $btn.data('site-url');
                 
                 if (!siteId) {
-                    alert('<?php echo esc_js(__('Site ID is required', 'instawp-integration')); ?>');
+                    alert('<?php echo esc_js(__('Site ID is required', 'iwp-wp-integration')); ?>');
                     return;
                 }
                 
                 var confirmMessage = siteUrl ? 
-                    '<?php echo esc_js(__('Are you sure you want to delete the site:', 'instawp-integration')); ?> ' + siteUrl + '?' :
-                    '<?php echo esc_js(__('Are you sure you want to delete this site?', 'instawp-integration')); ?>';
+                    '<?php echo esc_js(__('Are you sure you want to delete the site:', 'iwp-wp-integration')); ?> ' + siteUrl + '?' :
+                    '<?php echo esc_js(__('Are you sure you want to delete this site?', 'iwp-wp-integration')); ?>';
                 
                 if (!confirm(confirmMessage)) {
                     return;
                 }
                 
                 // Show loading state
-                $btn.prop('disabled', true).text('<?php echo esc_js(__('Deleting...', 'instawp-integration')); ?>');
+                $btn.prop('disabled', true).text('<?php echo esc_js(__('Deleting...', 'iwp-wp-integration')); ?>');
                 
                 // Make AJAX request
                 $.ajax({
@@ -1463,13 +1447,13 @@ class IWP_Woo_V2_Admin {
                                 $(this).remove();
                             });
                         } else {
-                            alert('<?php echo esc_js(__('Error:', 'instawp-integration')); ?> ' + (response.data.message || '<?php echo esc_js(__('Unknown error occurred', 'instawp-integration')); ?>'));
-                            $btn.prop('disabled', false).text('<?php echo esc_js(__('Delete', 'instawp-integration')); ?>');
+                            alert('<?php echo esc_js(__('Error:', 'iwp-wp-integration')); ?> ' + (response.data.message || '<?php echo esc_js(__('Unknown error occurred', 'iwp-wp-integration')); ?>'));
+                            $btn.prop('disabled', false).text('<?php echo esc_js(__('Delete', 'iwp-wp-integration')); ?>');
                         }
                     },
                     error: function() {
-                        alert('<?php echo esc_js(__('Network error occurred', 'instawp-integration')); ?>');
-                        $btn.prop('disabled', false).text('<?php echo esc_js(__('Delete', 'instawp-integration')); ?>');
+                        alert('<?php echo esc_js(__('Network error occurred', 'iwp-wp-integration')); ?>');
+                        $btn.prop('disabled', false).text('<?php echo esc_js(__('Delete', 'iwp-wp-integration')); ?>');
                     }
                 });
             });
@@ -1528,14 +1512,14 @@ class IWP_Woo_V2_Admin {
         // Check nonce
         if (!wp_verify_nonce($_POST['nonce'], $nonce_action)) {
             wp_send_json_error(array(
-                'message' => __('Security check failed.', 'instawp-integration')
+                'message' => __('Security check failed.', 'iwp-wp-integration')
             ));
         }
 
         // Check user capabilities
         if (!current_user_can($capability)) {
             wp_send_json_error(array(
-                'message' => __('Insufficient permissions.', 'instawp-integration')
+                'message' => __('Insufficient permissions.', 'iwp-wp-integration')
             ));
         }
 
@@ -1548,12 +1532,12 @@ class IWP_Woo_V2_Admin {
      * @return string The API key
      */
     private function get_validated_api_key() {
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         $api_key = isset($options['api_key']) ? $options['api_key'] : '';
         
         if (empty($api_key)) {
             wp_send_json_error(array(
-                'message' => __('API key is required.', 'instawp-integration')
+                'message' => __('API key is required.', 'iwp-wp-integration')
             ));
         }
 
@@ -1583,12 +1567,12 @@ class IWP_Woo_V2_Admin {
      * AJAX handler for refreshing templates
      */
     public function ajax_refresh_templates() {
-        IWP_Woo_V2_Security::validate_ajax_request('iwp_woo_v2_admin_nonce', 'manage_woocommerce', 'nonce');
+        IWP_Security::validate_ajax_request('iwp_admin_nonce', 'manage_woocommerce', 'nonce');
 
         $api_key = $this->get_validated_api_key();
         $this->setup_api_client($api_key);
         
-        $snapshots = IWP_Woo_V2_Service::refresh_snapshots();
+        $snapshots = IWP_Service::refresh_snapshots();
         
         if (is_wp_error($snapshots)) {
             wp_send_json_error(array(
@@ -1597,7 +1581,7 @@ class IWP_Woo_V2_Admin {
         }
 
         wp_send_json_success(array(
-            'message' => __('Snapshots refreshed successfully.', 'instawp-integration'),
+            'message' => __('Snapshots refreshed successfully.', 'iwp-wp-integration'),
             'snapshots' => $snapshots
         ));
     }
@@ -1611,7 +1595,7 @@ class IWP_Woo_V2_Admin {
         $api_key = $this->get_validated_api_key();
         $this->setup_api_client($api_key);
         
-        $snapshots = IWP_Woo_V2_Service::refresh_snapshots();
+        $snapshots = IWP_Service::refresh_snapshots();
         
         if (is_wp_error($snapshots)) {
             wp_send_json_error(array(
@@ -1620,7 +1604,7 @@ class IWP_Woo_V2_Admin {
         }
 
         wp_send_json_success(array(
-            'message' => __('Snapshots refreshed successfully.', 'instawp-integration'),
+            'message' => __('Snapshots refreshed successfully.', 'iwp-wp-integration'),
             'snapshots' => $snapshots
         ));
     }
@@ -1635,14 +1619,14 @@ class IWP_Woo_V2_Admin {
         
         if (empty($snapshot_slug)) {
             wp_send_json_error(array(
-                'message' => __('Snapshot slug is required.', 'instawp-integration')
+                'message' => __('Snapshot slug is required.', 'iwp-wp-integration')
             ));
         }
 
         $api_key = $this->get_validated_api_key();
         $this->setup_api_client($api_key);
         
-        $snapshot = IWP_Woo_V2_Service::get_snapshot($snapshot_slug);
+        $snapshot = IWP_Service::get_snapshot($snapshot_slug);
         
         if (is_wp_error($snapshot)) {
             wp_send_json_error(array(
@@ -1681,7 +1665,7 @@ class IWP_Woo_V2_Admin {
             
             echo '</div>';
         } else {
-            echo '<p>' . __('No snapshot data available.', 'instawp-integration') . '</p>';
+            echo '<p>' . __('No snapshot data available.', 'iwp-wp-integration') . '</p>';
         }
         
         return ob_get_clean();
@@ -1696,7 +1680,7 @@ class IWP_Woo_V2_Admin {
         $api_key = $this->get_validated_api_key();
         $this->setup_api_client($api_key);
         
-        $plans = IWP_Woo_V2_Service::refresh_plans();
+        $plans = IWP_Service::refresh_plans();
         
         if (is_wp_error($plans)) {
             wp_send_json_error(array(
@@ -1705,7 +1689,7 @@ class IWP_Woo_V2_Admin {
         }
 
         wp_send_json_success(array(
-            'message' => __('Plans refreshed successfully.', 'instawp-integration'),
+            'message' => __('Plans refreshed successfully.', 'iwp-wp-integration'),
             'plans' => $plans
         ));
     }
@@ -1714,12 +1698,12 @@ class IWP_Woo_V2_Admin {
      * AJAX handler for refreshing plans in settings
      */
     public function ajax_refresh_plans() {
-        IWP_Woo_V2_Security::validate_ajax_request('iwp_woo_v2_admin_nonce', 'manage_woocommerce', 'nonce');
+        IWP_Security::validate_ajax_request('iwp_admin_nonce', 'manage_woocommerce', 'nonce');
         
         $api_key = $this->get_validated_api_key();
         $this->setup_api_client($api_key);
         
-        $plans = IWP_Woo_V2_Service::refresh_plans();
+        $plans = IWP_Service::refresh_plans();
         
         if (is_wp_error($plans)) {
             wp_send_json_error(array(
@@ -1728,7 +1712,7 @@ class IWP_Woo_V2_Admin {
         }
 
         wp_send_json_success(array(
-            'message' => __('Plans refreshed successfully.', 'instawp-integration'),
+            'message' => __('Plans refreshed successfully.', 'iwp-wp-integration'),
             'plans' => $plans
         ));
     }
@@ -1740,7 +1724,7 @@ class IWP_Woo_V2_Admin {
      */
     private function refresh_plans() {
         // Clear cache first
-        delete_transient('iwp_woo_v2_plans');
+        delete_transient('iwp_plans');
         
         // Fetch fresh data
         $plans = $this->api_client->get_plans();
@@ -1782,17 +1766,17 @@ class IWP_Woo_V2_Admin {
      * AJAX handler for clearing all transients
      */
     public function ajax_clear_transients() {
-        IWP_Woo_V2_Security::validate_ajax_request('iwp_woo_v2_admin_nonce', 'manage_woocommerce', 'nonce');
+        IWP_Security::validate_ajax_request('iwp_admin_nonce', 'manage_woocommerce', 'nonce');
         
         error_log('IWP WooCommerce V2: Clearing all transients via centralized service');
-        IWP_Woo_V2_Service::clear_caches();
+        IWP_Service::clear_caches();
         
         // Get cache status to determine what was cleared
         $transients_cleared = array('snapshots', 'plans', 'templates (legacy)');
         
         wp_send_json_success(array(
             'message' => sprintf(
-                __('Successfully cleared %d cache type(s): %s', 'instawp-integration'),
+                __('Successfully cleared %d cache type(s): %s', 'iwp-wp-integration'),
                 count($transients_cleared),
                 implode(', ', $transients_cleared)
             ),
@@ -1804,12 +1788,12 @@ class IWP_Woo_V2_Admin {
      * AJAX handler for warming up caches
      */
     public function ajax_warm_cache() {
-        IWP_Woo_V2_Security::validate_ajax_request('iwp_woo_v2_admin_nonce', 'manage_woocommerce', 'nonce');
+        IWP_Security::validate_ajax_request('iwp_admin_nonce', 'manage_woocommerce', 'nonce');
         
         error_log('IWP WooCommerce V2: Warming up caches via AJAX');
         
         // Warm up caches using centralized service
-        $results = IWP_Woo_V2_Service::warm_up_caches();
+        $results = IWP_Service::warm_up_caches();
         
         $successful = array();
         if ($results['snapshots']) {
@@ -1821,18 +1805,18 @@ class IWP_Woo_V2_Admin {
         
         if (empty($successful) && !empty($results['errors'])) {
             wp_send_json_error(array(
-                'message' => __('Failed to warm up caches: ', 'instawp-integration') . implode(', ', $results['errors']),
+                'message' => __('Failed to warm up caches: ', 'iwp-wp-integration') . implode(', ', $results['errors']),
                 'errors' => $results['errors']
             ));
         } else {
             $message = sprintf(
-                __('Successfully warmed up %d cache type(s): %s', 'instawp-integration'),
+                __('Successfully warmed up %d cache type(s): %s', 'iwp-wp-integration'),
                 count($successful),
                 implode(', ', $successful)
             );
             
             if (!empty($results['errors'])) {
-                $message .= '. ' . __('Some errors occurred: ', 'instawp-integration') . implode(', ', $results['errors']);
+                $message .= '. ' . __('Some errors occurred: ', 'iwp-wp-integration') . implode(', ', $results['errors']);
             }
             
             wp_send_json_success(array(
@@ -1882,31 +1866,31 @@ class IWP_Woo_V2_Admin {
      */
     public function ajax_create_test_order() {
         // Verify nonce
-        if (!wp_verify_nonce($_POST['nonce'] ?? '', 'iwp_woo_v2_admin_nonce')) {
-            wp_send_json_error(__('Security check failed', 'instawp-integration'));
+        if (!wp_verify_nonce($_POST['nonce'] ?? '', 'iwp_admin_nonce')) {
+            wp_send_json_error(__('Security check failed', 'iwp-wp-integration'));
         }
 
         // Check permissions
         if (!current_user_can('manage_woocommerce')) {
-            wp_send_json_error(__('Insufficient permissions', 'instawp-integration'));
+            wp_send_json_error(__('Insufficient permissions', 'iwp-wp-integration'));
         }
 
         $product_id = intval($_POST['product_id'] ?? 0);
         $customer_type = sanitize_text_field($_POST['customer_type'] ?? 'existing');
         
         if (!$product_id) {
-            wp_send_json_error(__('Product ID is required', 'instawp-integration'));
+            wp_send_json_error(__('Product ID is required', 'iwp-wp-integration'));
         }
 
         $product = wc_get_product($product_id);
         if (!$product) {
-            wp_send_json_error(__('Product not found', 'instawp-integration'));
+            wp_send_json_error(__('Product not found', 'iwp-wp-integration'));
         }
 
         // Check if product has InstaWP snapshot configured
         $snapshot_slug = get_post_meta($product_id, '_iwp_selected_snapshot', true);
         if (empty($snapshot_slug)) {
-            wp_send_json_error(__('Product does not have an InstaWP snapshot configured', 'instawp-integration'));
+            wp_send_json_error(__('Product does not have an InstaWP snapshot configured', 'iwp-wp-integration'));
         }
 
         // Handle different customer types
@@ -1919,12 +1903,12 @@ class IWP_Woo_V2_Admin {
             case 'existing':
                 $customer_id = intval($_POST['customer_id'] ?? 0);
                 if (!$customer_id) {
-                    wp_send_json_error(__('Please select a user', 'instawp-integration'));
+                    wp_send_json_error(__('Please select a user', 'iwp-wp-integration'));
                 }
                 
                 $customer = get_user_by('ID', $customer_id);
                 if (!$customer) {
-                    wp_send_json_error(__('Selected user not found', 'instawp-integration'));
+                    wp_send_json_error(__('Selected user not found', 'iwp-wp-integration'));
                 }
                 
                 $customer_email = $customer->user_email;
@@ -1939,15 +1923,15 @@ class IWP_Woo_V2_Admin {
                 $new_last_name = sanitize_text_field($_POST['new_user_last_name'] ?? 'User');
                 
                 if (empty($new_username) || empty($new_email)) {
-                    wp_send_json_error(__('Username and email are required for new users', 'instawp-integration'));
+                    wp_send_json_error(__('Username and email are required for new users', 'iwp-wp-integration'));
                 }
                 
                 if (username_exists($new_username)) {
-                    wp_send_json_error(__('Username already exists', 'instawp-integration'));
+                    wp_send_json_error(__('Username already exists', 'iwp-wp-integration'));
                 }
                 
                 if (email_exists($new_email)) {
-                    wp_send_json_error(__('Email already exists', 'instawp-integration'));
+                    wp_send_json_error(__('Email already exists', 'iwp-wp-integration'));
                 }
                 
                 // Create new user
@@ -1955,7 +1939,7 @@ class IWP_Woo_V2_Admin {
                 $customer_id = wp_create_user($new_username, $new_password, $new_email);
                 
                 if (is_wp_error($customer_id)) {
-                    wp_send_json_error(__('Failed to create user: ', 'instawp-integration') . $customer_id->get_error_message());
+                    wp_send_json_error(__('Failed to create user: ', 'iwp-wp-integration') . $customer_id->get_error_message());
                 }
                 
                 // Update user meta
@@ -1981,7 +1965,7 @@ class IWP_Woo_V2_Admin {
                 $customer_last_name = sanitize_text_field($_POST['customer_last_name'] ?? 'Customer');
                 
                 if (empty($customer_email)) {
-                    wp_send_json_error(__('Customer email is required', 'instawp-integration'));
+                    wp_send_json_error(__('Customer email is required', 'iwp-wp-integration'));
                 }
                 break;
         }
@@ -2007,7 +1991,7 @@ class IWP_Woo_V2_Admin {
             $order->calculate_totals();
             
             // Check if auto-create is enabled globally
-            $options = get_option('iwp_woo_v2_options', array());
+            $options = get_option('iwp_options', array());
             $auto_create_enabled = isset($options['auto_create_sites_on_purchase']) ? $options['auto_create_sites_on_purchase'] : 'yes';
             
             if ($auto_create_enabled === 'yes') {
@@ -2022,35 +2006,35 @@ class IWP_Woo_V2_Admin {
             $order->save();
             
             // Add order note indicating this is a test order
-            $test_note = __('Test order created via InstaWP admin panel for testing site creation functionality.', 'instawp-integration');
+            $test_note = __('Test order created via InstaWP admin panel for testing site creation functionality.', 'iwp-wp-integration');
             if ($customer_type === 'new') {
-                $test_note .= ' ' . sprintf(__('New user created: %s', 'instawp-integration'), $customer_email);
+                $test_note .= ' ' . sprintf(__('New user created: %s', 'iwp-wp-integration'), $customer_email);
             }
             
             if ($auto_create_enabled === 'yes') {
-                $test_note .= ' ' . __('Sites will be created automatically.', 'instawp-integration');
+                $test_note .= ' ' . __('Sites will be created automatically.', 'iwp-wp-integration');
             } else {
-                $test_note .= ' ' . __('Auto-create is disabled - use "Setup Site" button to create sites manually.', 'instawp-integration');
+                $test_note .= ' ' . __('Auto-create is disabled - use "Setup Site" button to create sites manually.', 'iwp-wp-integration');
             }
             
             $order->add_order_note($test_note);
             
             $success_message = sprintf(
-                __('Test order #%s created successfully for product "%s"', 'instawp-integration'), 
+                __('Test order #%s created successfully for product "%s"', 'iwp-wp-integration'), 
                 $order->get_order_number(), 
                 $product->get_name()
             );
             
             if ($auto_create_enabled !== 'yes') {
-                $success_message .= ' ' . __('(Auto-create disabled - sites not created automatically)', 'instawp-integration');
+                $success_message .= ' ' . __('(Auto-create disabled - sites not created automatically)', 'iwp-wp-integration');
             }
             
             if ($customer_type === 'existing') {
-                $success_message .= sprintf(__(' for user %s', 'instawp-integration'), $customer_email);
+                $success_message .= sprintf(__(' for user %s', 'iwp-wp-integration'), $customer_email);
             } elseif ($customer_type === 'new') {
-                $success_message .= sprintf(__(' with new user %s (login details sent via email)', 'instawp-integration'), $customer_email);
+                $success_message .= sprintf(__(' with new user %s (login details sent via email)', 'iwp-wp-integration'), $customer_email);
             } else {
-                $success_message .= sprintf(__(' with guest customer %s', 'instawp-integration'), $customer_email);
+                $success_message .= sprintf(__(' with guest customer %s', 'iwp-wp-integration'), $customer_email);
             }
             
             wp_send_json_success(array(
@@ -2065,7 +2049,7 @@ class IWP_Woo_V2_Admin {
 
         } catch (Exception $e) {
             error_log('IWP WooCommerce V2: Test order creation failed - ' . $e->getMessage());
-            wp_send_json_error(__('Failed to create test order: ', 'instawp-integration') . $e->getMessage());
+            wp_send_json_error(__('Failed to create test order: ', 'iwp-wp-integration') . $e->getMessage());
         }
     }
 
@@ -2079,25 +2063,25 @@ class IWP_Woo_V2_Admin {
         
         if (!wp_verify_nonce($nonce, 'iwp_setup_sites_' . $order_id)) {
             wp_send_json_error(array(
-                'message' => __('Security check failed.', 'instawp-integration')
+                'message' => __('Security check failed.', 'iwp-wp-integration')
             ));
         }
 
         // Check permissions
         if (!current_user_can('manage_woocommerce')) {
             wp_send_json_error(array(
-                'message' => __('Insufficient permissions.', 'instawp-integration')
+                'message' => __('Insufficient permissions.', 'iwp-wp-integration')
             ));
         }
 
         if (!$order_id) {
             wp_send_json_error(array(
-                'message' => __('Order ID is required.', 'instawp-integration')
+                'message' => __('Order ID is required.', 'iwp-wp-integration')
             ));
         }
 
         // Get the order processor and call manual creation
-        $order_processor = new IWP_Woo_V2_Order_Processor();
+        $order_processor = new IWP_Order_Processor();
         $result = $order_processor->manually_create_sites($order_id);
         
         if ($result['success']) {
@@ -2121,7 +2105,7 @@ class IWP_Woo_V2_Admin {
         // Verify nonce
         if (!wp_verify_nonce($_POST['nonce'] ?? '', 'iwp_add_domain_nonce')) {
             wp_send_json_error(array(
-                'message' => __('Security check failed', 'instawp-integration')
+                'message' => __('Security check failed', 'iwp-wp-integration')
             ));
         }
 
@@ -2133,14 +2117,14 @@ class IWP_Woo_V2_Admin {
 
         if (!$order_id || !$site_id || !$domain_name) {
             wp_send_json_error(array(
-                'message' => __('Missing required information', 'instawp-integration')
+                'message' => __('Missing required information', 'iwp-wp-integration')
             ));
         }
 
         // Validate domain format
         if (!filter_var('http://' . $domain_name, FILTER_VALIDATE_URL)) {
             wp_send_json_error(array(
-                'message' => __('Invalid domain format', 'instawp-integration')
+                'message' => __('Invalid domain format', 'iwp-wp-integration')
             ));
         }
 
@@ -2148,7 +2132,7 @@ class IWP_Woo_V2_Admin {
         $order = wc_get_order($order_id);
         if (!$order) {
             wp_send_json_error(array(
-                'message' => __('Order not found', 'instawp-integration')
+                'message' => __('Order not found', 'iwp-wp-integration')
             ));
         }
 
@@ -2159,19 +2143,19 @@ class IWP_Woo_V2_Admin {
             
             if ($current_user_id != $order_customer_id) {
                 wp_send_json_error(array(
-                    'message' => __('Access denied', 'instawp-integration')
+                    'message' => __('Access denied', 'iwp-wp-integration')
                 ));
             }
         }
 
         // Get API client and add domain
-        $api_client = new IWP_Woo_V2_API_Client();
-        $options = get_option('iwp_woo_v2_options', array());
+        $api_client = new IWP_API_Client();
+        $options = get_option('iwp_options', array());
         $api_key = $options['api_key'] ?? '';
         
         if (empty($api_key)) {
             wp_send_json_error(array(
-                'message' => __('API key not configured', 'instawp-integration')
+                'message' => __('API key not configured', 'iwp-wp-integration')
             ));
         }
 
@@ -2193,7 +2177,7 @@ class IWP_Woo_V2_Admin {
             'api_response' => $result
         );
 
-        IWP_Woo_V2_Database::append_order_meta($order_id, '_iwp_mapped_domains', $domain_info);
+        IWP_Database::append_order_meta($order_id, '_iwp_mapped_domains', $domain_info);
 
         // Update site URL in database with mapped domain (for primary domains)
         if ($domain_type === 'primary') {
@@ -2203,7 +2187,7 @@ class IWP_Woo_V2_Admin {
         // Add order note
         $order->add_order_note(
             sprintf(
-                __('Custom domain "%s" mapped to InstaWP site (ID: %s) as %s', 'instawp-integration'),
+                __('Custom domain "%s" mapped to InstaWP site (ID: %s) as %s', 'iwp-wp-integration'),
                 $domain_name,
                 $site_id,
                 $domain_type
@@ -2213,7 +2197,7 @@ class IWP_Woo_V2_Admin {
 
         wp_send_json_success(array(
             'message' => sprintf(
-                __('Domain "%s" successfully mapped to your site!', 'instawp-integration'),
+                __('Domain "%s" successfully mapped to your site!', 'iwp-wp-integration'),
                 $domain_name
             ),
             'domain_info' => $domain_info
@@ -2266,24 +2250,24 @@ class IWP_Woo_V2_Admin {
      * AJAX handler for deleting InstaWP sites
      */
     public function ajax_delete_site() {
-        IWP_Woo_V2_Security::validate_ajax_request('iwp_delete_site_nonce', 'manage_woocommerce', 'nonce');
+        IWP_Security::validate_ajax_request('iwp_delete_site_nonce', 'manage_woocommerce', 'nonce');
 
         $site_id = sanitize_text_field($_POST['site_id'] ?? '');
         $site_url = sanitize_text_field($_POST['site_url'] ?? '');
 
         if (empty($site_id)) {
             wp_send_json_error(array(
-                'message' => __('Site ID is required', 'instawp-integration')
+                'message' => __('Site ID is required', 'iwp-wp-integration')
             ));
         }
 
         // Get API client and delete site
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         $api_key = $options['api_key'] ?? '';
         
         if (empty($api_key)) {
             wp_send_json_error(array(
-                'message' => __('API key not configured', 'instawp-integration')
+                'message' => __('API key not configured', 'iwp-wp-integration')
             ));
         }
 
@@ -2291,34 +2275,34 @@ class IWP_Woo_V2_Admin {
         $result = $this->api_client->delete_site($site_id);
 
         if (is_wp_error($result)) {
-            IWP_Woo_V2_Logger::error('Site deletion failed', 'admin', array(
+            IWP_Logger::error('Site deletion failed', 'admin', array(
                 'site_id' => $site_id,
                 'error' => $result->get_error_message()
             ));
             
             wp_send_json_error(array(
                 'message' => sprintf(
-                    __('Failed to delete site: %s', 'instawp-integration'),
+                    __('Failed to delete site: %s', 'iwp-wp-integration'),
                     $result->get_error_message()
                 )
             ));
         }
 
         // Also remove from database table if it exists
-        $db_site = IWP_Woo_V2_Sites_Model::get_by_site_id($site_id);
+        $db_site = IWP_Sites_Model::get_by_site_id($site_id);
         if ($db_site) {
-            IWP_Woo_V2_Sites_Model::delete($site_id);
-            IWP_Woo_V2_Logger::info('Removed site from database table', 'admin', array('site_id' => $site_id));
+            IWP_Sites_Model::delete($site_id);
+            IWP_Logger::info('Removed site from database table', 'admin', array('site_id' => $site_id));
         }
 
-        IWP_Woo_V2_Logger::info('Site deleted successfully', 'admin', array(
+        IWP_Logger::info('Site deleted successfully', 'admin', array(
             'site_id' => $site_id,
             'site_url' => $site_url
         ));
 
         wp_send_json_success(array(
             'message' => sprintf(
-                __('Site "%s" has been deleted successfully.', 'instawp-integration'),
+                __('Site "%s" has been deleted successfully.', 'iwp-wp-integration'),
                 $site_url ?: $site_id
             )
         ));
@@ -2328,7 +2312,7 @@ class IWP_Woo_V2_Admin {
      * AJAX handler for testing site creation
      */
     public function ajax_test_create_site() {
-        IWP_Woo_V2_Security::validate_ajax_request('iwp_woo_v2_admin_nonce', 'manage_options', 'nonce');
+        IWP_Security::validate_ajax_request('iwp_admin_nonce', 'manage_options', 'nonce');
 
         $snapshot_slug = sanitize_text_field($_POST['snapshot_slug'] ?? '');
         $site_name = sanitize_text_field($_POST['site_name'] ?? '');
@@ -2336,23 +2320,23 @@ class IWP_Woo_V2_Admin {
 
         if (empty($snapshot_slug)) {
             wp_send_json_error(array(
-                'message' => __('Snapshot slug is required', 'instawp-integration')
+                'message' => __('Snapshot slug is required', 'iwp-wp-integration')
             ));
         }
 
         if (empty($site_name)) {
             wp_send_json_error(array(
-                'message' => __('Site name is required', 'instawp-integration')
+                'message' => __('Site name is required', 'iwp-wp-integration')
             ));
         }
 
         // Get API key
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         $api_key = $options['api_key'] ?? '';
         
         if (empty($api_key)) {
             wp_send_json_error(array(
-                'message' => __('API key not configured', 'instawp-integration')
+                'message' => __('API key not configured', 'iwp-wp-integration')
             ));
         }
 
@@ -2366,7 +2350,7 @@ class IWP_Woo_V2_Admin {
         );
 
         // Use the site manager to create site with tracking
-        $site_manager = new IWP_Woo_V2_Site_Manager();
+        $site_manager = new IWP_Site_Manager();
         
         // Create a fake order for testing purposes
         $test_order_id = 0; // No real order
@@ -2396,26 +2380,26 @@ class IWP_Woo_V2_Admin {
                     )
                 );
 
-                $db_site_id = IWP_Woo_V2_Sites_Model::create($initial_site_data);
-                IWP_Woo_V2_Logger::info('Created test site record in database', 'admin-test', array(
+                $db_site_id = IWP_Sites_Model::create($initial_site_data);
+                IWP_Logger::info('Created test site record in database', 'admin-test', array(
                     'db_id' => $db_site_id,
                     'snapshot_slug' => $snapshot_slug
                 ));
             } else {
-                IWP_Woo_V2_Logger::info('Skipping database record creation per user request', 'admin-test', array(
+                IWP_Logger::info('Skipping database record creation per user request', 'admin-test', array(
                     'snapshot_slug' => $snapshot_slug
                 ));
             }
 
             // Create the site via API
-            $api_client = new IWP_Woo_V2_API_Client();
+            $api_client = new IWP_API_Client();
             $api_client->set_api_key($api_key);
             $response = $api_client->create_site_from_snapshot($snapshot_slug, $site_data);
 
             if (is_wp_error($response)) {
                 // Update database record to failed status
                 if ($db_site_id) {
-                    IWP_Woo_V2_Sites_Model::update($initial_site_data['site_id'], array(
+                    IWP_Sites_Model::update($initial_site_data['site_id'], array(
                         'status' => 'failed',
                         'api_response' => array('error' => $response->get_error_message())
                     ));
@@ -2423,7 +2407,7 @@ class IWP_Woo_V2_Admin {
                 
                 wp_send_json_error(array(
                     'message' => sprintf(
-                        __('Site creation failed: %s', 'instawp-integration'),
+                        __('Site creation failed: %s', 'iwp-wp-integration'),
                         $response->get_error_message()
                     )
                 ));
@@ -2450,35 +2434,35 @@ class IWP_Woo_V2_Admin {
                     'api_response' => $site_data_response
                 );
 
-                IWP_Woo_V2_Sites_Model::update($initial_site_data['site_id'], $update_data);
+                IWP_Sites_Model::update($initial_site_data['site_id'], $update_data);
                 
-                IWP_Woo_V2_Logger::info('Test site created and database updated', 'admin-test', array(
+                IWP_Logger::info('Test site created and database updated', 'admin-test', array(
                     'old_site_id' => $initial_site_data['site_id'],
                     'new_site_id' => $real_site_id,
                     'status' => $status
                 ));
             } else {
-                IWP_Woo_V2_Logger::info('Test site created (no database record)', 'admin-test', array(
+                IWP_Logger::info('Test site created (no database record)', 'admin-test', array(
                     'site_id' => $real_site_id,
                     'status' => $status
                 ));
             }
 
             $message = sprintf(
-                __('Test site created successfully! Site ID: %s', 'instawp-integration'),
+                __('Test site created successfully! Site ID: %s', 'iwp-wp-integration'),
                 $real_site_id
             );
 
             if ($status === 'completed') {
-                $message .= __(' (Ready immediately - pool site)', 'instawp-integration');
+                $message .= __(' (Ready immediately - pool site)', 'iwp-wp-integration');
             } else {
-                $message .= __(' (Creating in background - task-based)', 'instawp-integration');
+                $message .= __(' (Creating in background - task-based)', 'iwp-wp-integration');
             }
             
             if ($add_to_sites_table) {
-                $message .= __(' - Added to Sites table', 'instawp-integration');
+                $message .= __(' - Added to Sites table', 'iwp-wp-integration');
             } else {
-                $message .= __(' - Not added to Sites table', 'instawp-integration');
+                $message .= __(' - Not added to Sites table', 'iwp-wp-integration');
             }
 
             wp_send_json_success(array(
@@ -2492,13 +2476,13 @@ class IWP_Woo_V2_Admin {
             ));
 
         } catch (Exception $e) {
-            IWP_Woo_V2_Logger::error('Test site creation failed with exception', 'admin-test', array(
+            IWP_Logger::error('Test site creation failed with exception', 'admin-test', array(
                 'error' => $e->getMessage()
             ));
             
             wp_send_json_error(array(
                 'message' => sprintf(
-                    __('Site creation failed: %s', 'instawp-integration'),
+                    __('Site creation failed: %s', 'iwp-wp-integration'),
                     $e->getMessage()
                 )
             ));
@@ -2509,16 +2493,16 @@ class IWP_Woo_V2_Admin {
      * AJAX handler for testing status checking
      */
     public function ajax_test_check_status() {
-        IWP_Woo_V2_Security::validate_ajax_request('iwp_woo_v2_admin_nonce', 'manage_options', 'nonce');
+        IWP_Security::validate_ajax_request('iwp_admin_nonce', 'manage_options', 'nonce');
 
         try {
             // Get all pending sites
-            $pending_sites = IWP_Woo_V2_Sites_Model::get_pending_sites();
+            $pending_sites = IWP_Sites_Model::get_pending_sites();
             $checked_count = 0;
             $updated_count = 0;
             $results = array();
 
-            IWP_Woo_V2_Logger::info('Manual status check initiated', 'admin-test', array(
+            IWP_Logger::info('Manual status check initiated', 'admin-test', array(
                 'pending_sites_count' => count($pending_sites)
             ));
 
@@ -2532,21 +2516,21 @@ class IWP_Woo_V2_Admin {
                 $old_status = $db_site->status;
 
                 // Get API client
-                $options = get_option('iwp_woo_v2_options', array());
+                $options = get_option('iwp_options', array());
                 $api_key = $options['api_key'] ?? '';
                 
                 if (empty($api_key)) {
                     continue;
                 }
 
-                $api_client = new IWP_Woo_V2_API_Client();
+                $api_client = new IWP_API_Client();
                 $api_client->set_api_key($api_key);
 
                 // Check task status
                 $response = $api_client->get_task_status($db_site->task_id);
                 
                 if (is_wp_error($response)) {
-                    IWP_Woo_V2_Logger::error('Failed to check task status during manual check', 'admin-test', array(
+                    IWP_Logger::error('Failed to check task status during manual check', 'admin-test', array(
                         'site_id' => $db_site->site_id,
                         'task_id' => $db_site->task_id,
                         'error' => $response->get_error_message()
@@ -2573,7 +2557,7 @@ class IWP_Woo_V2_Admin {
 
                 // Update if status changed
                 if ($new_status !== $old_status && $new_status !== 'progress') {
-                    IWP_Woo_V2_Sites_Model::update($db_site->site_id, array(
+                    IWP_Sites_Model::update($db_site->site_id, array(
                         'status' => $new_status,
                         'api_response' => $task_info
                     ));
@@ -2586,7 +2570,7 @@ class IWP_Woo_V2_Admin {
                         'task_id' => $db_site->task_id
                     );
 
-                    IWP_Woo_V2_Logger::info('Updated site status during manual check', 'admin-test', array(
+                    IWP_Logger::info('Updated site status during manual check', 'admin-test', array(
                         'site_id' => $db_site->site_id,
                         'old_status' => $old_status,
                         'new_status' => $new_status
@@ -2596,7 +2580,7 @@ class IWP_Woo_V2_Admin {
 
             wp_send_json_success(array(
                 'message' => sprintf(
-                    __('Status check completed. Checked %d sites, updated %d sites.', 'instawp-integration'),
+                    __('Status check completed. Checked %d sites, updated %d sites.', 'iwp-wp-integration'),
                     $checked_count,
                     $updated_count
                 ),
@@ -2606,13 +2590,13 @@ class IWP_Woo_V2_Admin {
             ));
 
         } catch (Exception $e) {
-            IWP_Woo_V2_Logger::error('Manual status check failed with exception', 'admin-test', array(
+            IWP_Logger::error('Manual status check failed with exception', 'admin-test', array(
                 'error' => $e->getMessage()
             ));
             
             wp_send_json_error(array(
                 'message' => sprintf(
-                    __('Status check failed: %s', 'instawp-integration'),
+                    __('Status check failed: %s', 'iwp-wp-integration'),
                     $e->getMessage()
                 )
             ));
@@ -2623,27 +2607,96 @@ class IWP_Woo_V2_Admin {
      * AJAX handler for forcing cron check
      */
     public function ajax_force_cron_check() {
-        IWP_Woo_V2_Security::validate_ajax_request('iwp_woo_v2_admin_nonce', 'manage_options', 'nonce');
+        IWP_Security::validate_ajax_request('iwp_admin_nonce', 'manage_options', 'nonce');
 
         try {
             // Get the site manager and trigger the cron check manually
-            $site_manager = new IWP_Woo_V2_Site_Manager();
+            $site_manager = new IWP_Site_Manager();
             $site_manager->check_pending_sites();
 
-            IWP_Woo_V2_Logger::info('Manual cron check executed successfully', 'admin-test');
+            IWP_Logger::info('Manual cron check executed successfully', 'admin-test');
 
             wp_send_json_success(array(
-                'message' => __('Cron check executed successfully. Check the "Check All Pending Sites" button to see results.', 'instawp-integration')
+                'message' => __('Cron check executed successfully. Check the "Check All Pending Sites" button to see results.', 'iwp-wp-integration')
             ));
 
         } catch (Exception $e) {
-            IWP_Woo_V2_Logger::error('Manual cron check failed with exception', 'admin-test', array(
+            IWP_Logger::error('Manual cron check failed with exception', 'admin-test', array(
                 'error' => $e->getMessage()
             ));
             
             wp_send_json_error(array(
                 'message' => sprintf(
-                    __('Cron check failed: %s', 'instawp-integration'),
+                    __('Cron check failed: %s', 'iwp-wp-integration'),
+                    $e->getMessage()
+                )
+            ));
+        }
+    }
+
+    /**
+     * AJAX handler for testing site update API
+     */
+    public function ajax_test_site_update() {
+        IWP_Security::validate_ajax_request('iwp_admin_nonce', 'manage_options', 'nonce');
+
+        $site_id = sanitize_text_field($_POST['site_id'] ?? '');
+        
+        if (empty($site_id)) {
+            wp_send_json_error(array(
+                'message' => __('Site ID is required', 'iwp-wp-integration')
+            ));
+        }
+
+        try {
+            // Test post_options configuration (will be nested in wordpress object)
+            $post_options = array(
+                'option_name3' => false,
+                'option_name4' => 'test_value_' . time()
+            );
+
+            IWP_Logger::info('Testing site update API', 'admin-test', array(
+                'site_id' => $site_id,
+                'post_options' => $post_options
+            ));
+
+            $result = $this->api_client->update_site($site_id, $post_options);
+
+            if (is_wp_error($result)) {
+                IWP_Logger::error('Site update test failed', 'admin-test', array(
+                    'site_id' => $site_id,
+                    'error' => $result->get_error_message()
+                ));
+
+                wp_send_json_error(array(
+                    'message' => sprintf(
+                        __('Site update failed: %s', 'iwp-wp-integration'),
+                        $result->get_error_message()
+                    )
+                ));
+            }
+
+            IWP_Logger::info('Site update test successful', 'admin-test', array(
+                'site_id' => $site_id,
+                'result' => $result
+            ));
+
+            wp_send_json_success(array(
+                'message' => __('Site updated successfully with post_options!', 'iwp-wp-integration'),
+                'site_id' => $site_id,
+                'post_options' => $post_options,
+                'api_response' => $result
+            ));
+
+        } catch (Exception $e) {
+            IWP_Logger::error('Site update test failed with exception', 'admin-test', array(
+                'site_id' => $site_id,
+                'error' => $e->getMessage()
+            ));
+            
+            wp_send_json_error(array(
+                'message' => sprintf(
+                    __('Site update failed: %s', 'iwp-wp-integration'),
                     $e->getMessage()
                 )
             ));

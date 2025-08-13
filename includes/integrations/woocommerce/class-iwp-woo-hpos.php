@@ -2,7 +2,7 @@
 /**
  * HPOS (High Performance Order Storage) compatibility class
  *
- * @package IWP_Woo_V2
+ * @package IWP
  * @since 2.0.0
  */
 
@@ -12,9 +12,9 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * IWP_Woo_V2_HPOS class
+ * IWP_Woo_HPOS class
  */
-class IWP_Woo_V2_HPOS {
+class IWP_Woo_HPOS {
 
     /**
      * Constructor
@@ -264,10 +264,10 @@ class IWP_Woo_V2_HPOS {
      */
     public function handle_new_order($order_id, $order) {
         // Log order creation
-        IWP_Woo_V2_Utilities::log(sprintf('New order created: %d', $order_id));
+        IWP_Utilities::log(sprintf('New order created: %d', $order_id));
         
         // Add custom processing for new orders
-        do_action('iwp_woo_v2_new_order', $order_id, $order);
+        do_action('iwp_new_order', $order_id, $order);
     }
 
     /**
@@ -278,10 +278,10 @@ class IWP_Woo_V2_HPOS {
      */
     public function handle_order_update($order_id, $order) {
         // Log order update
-        IWP_Woo_V2_Utilities::log(sprintf('Order updated: %d', $order_id));
+        IWP_Utilities::log(sprintf('Order updated: %d', $order_id));
         
         // Add custom processing for order updates
-        do_action('iwp_woo_v2_order_updated', $order_id, $order);
+        do_action('iwp_order_updated', $order_id, $order);
     }
 
     /**
@@ -292,13 +292,13 @@ class IWP_Woo_V2_HPOS {
      */
     public function handle_order_delete($order_id, $order) {
         // Log order deletion
-        IWP_Woo_V2_Utilities::log(sprintf('Order deleted: %d', $order_id));
+        IWP_Utilities::log(sprintf('Order deleted: %d', $order_id));
         
         // Clean up custom data
         $this->cleanup_order_data($order_id);
         
         // Add custom processing for order deletion
-        do_action('iwp_woo_v2_order_deleted', $order_id, $order);
+        do_action('iwp_order_deleted', $order_id, $order);
     }
 
     /**
@@ -309,10 +309,10 @@ class IWP_Woo_V2_HPOS {
      */
     public function handle_order_trash($order_id, $order) {
         // Log order trash
-        IWP_Woo_V2_Utilities::log(sprintf('Order trashed: %d', $order_id));
+        IWP_Utilities::log(sprintf('Order trashed: %d', $order_id));
         
         // Add custom processing for order trash
-        do_action('iwp_woo_v2_order_trashed', $order_id, $order);
+        do_action('iwp_order_trashed', $order_id, $order);
     }
 
     /**
@@ -323,10 +323,10 @@ class IWP_Woo_V2_HPOS {
      */
     public function handle_order_untrash($order_id, $order) {
         // Log order untrash
-        IWP_Woo_V2_Utilities::log(sprintf('Order untrashed: %d', $order_id));
+        IWP_Utilities::log(sprintf('Order untrashed: %d', $order_id));
         
         // Add custom processing for order untrash
-        do_action('iwp_woo_v2_order_untrashed', $order_id, $order);
+        do_action('iwp_order_untrashed', $order_id, $order);
     }
 
     /**
@@ -339,10 +339,10 @@ class IWP_Woo_V2_HPOS {
      */
     public function handle_order_status_change($order_id, $status_from, $status_to, $order) {
         // Log status change
-        IWP_Woo_V2_Utilities::log(sprintf('Order status changed: %d from %s to %s', $order_id, $status_from, $status_to));
+        IWP_Utilities::log(sprintf('Order status changed: %d from %s to %s', $order_id, $status_from, $status_to));
         
         // Add custom processing for status changes
-        do_action('iwp_woo_v2_order_status_changed', $order_id, $status_from, $status_to, $order);
+        do_action('iwp_order_status_changed', $order_id, $status_from, $status_to, $order);
     }
 
     /**
@@ -355,10 +355,10 @@ class IWP_Woo_V2_HPOS {
      */
     public function handle_new_order_item($item_id, $item, $order_id, $args = array()) {
         // Log new order item
-        IWP_Woo_V2_Utilities::log(sprintf('New order item added: %d to order %d', $item_id, $order_id));
+        IWP_Utilities::log(sprintf('New order item added: %d to order %d', $item_id, $order_id));
         
         // Add custom processing for new order items
-        do_action('iwp_woo_v2_new_order_item', $item_id, $item, $order_id, $args);
+        do_action('iwp_new_order_item', $item_id, $item, $order_id, $args);
     }
 
     /**
@@ -371,10 +371,10 @@ class IWP_Woo_V2_HPOS {
      */
     public function handle_order_item_update($item_id, $item, $args, $data = array()) {
         // Log order item update
-        IWP_Woo_V2_Utilities::log(sprintf('Order item updated: %d', $item_id));
+        IWP_Utilities::log(sprintf('Order item updated: %d', $item_id));
         
         // Add custom processing for order item updates
-        do_action('iwp_woo_v2_order_item_updated', $item_id, $item, $args, $data);
+        do_action('iwp_order_item_updated', $item_id, $item, $args, $data);
     }
 
     /**
@@ -385,10 +385,10 @@ class IWP_Woo_V2_HPOS {
      */
     public function handle_order_item_delete($item_id, $item_type) {
         // Log order item deletion
-        IWP_Woo_V2_Utilities::log(sprintf('Order item deleted: %d', $item_id));
+        IWP_Utilities::log(sprintf('Order item deleted: %d', $item_id));
         
         // Add custom processing for order item deletion
-        do_action('iwp_woo_v2_order_item_deleted', $item_id, $item_type);
+        do_action('iwp_order_item_deleted', $item_id, $item_type);
     }
 
     /**
@@ -401,7 +401,7 @@ class IWP_Woo_V2_HPOS {
         
         // Clean up custom order data from plugin tables
         $wpdb->delete(
-            $wpdb->prefix . 'iwp_woo_v2_logs',
+            $wpdb->prefix . 'iwp_logs',
             array('order_id' => $order_id),
             array('%d')
         );

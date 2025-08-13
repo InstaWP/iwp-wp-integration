@@ -1,8 +1,8 @@
 <?php
 /**
- * Installer class for IWP WooCommerce Integration v2
+ * Installer class for InstaWP Integration
  *
- * @package IWP_Woo_V2
+ * @package IWP
  * @since 2.0.0
  */
 
@@ -12,9 +12,9 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * IWP_Woo_V2_Installer class
+ * IWP_Installer class
  */
-class IWP_Woo_V2_Installer {
+class IWP_Installer {
 
     /**
      * DB updates and callbacks that need to be run per version
@@ -23,12 +23,12 @@ class IWP_Woo_V2_Installer {
      */
     private static $db_updates = array(
         '2.0.0' => array(
-            'iwp_woo_v2_create_tables',
-            'iwp_woo_v2_create_options',
+            'iwp_create_tables',
+            'iwp_create_options',
         ),
         '2.1.0' => array(
-            array('IWP_Woo_V2_Installer', 'cleanup_old_product_meta'),
-            array('IWP_Woo_V2_Installer', 'set_default_auto_create_setting'),
+            array('IWP_Installer', 'cleanup_old_product_meta'),
+            array('IWP_Installer', 'set_default_auto_create_setting'),
         ),
     );
 
@@ -36,8 +36,8 @@ class IWP_Woo_V2_Installer {
      * Install the plugin
      */
     public static function install() {
-        if (!defined('IWP_WOO_V2_INSTALLING')) {
-            define('IWP_WOO_V2_INSTALLING', true);
+        if (!defined('IWP_INSTALLING')) {
+            define('IWP_INSTALLING', true);
         }
 
         // Check if we have the minimum requirements
@@ -56,7 +56,7 @@ class IWP_Woo_V2_Installer {
         self::update_version();
 
         // Trigger action
-        do_action('iwp_woo_v2_installed');
+        do_action('iwp_installed');
     }
 
     /**
@@ -66,8 +66,8 @@ class IWP_Woo_V2_Installer {
         // Check PHP version
         if (version_compare(PHP_VERSION, '7.4', '<')) {
             wp_die(
-                esc_html__('InstaWP Integration v2 requires PHP 7.4 or higher.', 'iwp-woo-v2'),
-                esc_html__('Requirements Error', 'iwp-woo-v2'),
+                esc_html__('InstaWP Integration requires PHP 7.4 or higher.', 'iwp-wp-integration'),
+                esc_html__('Requirements Error', 'iwp-wp-integration'),
                 array('back_link' => true)
             );
         }
@@ -75,8 +75,8 @@ class IWP_Woo_V2_Installer {
         // Check WordPress version
         if (version_compare(get_bloginfo('version'), '5.0', '<')) {
             wp_die(
-                esc_html__('InstaWP Integration v2 requires WordPress 5.0 or higher.', 'iwp-woo-v2'),
-                esc_html__('Requirements Error', 'iwp-woo-v2'),
+                esc_html__('InstaWP Integration requires WordPress 5.0 or higher.', 'iwp-wp-integration'),
+                esc_html__('Requirements Error', 'iwp-wp-integration'),
                 array('back_link' => true)
             );
         }
@@ -93,7 +93,7 @@ class IWP_Woo_V2_Installer {
 
         $tables = array(
             // Example table for storing plugin-specific data
-            "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}iwp_woo_v2_logs (
+            "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}iwp_logs (
                 id bigint(20) unsigned NOT NULL auto_increment,
                 user_id bigint(20) unsigned NOT NULL DEFAULT 0,
                 order_id bigint(20) unsigned NULL DEFAULT NULL,
@@ -108,7 +108,7 @@ class IWP_Woo_V2_Installer {
                 KEY created_at (created_at)
             ) $charset_collate;",
 
-            "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}iwp_woo_v2_settings (
+            "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}iwp_settings (
                 id bigint(20) unsigned NOT NULL auto_increment,
                 setting_key varchar(100) NOT NULL,
                 setting_value longtext,
@@ -120,7 +120,7 @@ class IWP_Woo_V2_Installer {
             ) $charset_collate;",
 
             // HPOS compatible order data table
-            "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}iwp_woo_v2_order_data (
+            "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}iwp_woo_order_data (
                 id bigint(20) unsigned NOT NULL auto_increment,
                 order_id bigint(20) unsigned NOT NULL,
                 order_type varchar(20) NOT NULL DEFAULT 'shop_order',
@@ -136,7 +136,7 @@ class IWP_Woo_V2_Installer {
             ) $charset_collate;",
 
             // Sites tracking table for real-time status updates
-            "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}iwp_woo_v2_sites (
+            "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}iwp_sites (
                 id bigint(20) unsigned NOT NULL auto_increment,
                 site_id varchar(100) NOT NULL,
                 site_url varchar(255) NULL,
@@ -183,19 +183,24 @@ class IWP_Woo_V2_Installer {
      */
     private static function create_options() {
         $default_options = array(
-            'version' => IWP_WOO_V2_VERSION,
+            'version' => IWP_VERSION,
             'installed_at' => current_time('mysql'),
-            'enabled' => 'yes',
+            // General Settings - All enabled by default for better user experience
+            'enable_integration' => 'yes',
+            'auto_create_sites' => 'yes', 
+            'use_site_id_parameter' => 'yes',
+            // Debug Settings - Reasonable defaults
             'debug_mode' => 'no',
             'log_level' => 'info',
+            // Legacy support
+            'enabled' => 'yes',
             'auto_create_sites_on_purchase' => 'yes',
-            'use_site_id_parameter' => 'yes',
         );
 
-        $existing_options = get_option('iwp_woo_v2_options', array());
+        $existing_options = get_option('iwp_options', array());
         $options = array_merge($default_options, $existing_options);
 
-        update_option('iwp_woo_v2_options', $options);
+        update_option('iwp_options', $options);
     }
 
     /**
@@ -204,7 +209,7 @@ class IWP_Woo_V2_Installer {
     private static function create_files() {
         // Create upload directory
         $upload_dir = wp_upload_dir();
-        $iwp_upload_dir = $upload_dir['basedir'] . '/iwp-woo-v2';
+        $iwp_upload_dir = $upload_dir['basedir'] . '/iwp';
 
         if (!file_exists($iwp_upload_dir)) {
             wp_mkdir_p($iwp_upload_dir);
@@ -229,8 +234,35 @@ class IWP_Woo_V2_Installer {
      * Update version
      */
     private static function update_version() {
-        delete_option('iwp_woo_v2_version');
-        add_option('iwp_woo_v2_version', IWP_WOO_V2_VERSION);
+        delete_option('iwp_version');
+        add_option('iwp_version', IWP_VERSION);
+    }
+
+    /**
+     * Set default settings for new installations or reset to defaults
+     * Can be called from admin if needed
+     */
+    public static function set_default_settings() {
+        $current_options = get_option('iwp_options', array());
+        
+        // Only update if API key exists (don't reset everything)
+        $api_key = isset($current_options['api_key']) ? $current_options['api_key'] : '';
+        
+        $default_options = array(
+            // Keep API key if it exists
+            'api_key' => $api_key,
+            // Set all checkboxes to enabled by default
+            'enable_integration' => 'yes',
+            'auto_create_sites' => 'yes',
+            'use_site_id_parameter' => 'yes',
+            // Reasonable debug defaults
+            'debug_mode' => 'no',
+            'log_level' => 'info',
+        );
+        
+        update_option('iwp_options', $default_options);
+        
+        return true;
     }
 
     /**
@@ -238,15 +270,15 @@ class IWP_Woo_V2_Installer {
      */
     public static function deactivate() {
         // Clear any scheduled events
-        wp_clear_scheduled_hook('iwp_woo_v2_daily_cleanup');
-        wp_clear_scheduled_hook('iwp_woo_v2_weekly_report');
-        wp_clear_scheduled_hook('iwp_woo_v2_check_pending_sites');
+        wp_clear_scheduled_hook('iwp_daily_cleanup');
+        wp_clear_scheduled_hook('iwp_weekly_report');
+        wp_clear_scheduled_hook('iwp_check_pending_sites');
 
         // Flush rewrite rules
         flush_rewrite_rules();
 
         // Trigger action
-        do_action('iwp_woo_v2_deactivated');
+        do_action('iwp_deactivated');
     }
 
     /**
@@ -256,15 +288,15 @@ class IWP_Woo_V2_Installer {
         global $wpdb;
 
         // Delete options
-        delete_option('iwp_woo_v2_options');
-        delete_option('iwp_woo_v2_version');
+        delete_option('iwp_options');
+        delete_option('iwp_version');
 
         // Delete tables
         $tables = array(
-            $wpdb->prefix . 'iwp_woo_v2_logs',
-            $wpdb->prefix . 'iwp_woo_v2_settings',
-            $wpdb->prefix . 'iwp_woo_v2_order_data',
-            $wpdb->prefix . 'iwp_woo_v2_sites'
+            $wpdb->prefix . 'iwp_logs',
+            $wpdb->prefix . 'iwp_settings',
+            $wpdb->prefix . 'iwp_order_data',
+            $wpdb->prefix . 'iwp_sites'
         );
 
         foreach ($tables as $table) {
@@ -272,22 +304,22 @@ class IWP_Woo_V2_Installer {
         }
 
         // Delete transients
-        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_iwp_woo_v2_%'");
-        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_timeout_iwp_woo_v2_%'");
+        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_iwp_%'");
+        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_timeout_iwp_%'");
 
         // Delete user meta
-        $wpdb->query("DELETE FROM {$wpdb->usermeta} WHERE meta_key LIKE 'iwp_woo_v2_%'");
+        $wpdb->query("DELETE FROM {$wpdb->usermeta} WHERE meta_key LIKE 'iwp_%'");
 
         // Delete files
         $upload_dir = wp_upload_dir();
-        $iwp_upload_dir = $upload_dir['basedir'] . '/iwp-woo-v2';
+        $iwp_upload_dir = $upload_dir['basedir'] . '/iwp';
         
         if (is_dir($iwp_upload_dir)) {
             self::delete_directory($iwp_upload_dir);
         }
 
         // Trigger action
-        do_action('iwp_woo_v2_uninstalled');
+        do_action('iwp_uninstalled');
     }
 
     /**
@@ -318,7 +350,7 @@ class IWP_Woo_V2_Installer {
      * Update database
      */
     public static function update_database() {
-        $current_version = get_option('iwp_woo_v2_version');
+        $current_version = get_option('iwp_version');
         
         if (!$current_version) {
             self::install();
@@ -344,13 +376,13 @@ class IWP_Woo_V2_Installer {
      * @return bool
      */
     public static function needs_database_update() {
-        $current_version = get_option('iwp_woo_v2_version');
+        $current_version = get_option('iwp_version');
         
         if (!$current_version) {
             return true;
         }
 
-        return version_compare($current_version, IWP_WOO_V2_VERSION, '<');
+        return version_compare($current_version, IWP_VERSION, '<');
     }
 
     /**
@@ -359,7 +391,7 @@ class IWP_Woo_V2_Installer {
     public static function cleanup_old_product_meta() {
         global $wpdb;
         
-        error_log('IWP WooCommerce V2: Cleaning up old _iwp_auto_create_site meta keys');
+        error_log('InstaWP Integration: Cleaning up old _iwp_auto_create_site meta keys');
         
         // Delete all _iwp_auto_create_site meta keys from products
         $result = $wpdb->delete(
@@ -369,9 +401,9 @@ class IWP_Woo_V2_Installer {
         );
         
         if ($result !== false) {
-            error_log("IWP WooCommerce V2: Successfully removed {$result} old auto-create meta keys");
+            error_log("InstaWP Integration: Successfully removed {$result} old auto-create meta keys");
         } else {
-            error_log('IWP WooCommerce V2: Failed to remove old auto-create meta keys: ' . $wpdb->last_error);
+            error_log('InstaWP Integration: Failed to remove old auto-create meta keys: ' . $wpdb->last_error);
         }
     }
 
@@ -380,13 +412,13 @@ class IWP_Woo_V2_Installer {
      * This maintains existing behavior for users upgrading
      */
     public static function set_default_auto_create_setting() {
-        $options = get_option('iwp_woo_v2_options', array());
+        $options = get_option('iwp_options', array());
         
         // Only set if not already configured
         if (!isset($options['auto_create_sites_on_purchase'])) {
             $options['auto_create_sites_on_purchase'] = 'yes';
-            update_option('iwp_woo_v2_options', $options);
-            error_log('IWP WooCommerce V2: Set default auto-create setting to enabled');
+            update_option('iwp_options', $options);
+            error_log('InstaWP Integration: Set default auto-create setting to enabled');
         }
     }
 }

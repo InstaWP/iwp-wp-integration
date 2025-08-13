@@ -2,7 +2,7 @@
 /**
  * WooCommerce Product Integration for IWP WooCommerce Integration v2
  *
- * @package IWP_Woo_V2
+ * @package IWP
  * @since 2.0.0
  */
 
@@ -12,14 +12,14 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * IWP_Woo_V2_Product_Integration class
+ * IWP_Woo_Product_Integration class
  */
-class IWP_Woo_V2_Product_Integration {
+class IWP_Woo_Product_Integration {
 
     /**
      * API Client instance
      *
-     * @var IWP_Woo_V2_API_Client
+     * @var IWP_API_Client
      */
     private $api_client;
 
@@ -27,7 +27,7 @@ class IWP_Woo_V2_Product_Integration {
      * Constructor
      */
     public function __construct() {
-        $this->api_client = new IWP_Woo_V2_API_Client();
+        $this->api_client = new IWP_API_Client();
         $this->init_hooks();
     }
 
@@ -56,7 +56,7 @@ class IWP_Woo_V2_Product_Integration {
      */
     public function add_product_data_tab($tabs) {
         $tabs['iwp_instawp'] = array(
-            'label'    => __('InstaWP', 'iwp-woo-v2'),
+            'label'    => __('InstaWP', 'iwp-wp-integration'),
             'target'   => 'iwp_instawp_product_data',
             'class'    => array('show_if_simple', 'show_if_variable'),
             'priority' => 80,
@@ -71,12 +71,12 @@ class IWP_Woo_V2_Product_Integration {
     public function add_product_data_fields() {
         global $post;
         
-        IWP_Woo_V2_Logger::debug('Rendering product data fields', 'product-integration', array('product_id' => $post->ID));
+        IWP_Logger::debug('Rendering product data fields', 'product-integration', array('product_id' => $post->ID));
         
         echo '<div id="iwp_instawp_product_data" class="panel woocommerce_options_panel">';
         
         echo '<div class="options_group">';
-        echo '<h4>' . __('InstaWP Snapshot Selection', 'iwp-woo-v2') . '</h4>';
+        echo '<h4>' . __('InstaWP Snapshot Selection', 'iwp-wp-integration') . '</h4>';
         // Get current values
         $selected_snapshot = get_post_meta($post->ID, '_iwp_selected_snapshot', true);
         
@@ -86,8 +86,8 @@ class IWP_Woo_V2_Product_Integration {
         // Snapshot selection dropdown
         woocommerce_wp_select(array(
             'id'          => '_iwp_selected_snapshot',
-            'label'       => __('InstaWP Snapshot', 'iwp-woo-v2'),
-            'description' => __('Select a snapshot to use for this product.', 'iwp-woo-v2'),
+            'label'       => __('InstaWP Snapshot', 'iwp-wp-integration'),
+            'description' => __('Select a snapshot to use for this product.', 'iwp-wp-integration'),
             'desc_tip'    => true,
             'options'     => $snapshots,
             'value'       => $selected_snapshot,
@@ -98,16 +98,16 @@ class IWP_Woo_V2_Product_Integration {
         echo '<p class="form-field">';
         echo '<label>&nbsp;</label>';
         echo '<button type="button" class="button button-secondary" id="iwp-refresh-product-snapshots">';
-        echo __('Refresh Snapshots', 'iwp-woo-v2');
+        echo __('Refresh Snapshots', 'iwp-wp-integration');
         echo '</button>';
-        echo '<span class="description">' . __('Click to refresh the snapshot list from InstaWP.', 'iwp-woo-v2') . '</span>';
+        echo '<span class="description">' . __('Click to refresh the snapshot list from InstaWP.', 'iwp-wp-integration') . '</span>';
         echo '</p>';
         
         echo '</div>'; // .options_group
         
         // Plans section
         echo '<div class="options_group">';
-        echo '<h4>' . __('InstaWP Plan Selection', 'iwp-woo-v2') . '</h4>';
+        echo '<h4>' . __('InstaWP Plan Selection', 'iwp-wp-integration') . '</h4>';
         
         // Get selected plan
         $selected_plan = get_post_meta($post->ID, '_iwp_selected_plan', true);
@@ -115,8 +115,8 @@ class IWP_Woo_V2_Product_Integration {
         // Plan dropdown
         woocommerce_wp_select(array(
             'id'          => '_iwp_selected_plan',
-            'label'       => __('Select Plan', 'iwp-woo-v2'),
-            'description' => __('Choose an InstaWP plan for site creation.', 'iwp-woo-v2'),
+            'label'       => __('Select Plan', 'iwp-wp-integration'),
+            'description' => __('Choose an InstaWP plan for site creation.', 'iwp-wp-integration'),
             'desc_tip'    => true,
             'options'     => $this->get_plans_for_dropdown(),
             'value'       => $selected_plan,
@@ -126,16 +126,16 @@ class IWP_Woo_V2_Product_Integration {
         echo '<p class="form-field">';
         echo '<label>&nbsp;</label>';
         echo '<button type="button" class="button button-secondary" id="iwp-refresh-product-plans">';
-        echo __('Refresh Plans', 'iwp-woo-v2');
+        echo __('Refresh Plans', 'iwp-wp-integration');
         echo '</button>';
-        echo '<span class="description">' . __('Click to refresh the plan list from InstaWP.', 'iwp-woo-v2') . '</span>';
+        echo '<span class="description">' . __('Click to refresh the plan list from InstaWP.', 'iwp-wp-integration') . '</span>';
         echo '</p>';
         
         echo '</div>'; // .options_group
         
         // Site Expiry section
         echo '<div class="options_group">';
-        echo '<h4>' . __('Site Expiry Settings', 'iwp-woo-v2') . '</h4>';
+        echo '<h4>' . __('Site Expiry Settings', 'iwp-wp-integration') . '</h4>';
         
         // Get current expiry type
         $expiry_type = get_post_meta($post->ID, '_iwp_site_expiry_type', true);
@@ -145,30 +145,30 @@ class IWP_Woo_V2_Product_Integration {
         
         // Site expiry type selection
         echo '<p class="form-field _iwp_site_expiry_type_field">';
-        echo '<label>' . __('Site Expiry', 'iwp-woo-v2') . '</label>';
+        echo '<label>' . __('Site Expiry', 'iwp-wp-integration') . '</label>';
         echo '<span class="wrap">';
-        echo '<label style="margin-right: 20px;">';
+        echo '<label>';
         echo '<input type="radio" name="_iwp_site_expiry_type" value="permanent" ' . checked($expiry_type, 'permanent', false) . ' /> ';
-        echo __('Permanent', 'iwp-woo-v2');
+        echo __('Permanent', 'iwp-wp-integration');
         echo '</label>';
         echo '<label>';
         echo '<input type="radio" name="_iwp_site_expiry_type" value="temporary" ' . checked($expiry_type, 'temporary', false) . ' /> ';
-        echo __('Temporary', 'iwp-woo-v2');
+        echo __('Temporary', 'iwp-wp-integration');
         echo '</label>';
         echo '</span>';
-        echo '<span class="description">' . __('Choose whether sites created from this product are permanent or temporary.', 'iwp-woo-v2') . '</span>';
+        echo '<span class="description">' . __('Choose whether sites created from this product are permanent or temporary.', 'iwp-wp-integration') . '</span>';
         echo '</p>';
         
         // Expiry hours field (shown only when temporary is selected)
         $expiry_hours = get_post_meta($post->ID, '_iwp_site_expiry_hours', true);
         if (empty($expiry_hours)) {
-            $expiry_hours = 28; // Default to 28 hours
+            $expiry_hours = 24; // Default to 24 hours
         }
         
         echo '<p class="form-field _iwp_site_expiry_hours_field" style="' . ($expiry_type === 'temporary' ? '' : 'display: none;') . '">';
-        echo '<label for="_iwp_site_expiry_hours">' . __('Expiry Hours', 'iwp-woo-v2') . '</label>';
+        echo '<label for="_iwp_site_expiry_hours">' . __('Expiry Hours', 'iwp-wp-integration') . '</label>';
         echo '<input type="number" name="_iwp_site_expiry_hours" id="_iwp_site_expiry_hours" value="' . esc_attr($expiry_hours) . '" min="1" max="8760" step="1" />';
-        echo '<span class="description">' . __('Number of hours before the site expires (1-8760 hours, default: 28).', 'iwp-woo-v2') . '</span>';
+        echo '<span class="description">' . __('Number of hours before the site expires (1-8760 hours, default: 24).', 'iwp-wp-integration') . '</span>';
         echo '</p>';
         
         echo '</div>'; // .options_group
@@ -176,7 +176,7 @@ class IWP_Woo_V2_Product_Integration {
         // Snapshot preview section
         // if (!empty($selected_snapshot)) {
         //     echo '<div class="options_group">';
-        //     echo '<h4>' . __('Selected Snapshot Preview', 'iwp-woo-v2') . '</h4>';
+        //     echo '<h4>' . __('Selected Snapshot Preview', 'iwp-wp-integration') . '</h4>';
         //     echo '<div id="iwp-snapshot-preview">';
         //     $this->render_snapshot_preview($selected_snapshot);
         //     echo '</div>';
@@ -192,7 +192,7 @@ class IWP_Woo_V2_Product_Integration {
      * @param int $post_id
      */
     public function save_product_data_fields($post_id) {
-        IWP_Woo_V2_Logger::debug('Saving product data fields', 'product-integration', array('product_id' => $post_id));
+        IWP_Logger::debug('Saving product data fields', 'product-integration', array('product_id' => $post_id));
         
         // Save selected snapshot
         $selected_snapshot = isset($_POST['_iwp_selected_snapshot']) ? sanitize_text_field($_POST['_iwp_selected_snapshot']) : '';
@@ -208,7 +208,7 @@ class IWP_Woo_V2_Product_Integration {
         
         // Save expiry hours (only if temporary)
         if ($expiry_type === 'temporary') {
-            $expiry_hours = isset($_POST['_iwp_site_expiry_hours']) ? intval($_POST['_iwp_site_expiry_hours']) : 28;
+            $expiry_hours = isset($_POST['_iwp_site_expiry_hours']) ? intval($_POST['_iwp_site_expiry_hours']) : 24;
             // Ensure expiry hours is within valid range
             $expiry_hours = max(1, min(8760, $expiry_hours));
             update_post_meta($post_id, '_iwp_site_expiry_hours', $expiry_hours);
@@ -217,11 +217,11 @@ class IWP_Woo_V2_Product_Integration {
             delete_post_meta($post_id, '_iwp_site_expiry_hours');
         }
         
-        IWP_Woo_V2_Logger::info('Saved product configuration', 'product-integration', array(
+        IWP_Logger::info('Saved product configuration', 'product-integration', array(
             'snapshot' => $selected_snapshot, 
             'plan' => $selected_plan,
             'expiry_type' => $expiry_type,
-            'expiry_hours' => ($expiry_type === 'temporary' ? ($expiry_hours ?? 28) : null)
+            'expiry_hours' => ($expiry_type === 'temporary' ? ($expiry_hours ?? 24) : null)
         ));
     }
 
@@ -246,7 +246,7 @@ class IWP_Woo_V2_Product_Integration {
         $expiry_type = $this->get_product_expiry_type($product_id);
         if ($expiry_type === 'temporary') {
             $expiry_hours = get_post_meta($product_id, '_iwp_site_expiry_hours', true);
-            return !empty($expiry_hours) ? intval($expiry_hours) : 28;
+            return !empty($expiry_hours) ? intval($expiry_hours) : 24;
         }
         return null;
     }
@@ -267,8 +267,8 @@ class IWP_Woo_V2_Product_Integration {
      * @return array
      */
     private function get_snapshot_options() {
-        IWP_Woo_V2_Logger::debug('Getting snapshots for product dropdown via centralized service', 'product-integration');
-        return IWP_Woo_V2_Service::get_snapshots_for_dropdown();
+        IWP_Logger::debug('Getting snapshots for product dropdown via centralized service', 'product-integration');
+        return IWP_Service::get_snapshots_for_dropdown();
     }
 
     /**
@@ -277,8 +277,8 @@ class IWP_Woo_V2_Product_Integration {
      * @return array
      */
     private function get_plans_for_dropdown() {
-        IWP_Woo_V2_Logger::debug('Getting plans for product dropdown via centralized service', 'product-integration');
-        return IWP_Woo_V2_Service::get_plans_for_dropdown();
+        IWP_Logger::debug('Getting plans for product dropdown via centralized service', 'product-integration');
+        return IWP_Service::get_plans_for_dropdown();
     }
 
     /**
@@ -292,11 +292,11 @@ class IWP_Woo_V2_Product_Integration {
         }
         
         // Get API key from settings
-        $plugin_options = get_option('iwp_woo_v2_options', array());
+        $plugin_options = get_option('iwp_options', array());
         $api_key = isset($plugin_options['api_key']) ? $plugin_options['api_key'] : '';
         
         if (empty($api_key)) {
-            echo '<p>' . __('API key not configured.', 'iwp-woo-v2') . '</p>';
+            echo '<p>' . __('API key not configured.', 'iwp-wp-integration') . '</p>';
             return;
         }
         
@@ -304,7 +304,7 @@ class IWP_Woo_V2_Product_Integration {
         $snapshot = $this->api_client->get_snapshot($snapshot_slug);
         
         if (is_wp_error($snapshot)) {
-            echo '<p>' . __('Error loading snapshot details: ', 'iwp-woo-v2') . esc_html($snapshot->get_error_message()) . '</p>';
+            echo '<p>' . __('Error loading snapshot details: ', 'iwp-wp-integration') . esc_html($snapshot->get_error_message()) . '</p>';
             return;
         }
         
@@ -345,30 +345,30 @@ class IWP_Woo_V2_Product_Integration {
         }
         
         wp_enqueue_script(
-            'iwp-woo-v2-product-admin',
-            IWP_WOO_V2_PLUGIN_URL . 'assets/js/admin-product.js',
+            'iwp-wp-integration-product-admin',
+            IWP_PLUGIN_URL . 'assets/js/integrations/woocommerce/woo-product.js',
             array('jquery'),
-            IWP_WOO_V2_VERSION,
+            IWP_VERSION,
             true
         );
         
         wp_enqueue_style(
-            'iwp-woo-v2-product-admin',
-            IWP_WOO_V2_PLUGIN_URL . 'assets/css/admin-product.css',
+            'iwp-wp-integration-product-admin',
+            IWP_PLUGIN_URL . 'assets/css/integrations/woocommerce/woo-product.css',
             array(),
-            IWP_WOO_V2_VERSION
+            IWP_VERSION
         );
         
-        wp_localize_script('iwp-woo-v2-product-admin', 'iwp_product_admin', array(
+        wp_localize_script('iwp-wp-integration-product-admin', 'iwp_product_admin', array(
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce'    => wp_create_nonce('iwp_product_admin_nonce'),
             'strings'  => array(
-                'refreshing' => __('Refreshing snapshots...', 'iwp-woo-v2'),
-                'error'      => __('Error refreshing snapshots', 'iwp-woo-v2'),
-                'success'    => __('Snapshots refreshed successfully', 'iwp-woo-v2'),
-                'refreshing_plans' => __('Refreshing plans...', 'iwp-woo-v2'),
-                'plans_error'      => __('Error refreshing plans', 'iwp-woo-v2'),
-                'plans_success'    => __('Plans refreshed successfully', 'iwp-woo-v2'),
+                'refreshing' => __('Refreshing snapshots...', 'iwp-wp-integration'),
+                'error'      => __('Error refreshing snapshots', 'iwp-wp-integration'),
+                'success'    => __('Snapshots refreshed successfully', 'iwp-wp-integration'),
+                'refreshing_plans' => __('Refreshing plans...', 'iwp-wp-integration'),
+                'plans_error'      => __('Error refreshing plans', 'iwp-wp-integration'),
+                'plans_success'    => __('Plans refreshed successfully', 'iwp-wp-integration'),
             ),
         ));
     }

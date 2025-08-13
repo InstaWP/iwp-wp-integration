@@ -1,8 +1,8 @@
-# InstaWP Integration - Claude Documentation
+# IWP WP Integration - Claude Documentation
 
 ## Overview
 
-This plugin is a comprehensive WordPress integration for InstaWP that provides enhanced functionality, seamless integration, WooCommerce support, standalone site creation tools, and high-performance order management with HPOS (High Performance Order Storage) compatibility. The plugin has been fully refactored to use "snapshots" terminology instead of "templates" and utilizes snapshot slugs for all API interactions.
+This plugin is a comprehensive WordPress integration for InstaWP that provides enhanced functionality, seamless integration, WooCommerce support, standalone site creation tools, and high-performance order management with HPOS (High Performance Order Storage) compatibility. The plugin has been fully refactored from WooCommerce-specific to a generic InstaWP Integration plugin that supports multiple e-commerce platforms, uses "snapshots" terminology instead of "templates", and utilizes snapshot slugs for all API interactions.
 
 **Key Features:**
 - ✅ Complete customer-facing site access and management
@@ -24,11 +24,12 @@ This plugin is a comprehensive WordPress integration for InstaWP that provides e
 - ✅ **NEW**: Eliminated duplicate site boxes on order pages
 - ✅ **NEW**: Simplified admin interface (removed API toggle)
 - ✅ **NEW**: Enhanced API key field with direct helper links
+- ✅ **NEW**: Automatic demo helper plugin disable after plan changes
 
 ## Project Structure
 
 ### Core Files
-- `instawp-integration.php` - Main plugin file with WordPress headers and initialization
+- `iwp-wp-integration.php` - Main plugin file with WordPress headers and initialization
 - `includes/class-iwp-woo-v2-main.php` - Primary plugin class managing all components
 - `includes/class-iwp-woo-v2-autoloader.php` - PSR-4 compatible class autoloader
 - `includes/class-iwp-woo-v2-installer.php` - Plugin installation, activation, and cleanup
@@ -321,7 +322,7 @@ The InstaWP Sites management interface now includes WordPress-style row actions 
 
 #### Key Components
 
-**Row Actions Implementation (`class-iwp-woo-v2-sites-list-table.php`)**
+**Row Actions Implementation (`class-iwp-sites-list-table.php`)**
 - **WordPress Core Style**: Uses native `$this->row_actions()` method for consistent WordPress admin experience
 - **Magic Login Priority**: Shows "Magic Login" when s_hash is available, falls back to "Admin Login" for regular wp-admin access
 - **Multiple Actions**: Visit Site, Magic Login/Admin Login, and Delete actions
@@ -349,15 +350,15 @@ public function column_site_url($item) {
     $site_link = sprintf('<a href="%s" target="_blank"><strong>%s</strong></a>', $url, esc_html($url));
     
     $actions = array();
-    $actions['visit'] = sprintf('<a href="%s" target="_blank">%s</a>', $url, __('Visit Site', 'instawp-integration'));
+    $actions['visit'] = sprintf('<a href="%s" target="_blank">%s</a>', $url, __('Visit Site', 'iwp-wp-integration'));
     
     // Magic Login with s_hash detection
     if (!empty($item['s_hash'])) {
         $magic_login_url = 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($item['s_hash']);
-        $actions['magic_login'] = sprintf('<a href="%s" target="_blank">%s</a>', esc_url($magic_login_url), __('Magic Login', 'instawp-integration'));
+        $actions['magic_login'] = sprintf('<a href="%s" target="_blank">%s</a>', esc_url($magic_login_url), __('Magic Login', 'iwp-wp-integration'));
     } else {
         $admin_url = trailingslashit($url) . 'wp-admin';
-        $actions['admin_login'] = sprintf('<a href="%s" target="_blank">%s</a>', esc_url($admin_url), __('Admin Login', 'instawp-integration'));
+        $actions['admin_login'] = sprintf('<a href="%s" target="_blank">%s</a>', esc_url($admin_url), __('Admin Login', 'iwp-wp-integration'));
     }
     
     return $site_link . $this->row_actions($actions);
@@ -370,12 +371,12 @@ private function handle_sites_page_actions() {
     if ($action === 'delete') {
         // Nonce verification
         if (!wp_verify_nonce($_GET['_wpnonce'], 'delete_site_' . $site_id)) {
-            wp_die(__('Security check failed', 'instawp-integration'));
+            wp_die(__('Security check failed', 'iwp-wp-integration'));
         }
         
         // Permission check
         if (!current_user_can('manage_woocommerce')) {
-            wp_die(__('You do not have sufficient permissions to perform this action.', 'instawp-integration'));
+            wp_die(__('You do not have sufficient permissions to perform this action.', 'iwp-wp-integration'));
         }
         
         // API deletion with error handling
@@ -1198,7 +1199,7 @@ Enable debug mode in plugin settings (Tools → InstaWP Integration) to:
 
 ### Development Setup
 1. Install WordPress and WooCommerce
-2. Clone plugin to `wp-content/plugins/instawp-integration`
+2. Clone plugin to `wp-content/plugins/iwp-wp-integration`
 3. Enable debug mode
 4. Create test users for customer testing
 5. Configure test email delivery
@@ -1380,10 +1381,10 @@ The plugin has been refactored to eliminate code duplication through the impleme
 **Security Validation - Before:**
 ```php
 if (!wp_verify_nonce($_POST['nonce'] ?? '', 'iwp_woo_v2_admin_nonce')) {
-    wp_send_json_error(array('message' => __('Security check failed.', 'instawp-integration')));
+    wp_send_json_error(array('message' => __('Security check failed.', 'iwp-wp-integration')));
 }
 if (!current_user_can('manage_woocommerce')) {
-    wp_send_json_error(array('message' => __('Insufficient permissions.', 'instawp-integration')));
+    wp_send_json_error(array('message' => __('Insufficient permissions.', 'iwp-wp-integration')));
 }
 ```
 
@@ -1591,6 +1592,191 @@ IWP_Woo_V2_Database::append_order_meta($order_id, '_iwp_mapped_domains', $domain
 - Real-time WebSocket status updates (future consideration)
 - Bulk status refresh for multiple pending sites
 - Enhanced admin dashboard with status overview widgets
+
+## Recent Updates (August 2025)
+
+### Site Expiry Settings Enhancement
+
+#### Fixed Product-Level Site Expiry Configuration
+**Problem**: The Site Expiry Settings in WooCommerce product edit pages had UI issues and incorrect default values.
+
+**Solutions Applied**:
+1. **Fixed Radio Button Overlap**: Updated CSS with proper flexbox spacing (30px gap) and `box-sizing: border-box`
+2. **Corrected Default Hours**: Changed default expiry from 28 hours to 24 hours across all code references
+3. **Mobile Responsive**: Added column layout for mobile devices to prevent radio button overlap
+
+**Files Modified**:
+- `includes/integrations/woocommerce/class-iwp-woo-product-integration.php` - Updated default values and help text
+- `assets/css/integrations/woocommerce/woo-product.css` - Fixed radio button spacing and mobile layout
+
+### Map Domain Functionality Restoration
+
+#### Restored Missing Map Domain Button
+**Problem**: Map Domain button was missing from order details and thank you pages after refactoring.
+
+**Solutions Applied**:
+1. **Fixed Context Checking**: Updated context checks to include all order page contexts (`'order-details'`, `'order-view'`, `'thank-you'`)
+2. **Modal Rendering**: Ensured domain mapping modal renders on all relevant pages
+3. **Fixed CSS Layout**: Added `box-sizing: border-box` to prevent input field overflow in the domain mapping modal
+
+**Files Modified**:
+- `includes/frontend/class-iwp-frontend.php` - Fixed context checks for button display and modal rendering
+- `assets/css/frontend.css` - Fixed modal form field sizing issues
+
+### Admin Menu Structure Improvement
+
+#### Fixed Menu Hierarchy
+**Problem**: Sites submenu was showing as "InstaWP" instead of "Sites".
+
+**Solution Applied**:
+- Added explicit submenu item to override WordPress's default first submenu behavior
+- Now shows proper hierarchy: **InstaWP** → **Sites** → **Settings**
+
+**Files Modified**:
+- `includes/admin/class-iwp-admin-simple.php` - Added explicit "Sites" submenu entry
+
+### Enhanced Sites Table Display
+
+#### Plan Names Instead of Plan IDs
+**Problem**: Sites table showed cryptic plan IDs instead of human-readable plan names.
+
+**Solutions Applied**:
+1. **Added Helper Method**: Created `IWP_Service::get_plan_name_by_id()` to lookup plan names from cached plan data
+2. **Enhanced Table Display**: Updated sites table to show plan names with plan ID as tooltip
+3. **Graceful Fallback**: Shows plan ID if plan name lookup fails
+
+**Benefits**:
+- ✅ User-friendly display: "Basic Plan" instead of "plan-abc123"
+- ✅ Tooltip shows technical details on hover
+- ✅ Maintains backward compatibility and error handling
+- ✅ Preserves upgrade indicators and sorting functionality
+
+**Files Modified**:
+- `includes/core/class-iwp-service.php` - Added plan name lookup method
+- `includes/admin/class-iwp-sites-list-table.php` - Enhanced plan column display
+
+### Technical Improvements
+
+#### CSS and Layout Fixes
+- **Modal Forms**: Fixed input field overflow issues with proper `box-sizing`
+- **Radio Buttons**: Improved spacing and mobile responsiveness
+- **Form Validation**: Enhanced user experience with proper field sizing
+
+#### Admin Interface Enhancements
+- **Menu Structure**: Logical hierarchy with proper submenu naming
+- **Table Display**: More informative data with human-readable plan names
+- **Context Handling**: Consistent behavior across all order page types
+
+### Testing and Validation
+
+#### Feature Verification
+- ✅ Site Expiry Settings display correctly without overlap
+- ✅ Default expiry hours set to 24 across all contexts
+- ✅ Map Domain button appears on all order pages (thank you, order view, My Account)
+- ✅ Domain mapping modal displays without layout issues
+- ✅ Admin menu shows "InstaWP" → "Sites" → "Settings" hierarchy
+- ✅ Sites table displays plan names with ID tooltips
+- ✅ Mobile responsive design maintained throughout
+
+#### Error Handling
+- ✅ Graceful fallback for plan name lookup failures
+- ✅ Proper context checking across different page types
+- ✅ CSS layout fixes prevent overflow issues
+- ✅ Backward compatibility maintained for existing data
+
+## Demo Helper Plugin Auto-Disable
+
+### Overview
+The plugin automatically disables the `iwp-demo-helper` plugin on sites after plan changes or status upgrades. This ensures that when customers upgrade from demo/trial plans to paid plans, any demo limitations are automatically removed.
+
+### Key Components
+
+#### API Client Enhancement (`class-iwp-api-client.php`)
+- **New Method**: `disable_demo_helper($site_id, $site_url = '')`
+- **Endpoint**: Calls `{site_url}/wp-json/iwp-demo-helper/v1/disable` on the target site
+- **Auto URL Detection**: Automatically fetches site URL if not provided
+- **Silent Failure Handling**: 404 responses are treated as success (plugin not installed)
+- **Comprehensive Logging**: Both success and failure scenarios are logged
+
+#### Integration Points
+
+**1. Plan Upgrades (`class-iwp-woo-order-processor.php`)**
+- Triggers when site plan is upgraded via WooCommerce order processing
+- Called immediately after successful `upgrade_site_plan()` API call
+- Does not fail the upgrade if demo helper disable fails
+
+**2. Status Changes (`class-iwp-service.php`)**
+- Triggers when site changes from temporary to permanent status
+- Called in `set_permanent()` method when `$permanent = true` and site was previously temporary
+- Handles both subscription-based and manual status changes
+
+#### Technical Implementation
+
+**API Call Structure:**
+```php
+// Endpoint
+POST {site_url}/wp-json/iwp-demo-helper/v1/disable
+
+// Headers
+Content-Type: application/json
+User-Agent: InstaWP-Integration/{version}
+
+// Body
+{
+    "source": "instawp-integration",
+    "site_id": 123,
+    "timestamp": 1692345678
+}
+```
+
+**Response Handling:**
+- **200 OK**: Demo helper successfully disabled
+- **404 Not Found**: Plugin not installed (treated as success)
+- **Other codes**: Logged as warnings but don't fail the parent operation
+
+#### Error Handling and Logging
+
+**Success Scenarios:**
+- Plugin disabled successfully (200)
+- Plugin not installed/found (404) - silently ignored
+
+**Failure Scenarios:**
+- Network errors during API call
+- HTTP error responses (non-200, non-404)
+- Site URL cannot be determined
+
+**Logging Examples:**
+```
+[INFO] Disabling demo helper plugin | site_id: 123, endpoint: https://site.com/wp-json/iwp-demo-helper/v1/disable
+[INFO] Successfully disabled demo helper plugin | response: "Plugin disabled"
+[INFO] Demo helper plugin not found (expected) | response_code: 404
+[WARNING] Demo helper disable returned non-success code | response_code: 500
+```
+
+### Use Cases
+
+#### Plan Upgrade Scenarios
+1. **Demo to Paid Plan**: Customer purchases upgrade from demo plan → demo helper disabled
+2. **Trial to Premium**: Trial period expires, customer pays → demo limitations removed
+3. **Subscription Activation**: Free trial converts to paid subscription → demo features disabled
+
+#### Status Change Scenarios
+1. **Temporary to Permanent**: Site reservation status changes → demo helper disabled
+2. **Subscription Payment**: Failed payment resolved → site becomes permanent → demo disabled
+3. **Manual Admin Action**: Admin manually changes site to permanent → demo disabled
+
+### Configuration
+
+No additional configuration required - the feature works automatically when:
+- Site plan upgrades occur through WooCommerce orders
+- Site status changes from temporary to permanent
+- The target site has the `iwp-demo-helper` plugin installed with the REST API endpoint
+
+### Backward Compatibility
+- Sites without the demo helper plugin are unaffected
+- Feature fails gracefully if target site is unreachable
+- Parent operations (plan upgrades, status changes) continue even if demo disable fails
+- No breaking changes to existing API or database structures
 
 ---
 

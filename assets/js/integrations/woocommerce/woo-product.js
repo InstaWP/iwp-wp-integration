@@ -1,7 +1,7 @@
 /**
- * Admin Product JavaScript for IWP WooCommerce Integration v2
+ * Admin Product JavaScript for InstaWP WooCommerce Integration
  *
- * @package IWP_Woo_V2
+ * @package IWP
  * @since 2.0.0
  */
 

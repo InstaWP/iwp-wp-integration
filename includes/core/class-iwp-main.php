@@ -1,8 +1,8 @@
 <?php
 /**
- * Main plugin class for IWP WooCommerce Integration v2
+ * Main plugin class for InstaWP Integration
  *
- * @package IWP_Woo_V2
+ * @package IWP
  * @since 2.0.0
  */
 
@@ -12,78 +12,85 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * IWP_Woo_V2_Main class
+ * IWP_Main class
  */
-class IWP_Woo_V2_Main {
+class IWP_Main {
 
     /**
      * Plugin version
      *
      * @var string
      */
-    public $version = IWP_WOO_V2_VERSION;
+    public $version = IWP_VERSION;
 
     /**
      * The single instance of the class
      *
-     * @var IWP_Woo_V2_Main
+     * @var IWP_Main
      */
     protected static $_instance = null;
 
     /**
      * Admin instance
      *
-     * @var IWP_Woo_V2_Admin
+     * @var IWP_Admin
      */
     public $admin = null;
 
     /**
      * Frontend instance
      *
-     * @var IWP_Woo_V2_Frontend
+     * @var IWP_Frontend
      */
     public $frontend = null;
 
     /**
      * API instance
      *
-     * @var IWP_Woo_V2_API
+     * @var IWP_API
      */
     public $api = null;
 
     /**
      * HPOS instance
      *
-     * @var IWP_Woo_V2_HPOS
+     * @var IWP_Woo_HPOS
      */
     public $hpos = null;
 
     /**
      * Product Integration instance
      *
-     * @var IWP_Woo_V2_Product_Integration
+     * @var IWP_Woo_Product_Integration
      */
     public $product_integration = null;
 
     /**
      * Order Processor instance
      *
-     * @var IWP_Woo_V2_Order_Processor
+     * @var IWP_Woo_Order_Processor
      */
     public $order_processor = null;
 
     /**
      * Shortcode instance
      *
-     * @var IWP_Woo_V2_Shortcode
+     * @var IWP_Shortcode
      */
     public $shortcode = null;
+
+    /**
+     * Site Manager instance
+     *
+     * @var IWP_Site_Manager
+     */
+    public $site_manager = null;
 
     /**
      * Main instance
      *
      * @static
-     * @return IWP_Woo_V2_Main
+     * @return IWP_Main
      */
     public static function instance() {
         if (is_null(self::$_instance)) {
@@ -104,7 +111,7 @@ class IWP_Woo_V2_Main {
      * Define constants
      */
     private function define_constants() {
-        $this->define('IWP_WOO_V2_ABSPATH', dirname(IWP_WOO_V2_PLUGIN_FILE) . '/');
+        $this->define('IWP_ABSPATH', dirname(IWP_PLUGIN_FILE) . '/');
     }
 
     /**
@@ -145,7 +152,7 @@ class IWP_Woo_V2_Main {
         }
 
         // Trigger action
-        do_action('iwp_woo_v2_init');
+        do_action('iwp_init');
     }
 
     /**
@@ -161,34 +168,17 @@ class IWP_Woo_V2_Main {
      * Include required files
      */
     private function init_includes() {
-        // Core includes
-        include_once IWP_WOO_V2_PLUGIN_PATH . 'includes/class-iwp-woo-v2-installer.php';
-        include_once IWP_WOO_V2_PLUGIN_PATH . 'includes/class-iwp-woo-v2-security.php';
-        include_once IWP_WOO_V2_PLUGIN_PATH . 'includes/class-iwp-woo-v2-database.php';
-        include_once IWP_WOO_V2_PLUGIN_PATH . 'includes/class-iwp-woo-v2-logger.php';
-        include_once IWP_WOO_V2_PLUGIN_PATH . 'includes/class-iwp-woo-v2-form-helper.php';
-        include_once IWP_WOO_V2_PLUGIN_PATH . 'includes/class-iwp-woo-v2-utilities.php';
-        include_once IWP_WOO_V2_PLUGIN_PATH . 'includes/class-iwp-woo-v2-hpos.php';
-        include_once IWP_WOO_V2_PLUGIN_PATH . 'includes/class-iwp-woo-v2-api-client.php';
-        include_once IWP_WOO_V2_PLUGIN_PATH . 'includes/class-iwp-woo-v2-service.php';
-        include_once IWP_WOO_V2_PLUGIN_PATH . 'includes/class-iwp-woo-v2-product-integration.php';
-        include_once IWP_WOO_V2_PLUGIN_PATH . 'includes/class-iwp-woo-v2-order-processor.php';
-        include_once IWP_WOO_V2_PLUGIN_PATH . 'includes/class-iwp-woo-v2-site-manager.php';
-        include_once IWP_WOO_V2_PLUGIN_PATH . 'includes/class-iwp-woo-v2-shortcode.php';
-
+        // Core includes (with autoloader, these are not strictly needed)
+        // But keeping for explicit loading
+        
         // Admin includes
         if ($this->is_request('admin')) {
-            include_once IWP_WOO_V2_PLUGIN_PATH . 'includes/admin/class-iwp-woo-v2-admin.php';
+            // Admin classes will be autoloaded
         }
 
         // Frontend includes
         if ($this->is_request('frontend')) {
-            include_once IWP_WOO_V2_PLUGIN_PATH . 'includes/frontend/class-iwp-woo-v2-frontend.php';
-        }
-
-        // API includes
-        if ($this->is_request('api')) {
-            include_once IWP_WOO_V2_PLUGIN_PATH . 'includes/api/class-iwp-woo-v2-api.php';
+            // Frontend classes will be autoloaded
         }
     }
 
@@ -197,44 +187,44 @@ class IWP_Woo_V2_Main {
      */
     private function init_classes() {
         // Initialize security
-        new IWP_Woo_V2_Security();
+        new IWP_Security();
 
         // Initialize HPOS compatibility (only if WooCommerce is active)
         if ($this->is_woocommerce_active()) {
-            $this->hpos = new IWP_Woo_V2_HPOS();
+            $this->hpos = new IWP_Woo_HPOS();
         }
 
         // Initialize admin
         if ($this->is_request('admin')) {
-            $this->admin = new IWP_Woo_V2_Admin();
+            $this->admin = new IWP_Admin();
             // Only initialize product integration if WooCommerce is active
             if ($this->is_woocommerce_active()) {
-                $this->product_integration = new IWP_Woo_V2_Product_Integration();
+                $this->product_integration = new IWP_Woo_Product_Integration();
             }
         }
 
         // Initialize order processor (only if WooCommerce is active)
         if ($this->is_woocommerce_active()) {
-            $this->order_processor = new IWP_Woo_V2_Order_Processor();
+            $this->order_processor = new IWP_Woo_Order_Processor();
             if ($this->product_integration) {
                 $this->order_processor->set_product_integration($this->product_integration);
             }
         }
 
         // Initialize site manager (always needed for site tracking)
-        $this->site_manager = new IWP_Woo_V2_Site_Manager();
+        $this->site_manager = new IWP_Site_Manager();
 
         // Initialize shortcode (always needed for shortcode functionality)
-        $this->shortcode = new IWP_Woo_V2_Shortcode();
+        $this->shortcode = new IWP_Shortcode();
 
         // Initialize frontend
         if ($this->is_request('frontend')) {
-            $this->frontend = new IWP_Woo_V2_Frontend();
+            $this->frontend = new IWP_Frontend();
         }
 
         // Initialize API
         if ($this->is_request('api')) {
-            $this->api = new IWP_Woo_V2_API();
+            $this->api = new IWP_API();
         }
     }
 
@@ -265,17 +255,17 @@ class IWP_Woo_V2_Main {
      */
     public function woocommerce_init() {
         // Add WooCommerce-specific functionality here
-        do_action('iwp_woo_v2_woocommerce_init');
+        do_action('iwp_woocommerce_init');
     }
 
     /**
      * Load plugin textdomain
      */
     public function load_textdomain() {
-        $locale = apply_filters('plugin_locale', get_locale(), 'instawp-integration');
+        $locale = apply_filters('plugin_locale', get_locale(), 'iwp-wp-integration');
         
-        load_textdomain('instawp-integration', WP_LANG_DIR . '/instawp-integration/instawp-integration-' . $locale . '.mo');
-        load_plugin_textdomain('instawp-integration', false, plugin_basename(dirname(IWP_WOO_V2_PLUGIN_FILE)) . '/languages');
+        load_textdomain('iwp-wp-integration', WP_LANG_DIR . '/iwp-wp-integration/iwp-wp-integration-' . $locale . '.mo');
+        load_plugin_textdomain('iwp-wp-integration', false, plugin_basename(dirname(IWP_PLUGIN_FILE)) . '/languages');
     }
 
 
@@ -285,7 +275,7 @@ class IWP_Woo_V2_Main {
      * @return string
      */
     public function plugin_url() {
-        return untrailingslashit(plugins_url('/', IWP_WOO_V2_PLUGIN_FILE));
+        return untrailingslashit(plugins_url('/', IWP_PLUGIN_FILE));
     }
 
     /**
@@ -294,7 +284,7 @@ class IWP_Woo_V2_Main {
      * @return string
      */
     public function plugin_path() {
-        return untrailingslashit(plugin_dir_path(IWP_WOO_V2_PLUGIN_FILE));
+        return untrailingslashit(plugin_dir_path(IWP_PLUGIN_FILE));
     }
 
     /**
@@ -303,7 +293,7 @@ class IWP_Woo_V2_Main {
      * @return string
      */
     public function template_path() {
-        return apply_filters('iwp_woo_v2_template_path', 'iwp-woo-v2/');
+        return apply_filters('iwp_template_path', 'iwp/');
     }
 
     /**
@@ -324,7 +314,7 @@ class IWP_Woo_V2_Main {
     public function add_cron_schedules($schedules) {
         $schedules['every_minute'] = array(
             'interval' => 60,
-            'display' => __('Every Minute', 'instawp-integration')
+            'display' => __('Every Minute', 'iwp-wp-integration')
         );
         return $schedules;
     }

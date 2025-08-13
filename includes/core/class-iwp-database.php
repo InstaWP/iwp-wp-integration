@@ -2,7 +2,7 @@
 /**
  * Database Helper Class
  *
- * @package IWP_Woo_V2
+ * @package IWP
  * @since 2.0.0
  */
 
@@ -12,11 +12,11 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * IWP_Woo_V2_Database class
+ * IWP_Database class
  * 
  * Centralized database operations for order meta, options, and common queries
  */
-class IWP_Woo_V2_Database {
+class IWP_Database {
 
     /**
      * Append data to order meta array
@@ -122,7 +122,7 @@ class IWP_Woo_V2_Database {
         static $options = null;
 
         if ($options === null) {
-            $options = get_option('iwp_woo_v2_options', array());
+            $options = get_option('iwp_options', array());
         }
 
         if ($key !== null) {
@@ -142,7 +142,7 @@ class IWP_Woo_V2_Database {
     public static function update_plugin_option($key, $value) {
         $options = self::get_plugin_options();
         $options[$key] = $value;
-        return update_option('iwp_woo_v2_options', $options);
+        return update_option('iwp_options', $options);
     }
 
     /**
@@ -233,7 +233,7 @@ class IWP_Woo_V2_Database {
      *
      * @param string $prefix Optional prefix to filter transients
      */
-    public static function cleanup_transients($prefix = 'iwp_woo_v2_') {
+    public static function cleanup_transients($prefix = 'iwp_') {
         global $wpdb;
 
         $wpdb->query($wpdb->prepare(
@@ -280,7 +280,7 @@ class IWP_Woo_V2_Database {
     public static function create_logs_table() {
         global $wpdb;
 
-        $table_name = $wpdb->prefix . 'iwp_woo_v2_logs';
+        $table_name = $wpdb->prefix . 'iwp_logs';
 
         $charset_collate = $wpdb->get_charset_collate();
 
@@ -316,7 +316,7 @@ class IWP_Woo_V2_Database {
     public static function log_activity($action, $message, $data = array(), $order_id = null, $user_id = null) {
         global $wpdb;
 
-        $table_name = $wpdb->prefix . 'iwp_woo_v2_logs';
+        $table_name = $wpdb->prefix . 'iwp_logs';
 
         if ($user_id === null) {
             $user_id = get_current_user_id();
@@ -345,7 +345,7 @@ class IWP_Woo_V2_Database {
     public static function get_activity_logs($args = array()) {
         global $wpdb;
 
-        $table_name = $wpdb->prefix . 'iwp_woo_v2_logs';
+        $table_name = $wpdb->prefix . 'iwp_logs';
 
         $defaults = array(
             'limit' => 50,
@@ -394,7 +394,17 @@ class IWP_Woo_V2_Database {
         $where_values[] = $args['offset'];
 
         if (!empty($where_values)) {
-            $query = $wpdb->prepare($query, $where_values);
+            error_log('IWP DEBUG: database get_activity_logs() - About to prepare SQL with values: ' . print_r($where_values, true));
+            error_log('IWP DEBUG: database get_activity_logs() - Query: ' . $query);
+            error_log('IWP DEBUG: database get_activity_logs() - Values type check: is_array=' . (is_array($where_values) ? 'YES' : 'NO') . ', count=' . (is_array($where_values) ? count($where_values) : 'N/A'));
+            
+            try {
+                $query = $wpdb->prepare($query, $where_values);
+                error_log('IWP DEBUG: database get_activity_logs() - SQL prepared successfully');
+            } catch (Exception $e) {
+                error_log('IWP ERROR: database get_activity_logs() - Exception during prepare: ' . $e->getMessage());
+                throw $e;
+            }
         }
 
         return $wpdb->get_results($query);
@@ -419,7 +429,7 @@ class IWP_Woo_V2_Database {
      * @return string
      */
     public static function get_schema_version() {
-        return get_option('iwp_woo_v2_db_version', '1.0.0');
+        return get_option('iwp_db_version', '1.0.0');
     }
 
     /**
@@ -429,6 +439,6 @@ class IWP_Woo_V2_Database {
      * @return bool
      */
     public static function update_schema_version($version) {
-        return update_option('iwp_woo_v2_db_version', $version);
+        return update_option('iwp_db_version', $version);
     }
 }

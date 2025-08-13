@@ -1,14 +1,14 @@
 /**
- * Frontend JavaScript for IWP WooCommerce Integration v2
+ * Frontend JavaScript for InstaWP Integration
  *
- * @package IWP_Woo_V2
+ * @package IWP
  * @since 2.0.0
  */
 
 (function($) {
     'use strict';
 
-    var IWP_Woo_V2_Frontend = {
+    var IWP_Frontend = {
         
         /**
          * Initialize the frontend functionality
@@ -23,7 +23,7 @@
          */
         bindEvents: function() {
             // Product page events
-            $('.single-product').on('click', '.iwp-woo-v2-product-action', this.handleProductAction);
+            $('.single-product').on('click', '.iwp-product-action', this.handleProductAction);
             
             // Cart events
             $(document.body).on('updated_cart_totals', this.handleCartUpdate);
@@ -35,10 +35,10 @@
             $(document.body).on('checkout_error', this.handleCheckoutError);
             
             // General AJAX events
-            $('.iwp-woo-v2-ajax-action').on('click', this.handleAjaxAction);
+            $('.iwp-ajax-action').on('click', this.handleAjaxAction);
             
             // Form events
-            $('.iwp-woo-v2-form').on('submit', this.handleFormSubmit);
+            $('.iwp-form').on('submit', this.handleFormSubmit);
             
             // Window events
             $(window).on('resize', this.handleWindowResize);
@@ -82,14 +82,14 @@
          * Initialize tooltips
          */
         initTooltips: function() {
-            $('.iwp-woo-v2-tooltip').each(function() {
+            $('.iwp-tooltip').each(function() {
                 var $tooltip = $(this);
                 var title = $tooltip.attr('title') || $tooltip.data('tooltip');
                 
                 if (title) {
                     $tooltip.removeAttr('title');
                     $tooltip.on('mouseenter', function(e) {
-                        var $content = $('<div class="iwp-woo-v2-tooltip-content">' + title + '</div>');
+                        var $content = $('<div class="iwp-tooltip-content">' + title + '</div>');
                         $content.appendTo('body').css({
                             position: 'absolute',
                             top: e.pageY + 10,
@@ -97,7 +97,7 @@
                             zIndex: 1000
                         }).fadeIn(200);
                     }).on('mouseleave', function() {
-                        $('.iwp-woo-v2-tooltip-content').fadeOut(200, function() {
+                        $('.iwp-tooltip-content').fadeOut(200, function() {
                             $(this).remove();
                         });
                     });
@@ -113,26 +113,26 @@
             $('[data-iwp-modal]').on('click', function(e) {
                 e.preventDefault();
                 var modalId = $(this).data('iwp-modal');
-                IWP_Woo_V2_Frontend.openModal(modalId);
+                IWP_Frontend.openModal(modalId);
             });
             
             // Modal close buttons
-            $(document).on('click', '.iwp-woo-v2-modal-close', function(e) {
+            $(document).on('click', '.iwp-modal-close', function(e) {
                 e.preventDefault();
-                IWP_Woo_V2_Frontend.closeModal();
+                IWP_Frontend.closeModal();
             });
             
             // Close modal on overlay click
-            $(document).on('click', '.iwp-woo-v2-modal-overlay', function(e) {
+            $(document).on('click', '.iwp-modal-overlay', function(e) {
                 if (e.target === this) {
-                    IWP_Woo_V2_Frontend.closeModal();
+                    IWP_Frontend.closeModal();
                 }
             });
             
             // Close modal on escape key
             $(document).on('keydown', function(e) {
                 if (e.keyCode === 27) {
-                    IWP_Woo_V2_Frontend.closeModal();
+                    IWP_Frontend.closeModal();
                 }
             });
         },
@@ -142,7 +142,7 @@
          */
         initNotices: function() {
             // Auto-dismiss notices
-            $('.iwp-woo-v2-notice[data-auto-dismiss]').each(function() {
+            $('.iwp-notice[data-auto-dismiss]').each(function() {
                 var $notice = $(this);
                 var delay = parseInt($notice.data('auto-dismiss')) || 5000;
                 
@@ -152,9 +152,9 @@
             });
             
             // Dismiss button
-            $(document).on('click', '.iwp-woo-v2-notice-dismiss', function(e) {
+            $(document).on('click', '.iwp-notice-dismiss', function(e) {
                 e.preventDefault();
-                $(this).closest('.iwp-woo-v2-notice').fadeOut();
+                $(this).closest('.iwp-notice').fadeOut();
             });
         },
 
@@ -168,14 +168,14 @@
                         if (entry.isIntersecting) {
                             var lazyImage = entry.target;
                             lazyImage.src = lazyImage.dataset.src;
-                            lazyImage.classList.remove('iwp-woo-v2-lazy');
-                            lazyImage.classList.add('iwp-woo-v2-loaded');
+                            lazyImage.classList.remove('iwp-lazy');
+                            lazyImage.classList.add('iwp-loaded');
                             lazyImageObserver.unobserve(lazyImage);
                         }
                     });
                 });
 
-                $('.iwp-woo-v2-lazy').each(function() {
+                $('.iwp-lazy').each(function() {
                     lazyImageObserver.observe(this);
                 });
             }
@@ -205,7 +205,7 @@
          */
         trackPageView: function() {
             // Only track if analytics is enabled
-            if (typeof iwp_woo_v2_frontend.track_views !== 'undefined' && iwp_woo_v2_frontend.track_views) {
+            if (typeof iwp_frontend.track_views !== 'undefined' && iwp_frontend.track_views) {
                 this.sendAnalytics('page_view', {
                     page: window.location.pathname,
                     title: document.title
@@ -232,25 +232,25 @@
             $button.addClass('loading');
             
             $.ajax({
-                url: iwp_woo_v2_frontend.ajax_url,
+                url: iwp_frontend.ajax_url,
                 type: 'POST',
                 data: {
-                    action: 'iwp_woo_v2_product_' + action,
+                    action: 'iwp_product_' + action,
                     product_id: productId,
-                    nonce: iwp_woo_v2_frontend.nonce
+                    nonce: iwp_frontend.nonce
                 },
                 success: function(response) {
                     if (response.success) {
-                        IWP_Woo_V2_Frontend.showNotice(response.data.message, 'success');
+                        IWP_Frontend.showNotice(response.data.message, 'success');
                         
                         // Trigger custom event
-                        $(document.body).trigger('iwp_woo_v2_product_action_success', [action, productId, response.data]);
+                        $(document.body).trigger('iwp_product_action_success', [action, productId, response.data]);
                     } else {
-                        IWP_Woo_V2_Frontend.showNotice(response.data.message || iwp_woo_v2_frontend.strings.error, 'error');
+                        IWP_Frontend.showNotice(response.data.message || iwp_frontend.strings.error, 'error');
                     }
                 },
                 error: function() {
-                    IWP_Woo_V2_Frontend.showNotice(iwp_woo_v2_frontend.strings.error, 'error');
+                    IWP_Frontend.showNotice(iwp_frontend.strings.error, 'error');
                 },
                 complete: function() {
                     $button.prop('disabled', false);
@@ -264,10 +264,10 @@
          */
         handleCartUpdate: function() {
             // Track cart update
-            IWP_Woo_V2_Frontend.sendAnalytics('cart_update');
+            IWP_Frontend.sendAnalytics('cart_update');
             
             // Update cart indicators
-            IWP_Woo_V2_Frontend.updateCartIndicators();
+            IWP_Frontend.updateCartIndicators();
         },
 
         /**
@@ -275,12 +275,12 @@
          */
         handleAddToCart: function(e, fragments, cart_hash, $button) {
             // Track add to cart
-            IWP_Woo_V2_Frontend.sendAnalytics('add_to_cart', {
+            IWP_Frontend.sendAnalytics('add_to_cart', {
                 product_id: $button ? $button.data('product_id') : null
             });
             
             // Show success message
-            IWP_Woo_V2_Frontend.showNotice(iwp_woo_v2_frontend.strings.added_to_cart || 'Product added to cart', 'success');
+            IWP_Frontend.showNotice(iwp_frontend.strings.added_to_cart || 'Product added to cart', 'success');
         },
 
         /**
@@ -288,7 +288,7 @@
          */
         handleRemoveFromCart: function() {
             // Track remove from cart
-            IWP_Woo_V2_Frontend.sendAnalytics('remove_from_cart');
+            IWP_Frontend.sendAnalytics('remove_from_cart');
         },
 
         /**
@@ -296,7 +296,7 @@
          */
         handleCheckoutUpdate: function() {
             // Track checkout update
-            IWP_Woo_V2_Frontend.sendAnalytics('checkout_update');
+            IWP_Frontend.sendAnalytics('checkout_update');
         },
 
         /**
@@ -304,7 +304,7 @@
          */
         handleCheckoutError: function() {
             // Track checkout error
-            IWP_Woo_V2_Frontend.sendAnalytics('checkout_error');
+            IWP_Frontend.sendAnalytics('checkout_error');
         },
 
         /**
@@ -326,15 +326,15 @@
             $button.addClass('loading');
             
             $.ajax({
-                url: iwp_woo_v2_frontend.ajax_url,
+                url: iwp_frontend.ajax_url,
                 type: 'POST',
                 data: $.extend({
-                    action: 'iwp_woo_v2_' + action,
-                    nonce: iwp_woo_v2_frontend.nonce
+                    action: 'iwp_' + action,
+                    nonce: iwp_frontend.nonce
                 }, data),
                 success: function(response) {
                     if (response.success) {
-                        IWP_Woo_V2_Frontend.showNotice(response.data.message, 'success');
+                        IWP_Frontend.showNotice(response.data.message, 'success');
                         
                         // Handle specific actions
                         if (response.data.redirect) {
@@ -345,11 +345,11 @@
                             location.reload();
                         }
                     } else {
-                        IWP_Woo_V2_Frontend.showNotice(response.data.message || iwp_woo_v2_frontend.strings.error, 'error');
+                        IWP_Frontend.showNotice(response.data.message || iwp_frontend.strings.error, 'error');
                     }
                 },
                 error: function() {
-                    IWP_Woo_V2_Frontend.showNotice(iwp_woo_v2_frontend.strings.error, 'error');
+                    IWP_Frontend.showNotice(iwp_frontend.strings.error, 'error');
                 },
                 complete: function() {
                     $button.prop('disabled', false);
@@ -372,7 +372,7 @@
             e.preventDefault();
             
             // Validate form
-            if (!IWP_Woo_V2_Frontend.validateForm($form)) {
+            if (!IWP_Frontend.validateForm($form)) {
                 return;
             }
             
@@ -382,23 +382,23 @@
             $submitButton.addClass('loading');
             
             $.ajax({
-                url: iwp_woo_v2_frontend.ajax_url,
+                url: iwp_frontend.ajax_url,
                 type: 'POST',
-                data: $form.serialize() + '&action=iwp_woo_v2_' + action + '&nonce=' + iwp_woo_v2_frontend.nonce,
+                data: $form.serialize() + '&action=iwp_' + action + '&nonce=' + iwp_frontend.nonce,
                 success: function(response) {
                     if (response.success) {
-                        IWP_Woo_V2_Frontend.showNotice(response.data.message, 'success');
+                        IWP_Frontend.showNotice(response.data.message, 'success');
                         
                         // Reset form if specified
                         if (response.data.reset_form) {
                             $form[0].reset();
                         }
                     } else {
-                        IWP_Woo_V2_Frontend.showNotice(response.data.message || iwp_woo_v2_frontend.strings.error, 'error');
+                        IWP_Frontend.showNotice(response.data.message || iwp_frontend.strings.error, 'error');
                     }
                 },
                 error: function() {
-                    IWP_Woo_V2_Frontend.showNotice(iwp_woo_v2_frontend.strings.error, 'error');
+                    IWP_Frontend.showNotice(iwp_frontend.strings.error, 'error');
                 },
                 complete: function() {
                     $submitButton.prop('disabled', false);
@@ -415,7 +415,7 @@
             clearTimeout(this.resizeTimer);
             this.resizeTimer = setTimeout(function() {
                 // Trigger custom event
-                $(document.body).trigger('iwp_woo_v2_window_resized');
+                $(document.body).trigger('iwp_window_resized');
             }, 250);
         },
 
@@ -427,7 +427,7 @@
             clearTimeout(this.scrollTimer);
             this.scrollTimer = setTimeout(function() {
                 // Trigger custom event
-                $(document.body).trigger('iwp_woo_v2_window_scrolled');
+                $(document.body).trigger('iwp_window_scrolled');
             }, 100);
         },
 
@@ -438,14 +438,14 @@
             var isValid = true;
             
             // Clear previous errors
-            $form.find('.iwp-woo-v2-field-error').removeClass('iwp-woo-v2-field-error');
-            $form.find('.iwp-woo-v2-error-message').remove();
+            $form.find('.iwp-field-error').removeClass('iwp-field-error');
+            $form.find('.iwp-error-message').remove();
             
             // Validate required fields
             $form.find('[required]').each(function() {
                 var $field = $(this);
                 if (!$field.val()) {
-                    IWP_Woo_V2_Frontend.showFieldError($field, 'This field is required');
+                    IWP_Frontend.showFieldError($field, 'This field is required');
                     isValid = false;
                 }
             });
@@ -455,7 +455,7 @@
                 var $field = $(this);
                 var email = $field.val();
                 if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                    IWP_Woo_V2_Frontend.showFieldError($field, 'Please enter a valid email address');
+                    IWP_Frontend.showFieldError($field, 'Please enter a valid email address');
                     isValid = false;
                 }
             });
@@ -467,8 +467,8 @@
          * Show field error
          */
         showFieldError: function($field, message) {
-            $field.addClass('iwp-woo-v2-field-error');
-            $('<div class="iwp-woo-v2-error-message">' + message + '</div>').insertAfter($field);
+            $field.addClass('iwp-field-error');
+            $('<div class="iwp-error-message">' + message + '</div>').insertAfter($field);
         },
 
         /**
@@ -477,9 +477,9 @@
         showNotice: function(message, type) {
             type = type || 'info';
             
-            var $notice = $('<div class="iwp-woo-v2-notice iwp-woo-v2-notice-' + type + '">' +
+            var $notice = $('<div class="iwp-notice iwp-notice-' + type + '">' +
                 '<p>' + message + '</p>' +
-                '<button class="iwp-woo-v2-notice-dismiss">&times;</button>' +
+                '<button class="iwp-notice-dismiss">&times;</button>' +
                 '</div>');
             
             $('body').prepend($notice);
@@ -498,7 +498,7 @@
             var $modal = $('#' + modalId);
             if ($modal.length) {
                 $modal.fadeIn();
-                $('body').addClass('iwp-woo-v2-modal-open');
+                $('body').addClass('iwp-modal-open');
             }
         },
 
@@ -506,8 +506,8 @@
          * Close modal
          */
         closeModal: function() {
-            $('.iwp-woo-v2-modal').fadeOut();
-            $('body').removeClass('iwp-woo-v2-modal-open');
+            $('.iwp-modal').fadeOut();
+            $('body').removeClass('iwp-modal-open');
         },
 
         /**
@@ -515,14 +515,14 @@
          */
         updateCartIndicators: function() {
             // Update cart count and total in custom elements
-            $('.iwp-woo-v2-cart-count').each(function() {
+            $('.iwp-cart-count').each(function() {
                 var $element = $(this);
                 $.ajax({
-                    url: iwp_woo_v2_frontend.ajax_url,
+                    url: iwp_frontend.ajax_url,
                     type: 'POST',
                     data: {
-                        action: 'iwp_woo_v2_get_cart_count',
-                        nonce: iwp_woo_v2_frontend.nonce
+                        action: 'iwp_get_cart_count',
+                        nonce: iwp_frontend.nonce
                     },
                     success: function(response) {
                         if (response.success) {
@@ -540,13 +540,13 @@
             data = data || {};
             
             $.ajax({
-                url: iwp_woo_v2_frontend.ajax_url,
+                url: iwp_frontend.ajax_url,
                 type: 'POST',
                 data: {
-                    action: 'iwp_woo_v2_track_event',
+                    action: 'iwp_track_event',
                     event: event,
                     data: data,
-                    nonce: iwp_woo_v2_frontend.nonce
+                    nonce: iwp_frontend.nonce
                 }
             });
         },
@@ -567,13 +567,13 @@
             // Use the modern Clipboard API if available
             if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard.writeText(textToCopy).then(function() {
-                    IWP_Woo_V2_Frontend.showCopyFeedback($button, 'Copied!');
+                    IWP_Frontend.showCopyFeedback($button, 'Copied!');
                 }).catch(function() {
-                    IWP_Woo_V2_Frontend.fallbackCopyTextToClipboard(textToCopy, $button);
+                    IWP_Frontend.fallbackCopyTextToClipboard(textToCopy, $button);
                 });
             } else {
                 // Fallback for older browsers
-                IWP_Woo_V2_Frontend.fallbackCopyTextToClipboard(textToCopy, $button);
+                IWP_Frontend.fallbackCopyTextToClipboard(textToCopy, $button);
             }
         },
 
@@ -597,12 +597,12 @@
             try {
                 var successful = document.execCommand('copy');
                 if (successful) {
-                    IWP_Woo_V2_Frontend.showCopyFeedback($button, 'Copied!');
+                    IWP_Frontend.showCopyFeedback($button, 'Copied!');
                 } else {
-                    IWP_Woo_V2_Frontend.showCopyFeedback($button, 'Copy failed', 'error');
+                    IWP_Frontend.showCopyFeedback($button, 'Copy failed', 'error');
                 }
             } catch (err) {
-                IWP_Woo_V2_Frontend.showCopyFeedback($button, 'Copy failed', 'error');
+                IWP_Frontend.showCopyFeedback($button, 'Copy failed', 'error');
             }
             
             document.body.removeChild(textArea);
@@ -721,14 +721,14 @@
             
             // Basic validation
             if (!formData.domain_name) {
-                IWP_Woo_V2_Frontend.showDomainResult('Please enter a domain name', 'error');
+                IWP_Frontend.showDomainResult('Please enter a domain name', 'error');
                 return;
             }
             
             // Validate domain format (basic)
             var domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?\.([a-zA-Z]{2,}|[a-zA-Z0-9-]{2,}\.[a-zA-Z]{2,})$/;
             if (!domainRegex.test(formData.domain_name)) {
-                IWP_Woo_V2_Frontend.showDomainResult('Please enter a valid domain name (e.g., example.com or www.example.com)', 'error');
+                IWP_Frontend.showDomainResult('Please enter a valid domain name (e.g., example.com or www.example.com)', 'error');
                 return;
             }
             
@@ -738,12 +738,12 @@
             
             // Submit via AJAX
             $.ajax({
-                url: iwp_woo_v2_frontend.ajax_url,
+                url: iwp_frontend.ajax_url,
                 type: 'POST',
                 data: formData,
                 success: function(response) {
                     if (response.success) {
-                        IWP_Woo_V2_Frontend.showDomainResult(response.data.message, 'success');
+                        IWP_Frontend.showDomainResult(response.data.message, 'success');
                         
                         // Reset form after success
                         setTimeout(function() {
@@ -754,7 +754,7 @@
                             }, 2000);
                         }, 1000);
                     } else {
-                        IWP_Woo_V2_Frontend.showDomainResult(response.data.message || 'Domain mapping failed', 'error');
+                        IWP_Frontend.showDomainResult(response.data.message || 'Domain mapping failed', 'error');
                     }
                 },
                 error: function(xhr, status, error) {
@@ -769,7 +769,7 @@
                         // Use default error message
                     }
                     
-                    IWP_Woo_V2_Frontend.showDomainResult(errorMessage, 'error');
+                    IWP_Frontend.showDomainResult(errorMessage, 'error');
                 },
                 complete: function() {
                     $submitBtn.prop('disabled', false).text('Map Domain');
@@ -795,10 +795,10 @@
 
     // Initialize on document ready
     $(document).ready(function() {
-        IWP_Woo_V2_Frontend.init();
+        IWP_Frontend.init();
     });
 
     // Make it globally accessible
-    window.IWP_Woo_V2_Frontend = IWP_Woo_V2_Frontend;
+    window.IWP_Frontend = IWP_Frontend;
 
 })(jQuery);
