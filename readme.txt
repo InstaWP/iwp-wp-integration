@@ -4,7 +4,7 @@ Tags: instawp, woocommerce, staging, development, site creation, snapshots
 Requires at least: 5.0
 Tested up to: 6.4
 Requires PHP: 7.4
-Stable tag: 0.0.1
+Stable tag: 2.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -136,7 +136,7 @@ Yes, the plugin is fully internationalized and ready for translation into any la
 
 == Changelog ==
 
-= 0.0.1 =
+= 2.0.0 =
 * **Major Release** - Complete rewrite with enhanced features
 * Added real-time site creation status tracking
 * Implemented Magic Login functionality for one-click site access
@@ -155,9 +155,16 @@ Yes, the plugin is fully internationalized and ready for translation into any la
 * Simplified admin interface and enhanced API key management
 * Optimized performance with efficient database queries
 * Enhanced security with comprehensive input validation
+
+= 1.0.0 =
 * Initial release
 * Basic InstaWP integration
 * Simple site creation functionality
+
+== Upgrade Notice ==
+
+= 2.0.0 =
+This is a major update with significant new features and improvements. Please backup your site before upgrading. The new version includes enhanced customer experience, real-time status tracking, and comprehensive admin management tools.
 
 == Support ==
 

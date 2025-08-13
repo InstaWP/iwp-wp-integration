@@ -3,7 +3,7 @@
  * Installer class for InstaWP Integration
  *
  * @package IWP
- * @since 0.0.1
+ * @since 2.0.0
  */
 
 // Prevent direct access
@@ -22,7 +22,7 @@ class IWP_Installer {
      * @var array
      */
     private static $db_updates = array(
-        '0.0.1' => array(
+        '2.0.0' => array(
             'iwp_create_tables',
             'iwp_create_options',
         ),

@@ -3,7 +3,7 @@
  * HPOS (High Performance Order Storage) compatibility class
  *
  * @package IWP
- * @since 0.0.1
+ * @since 2.0.0
  */
 
 // Prevent direct access

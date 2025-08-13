@@ -754,21 +754,34 @@ class IWP_Site_Manager {
                     $current_status = $db_site->status;
                     
                     // If database has updated site details, use them
-                    if ($db_site->status === 'completed' && !empty($db_site->api_response)) {
-                        $api_response = json_decode($db_site->api_response, true);
-                        if (is_array($api_response)) {
-                            // Update site details from API response if available
-                            if (!empty($api_response['wp_url']) && empty($site_url)) {
-                                $site_url = $api_response['wp_url'];
-                            }
-                            if (!empty($api_response['wp_username']) && empty($raw_site_data['wp_username'])) {
-                                $raw_site_data['wp_username'] = $api_response['wp_username'];
-                            }
-                            if (!empty($api_response['wp_password']) && empty($raw_site_data['wp_password'])) {
-                                $raw_site_data['wp_password'] = $api_response['wp_password'];
-                            }
-                            if (!empty($api_response['s_hash']) && empty($raw_site_data['s_hash'])) {
-                                $raw_site_data['s_hash'] = $api_response['s_hash'];
+                    if ($db_site->status === 'completed') {
+                        // Update site details from database fields (direct columns)
+                        if (!empty($db_site->site_url) && empty($site_url)) {
+                            $site_url = $db_site->site_url;
+                        }
+                        if (!empty($db_site->wp_username) && empty($raw_site_data['wp_username'])) {
+                            $raw_site_data['wp_username'] = $db_site->wp_username;
+                            error_log('IWP DEBUG: Updated wp_username from database: ' . $db_site->wp_username);
+                        }
+                        if (!empty($db_site->wp_password) && empty($raw_site_data['wp_password'])) {
+                            $raw_site_data['wp_password'] = $db_site->wp_password;
+                            error_log('IWP DEBUG: Updated wp_password from database: [REDACTED]');
+                        }
+                        if (!empty($db_site->s_hash) && empty($raw_site_data['s_hash'])) {
+                            $raw_site_data['s_hash'] = $db_site->s_hash;
+                        }
+                        
+                        // Also check API response for additional details if needed
+                        if (!empty($db_site->api_response)) {
+                            $api_response = json_decode($db_site->api_response, true);
+                            if (is_array($api_response)) {
+                                // Fallback to API response if database fields are still empty
+                                if (!empty($api_response['wp_url']) && empty($site_url)) {
+                                    $site_url = $api_response['wp_url'];
+                                }
+                                if (!empty($api_response['s_hash']) && empty($raw_site_data['s_hash'])) {
+                                    $raw_site_data['s_hash'] = $api_response['s_hash'];
+                                }
                             }
                         }
                     }

@@ -80,12 +80,24 @@ class IWP_Sites_Model {
             self::init();
         }
 
-        $data['updated_at'] = current_time('mysql');
+        // Sanitize data for database storage
+        $sanitized_data = array();
+        foreach ($data as $key => $value) {
+            if (is_array($value)) {
+                // JSON encode array values for database storage
+                $sanitized_data[$key] = wp_json_encode($value);
+                error_log('IWP DEBUG: sites model update() - Converted array field "' . $key . '" to JSON');
+            } else {
+                $sanitized_data[$key] = $value;
+            }
+        }
+        
+        $sanitized_data['updated_at'] = current_time('mysql');
 
-        error_log('IWP DEBUG: sites model update() - About to call wpdb->update');
+        error_log('IWP DEBUG: sites model update() - About to call wpdb->update with sanitized data');
         $result = $wpdb->update(
             self::$table_name,
-            $data,
+            $sanitized_data,
             array('site_id' => sanitize_text_field($site_id))
         );
         error_log('IWP DEBUG: sites model update() - wpdb->update result: ' . ($result !== false ? 'SUCCESS' : 'FAILED'));

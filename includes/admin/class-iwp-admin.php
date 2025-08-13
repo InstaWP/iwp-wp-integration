@@ -3,7 +3,7 @@
  * Admin class for IWP WooCommerce Integration v2
  *
  * @package IWP
- * @since 0.0.1
+ * @since 2.0.0
  */
 
 // Prevent direct access
