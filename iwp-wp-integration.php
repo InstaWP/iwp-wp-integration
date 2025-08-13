@@ -3,7 +3,7 @@
  * Plugin Name: InstaWP Integration
  * Plugin URI: https://instawp.com
  * Description: A comprehensive WordPress integration plugin for InstaWP that provides enhanced functionality, seamless integration, WooCommerce support, and standalone site creation tools.
- * Version: 2.0.0
+ * Version: 0.0.1
  * Author: InstaWP
  * Author URI: https://instawp.com
  * Text Domain: iwp-wp-integration
@@ -24,7 +24,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('IWP_VERSION', '2.0.0');
+define('IWP_VERSION', '0.0.1');
 define('IWP_PLUGIN_FILE', __FILE__);
 define('IWP_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('IWP_PLUGIN_URL', plugin_dir_url(__FILE__));

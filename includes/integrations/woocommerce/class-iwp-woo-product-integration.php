@@ -3,7 +3,7 @@
  * WooCommerce Product Integration for IWP WooCommerce Integration v2
  *
  * @package IWP
- * @since 2.0.0
+ * @since 0.0.1
  */
 
 // Prevent direct access

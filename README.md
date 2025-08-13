@@ -302,7 +302,7 @@ This plugin is licensed under the GPL v2 or later.
 
 ## Changelog
 
-### Version 2.0.0
+### Version 0.0.1
 - Complete refactor from WooCommerce-specific to generic WordPress integration
 - New simplified admin interface with tabbed settings
 - Enhanced shortcode functionality with real-time status tracking
