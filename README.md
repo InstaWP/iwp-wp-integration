@@ -314,6 +314,16 @@ This plugin is licensed under the GPL v2 or later.
 - Mobile-responsive design
 - API timeout increased to 60 seconds
 
+### Recent Updates (August 2025)
+- **Fixed wpdb::prepare array error**: Resolved database error when updating site records with array values
+- **Fixed frontend credential display**: Username and password now display correctly in customer-facing interfaces
+- **Improved site information positioning**: Site details now appear right after order table instead of at page bottom
+- **Enhanced WooCommerce Subscriptions support**: Fixed argument count errors in subscription hooks
+- **Added demo helper auto-disable**: Automatically disables demo plugin when sites upgrade to paid plans
+- **Team management improvements**: Better team filtering and caching for multi-team environments
+- **UI enhancements**: Fixed radio button spacing and mobile responsiveness in product settings
+- **Map domain functionality**: Restored missing domain mapping features on order pages
+
 ---
 
 **Need Help?** Check the plugin settings page for more detailed documentation and examples, or refer to the troubleshooting section above.

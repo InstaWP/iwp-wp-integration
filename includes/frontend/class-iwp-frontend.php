@@ -50,8 +50,8 @@ class IWP_Frontend {
         // For thank you page (order-received)
         add_action('woocommerce_thankyou', array($this, 'display_order_sites_thankyou'), 10);
         
-        // For order view page (view-order) - but not on thank you page
-        add_action('woocommerce_view_order', array($this, 'display_order_sites_view'), 10);
+        // For order view page (view-order) - positioned right after order table
+        add_action('woocommerce_order_details_after_order_table', array($this, 'display_order_sites_after_table'), 10);
         
         // Email integration
         add_action('woocommerce_email_order_details', array($this, 'add_sites_to_emails'), 15, 4);
@@ -370,15 +370,21 @@ class IWP_Frontend {
     }
     
     /**
-     * Display sites on order view page (my-account/view-order)
+     * Display sites after order table (positioned higher on page)
      *
-     * @param int $order_id
+     * @param WC_Order $order
      */
-    public function display_order_sites_view($order_id) {
+    public function display_order_sites_after_table($order) {
+        if (!$order) {
+            return;
+        }
+        
+        $order_id = $order->get_id();
         if (!$order_id) {
             return;
         }
-        $this->display_order_sites($order_id, 'order-view');
+        
+        $this->display_order_sites($order_id, 'order-details');
     }
 
     /**
