@@ -3,8 +3,8 @@
 A comprehensive WordPress plugin that seamlessly integrates InstaWP's site creation and management capabilities with your WordPress website and WooCommerce store.
 
 ## How to Setup (Video)
-Direct Site Creation - https://www.youtube.com/watch?v=XrmSijeVNSc
-With Trial Site - https://www.youtube.com/watch?v=in04cyMqvbQ
+- Direct Site Creation - https://www.youtube.com/watch?v=XrmSijeVNSc
+- With Trial Site - https://www.youtube.com/watch?v=in04cyMqvbQ
 
 ## Overview
 
