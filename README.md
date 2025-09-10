@@ -306,6 +306,9 @@ This plugin is licensed under the GPL v2 or later.
 
 ## Changelog
 
+### Version 0.0.2
+- Fixed WooCommerce Subscription error reported by Fixrunner
+
 ### Version 0.0.1
 - Complete refactor from WooCommerce-specific to generic WordPress integration
 - New simplified admin interface with tabbed settings

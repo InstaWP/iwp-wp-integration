@@ -47,6 +47,37 @@ class IWP_Woo_Subscriptions_Integration {
     }
 
     /**
+     * Ensure subscription is a WC_Subscription object
+     *
+     * @param mixed $subscription Subscription ID or object
+     * @return WC_Subscription|false
+     */
+    private function ensure_subscription_object($subscription) {
+        if (!is_object($subscription)) {
+            if (function_exists('wcs_get_subscription')) {
+                $subscription = wcs_get_subscription($subscription);
+            }
+        }
+        return $subscription instanceof WC_Subscription ? $subscription : false;
+    }
+
+    /**
+     * Ensure order is a WC_Order object
+     *
+     * @param mixed $order Order ID or object
+     * @return WC_Order|false
+     */
+    private function ensure_order_object($order) {
+        if (is_null($order)) {
+            return false;
+        }
+        if (!is_object($order)) {
+            $order = wc_get_order($order);
+        }
+        return $order instanceof WC_Order ? $order : false;
+    }
+
+    /**
      * Initialize hooks
      */
     private function init_hooks() {
@@ -76,6 +107,14 @@ class IWP_Woo_Subscriptions_Integration {
      * @param WC_Order $order
      */
     public function handle_payment_failed($subscription, $order = null) {
+        $subscription = $this->ensure_subscription_object($subscription);
+        if (!$subscription) {
+            IWP_Logger::error('Invalid subscription passed to handle_payment_failed', 'subscriptions');
+            return;
+        }
+
+        $order = $this->ensure_order_object($order);
+
         IWP_Logger::warning('Subscription payment failed', 'subscriptions', array(
             'subscription_id' => $subscription->get_id(),
             'order_id' => $order ? $order->get_id() : 'N/A'
@@ -91,6 +130,18 @@ class IWP_Woo_Subscriptions_Integration {
      * @param WC_Order $order
      */
     public function handle_renewal_payment_failed($subscription, $order) {
+        $subscription = $this->ensure_subscription_object($subscription);
+        if (!$subscription) {
+            IWP_Logger::error('Invalid subscription passed to handle_renewal_payment_failed', 'subscriptions');
+            return;
+        }
+
+        $order = $this->ensure_order_object($order);
+        if (!$order) {
+            IWP_Logger::error('Invalid order passed to handle_renewal_payment_failed', 'subscriptions');
+            return;
+        }
+
         IWP_Logger::warning('Subscription renewal payment failed', 'subscriptions', array(
             'subscription_id' => $subscription->get_id(),
             'order_id' => $order->get_id()
@@ -106,6 +157,14 @@ class IWP_Woo_Subscriptions_Integration {
      * @param WC_Order $order
      */
     public function handle_payment_complete($subscription, $order = null) {
+        $subscription = $this->ensure_subscription_object($subscription);
+        if (!$subscription) {
+            IWP_Logger::error('Invalid subscription passed to handle_payment_complete', 'subscriptions');
+            return;
+        }
+
+        $order = $this->ensure_order_object($order);
+
         IWP_Logger::info('Subscription payment completed', 'subscriptions', array(
             'subscription_id' => $subscription->get_id(),
             'order_id' => $order ? $order->get_id() : 'N/A'
@@ -121,6 +180,18 @@ class IWP_Woo_Subscriptions_Integration {
      * @param WC_Order $order
      */
     public function handle_renewal_payment_complete($subscription, $order) {
+        $subscription = $this->ensure_subscription_object($subscription);
+        if (!$subscription) {
+            IWP_Logger::error('Invalid subscription passed to handle_renewal_payment_complete', 'subscriptions');
+            return;
+        }
+
+        $order = $this->ensure_order_object($order);
+        if (!$order) {
+            IWP_Logger::error('Invalid order passed to handle_renewal_payment_complete', 'subscriptions');
+            return;
+        }
+
         IWP_Logger::info('Subscription renewal payment completed', 'subscriptions', array(
             'subscription_id' => $subscription->get_id(),
             'order_id' => $order->get_id()
@@ -136,6 +207,12 @@ class IWP_Woo_Subscriptions_Integration {
      * @param string $old_status Optional - may not be passed by all hooks
      */
     public function handle_subscription_cancelled($subscription, $old_status = '') {
+        $subscription = $this->ensure_subscription_object($subscription);
+        if (!$subscription) {
+            IWP_Logger::error('Invalid subscription passed to handle_subscription_cancelled', 'subscriptions');
+            return;
+        }
+
         IWP_Logger::warning('Subscription cancelled', 'subscriptions', array(
             'subscription_id' => $subscription->get_id(),
             'old_status' => $old_status
@@ -151,6 +228,12 @@ class IWP_Woo_Subscriptions_Integration {
      * @param string $old_status Optional - may not be passed by all hooks
      */
     public function handle_subscription_expired($subscription, $old_status = '') {
+        $subscription = $this->ensure_subscription_object($subscription);
+        if (!$subscription) {
+            IWP_Logger::error('Invalid subscription passed to handle_subscription_expired', 'subscriptions');
+            return;
+        }
+
         IWP_Logger::warning('Subscription expired', 'subscriptions', array(
             'subscription_id' => $subscription->get_id(),
             'old_status' => $old_status
@@ -166,6 +249,12 @@ class IWP_Woo_Subscriptions_Integration {
      * @param string $old_status Optional - may not be passed by all hooks
      */
     public function handle_subscription_on_hold($subscription, $old_status = '') {
+        $subscription = $this->ensure_subscription_object($subscription);
+        if (!$subscription) {
+            IWP_Logger::error('Invalid subscription passed to handle_subscription_on_hold', 'subscriptions');
+            return;
+        }
+
         IWP_Logger::info('Subscription on hold', 'subscriptions', array(
             'subscription_id' => $subscription->get_id(),
             'old_status' => $old_status
@@ -181,6 +270,12 @@ class IWP_Woo_Subscriptions_Integration {
      * @param string $old_status Optional - may not be passed by all hooks
      */
     public function handle_subscription_active($subscription, $old_status = '') {
+        $subscription = $this->ensure_subscription_object($subscription);
+        if (!$subscription) {
+            IWP_Logger::error('Invalid subscription passed to handle_subscription_active', 'subscriptions');
+            return;
+        }
+
         IWP_Logger::info('Subscription activated', 'subscriptions', array(
             'subscription_id' => $subscription->get_id(),
             'old_status' => $old_status

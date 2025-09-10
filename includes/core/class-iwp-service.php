@@ -37,7 +37,7 @@ class IWP_Service {
      *
      * @return IWP_API_Client|WP_Error
      */
-    private static function get_api_client() {
+    public static function get_api_client() {
         if (self::$api_client === null) {
             self::$api_client = new IWP_API_Client();
             
