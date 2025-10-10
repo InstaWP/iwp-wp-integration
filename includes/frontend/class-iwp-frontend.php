@@ -45,12 +45,10 @@ class IWP_Frontend {
         add_action('woocommerce_after_checkout_form', array($this, 'after_checkout_form'));
         add_filter('woocommerce_product_tabs', array($this, 'add_product_tab'));
         add_shortcode('iwp_info', array($this, 'info_shortcode'));
-        
+
         // Customer order details integration
-        // For thank you page (order-received)
-        add_action('woocommerce_thankyou', array($this, 'display_order_sites_thankyou'), 10);
-        
-        // For order view page (view-order) - positioned right after order table
+        // For both thank you page (order-received) and order view page (view-order)
+        // Positioned right after order table for better visibility
         add_action('woocommerce_order_details_after_order_table', array($this, 'display_order_sites_after_table'), 10);
         
         // Email integration
@@ -358,19 +356,8 @@ class IWP_Frontend {
 
 
     /**
-     * Display sites on thank you page (order-received)
-     *
-     * @param int $order_id
-     */
-    public function display_order_sites_thankyou($order_id) {
-        if (!$order_id) {
-            return;
-        }
-        $this->display_order_sites($order_id, 'thank-you');
-    }
-    
-    /**
      * Display sites after order table (positioned higher on page)
+     * Works for both thank you page (order-received) and order view page (view-order)
      *
      * @param WC_Order $order
      */
