@@ -4,9 +4,9 @@
 
 The InstaWP Integration plugin is a comprehensive WordPress plugin that provides seamless integration with InstaWP's site creation and management platform. Originally designed as "IWP WooCommerce Integration v2", it has evolved into a full-featured WordPress plugin supporting multiple integration points and standalone functionality.
 
-**Current Version**: 0.0.1  
-**WordPress Compatibility**: 5.0+  
-**WooCommerce Compatibility**: 5.0+ (Optional)  
+**Current Version**: 0.0.3
+**WordPress Compatibility**: 5.0+
+**WooCommerce Compatibility**: 5.0+ (Optional)
 **PHP Requirements**: 7.4+  
 
 ## Architecture
@@ -140,6 +140,7 @@ CREATE TABLE wp_iwp_sites (
     wp_admin_url varchar(500),
     s_hash varchar(500),
     status varchar(50) DEFAULT 'creating',
+    site_type varchar(50) DEFAULT 'paid',  -- NEW in v0.0.3: 'demo', 'paid', 'trial'
     task_id varchar(255),
     snapshot_slug varchar(255),
     plan_id varchar(255),
@@ -154,9 +155,10 @@ CREATE TABLE wp_iwp_sites (
     api_response longtext,
     created_at datetime DEFAULT CURRENT_TIMESTAMP,
     updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
+
     INDEX idx_site_id (site_id),
     INDEX idx_status (status),
+    INDEX idx_site_type (site_type),  -- NEW in v0.0.3
     INDEX idx_order_id (order_id),
     INDEX idx_user_id (user_id)
 );
@@ -175,6 +177,11 @@ get_pending_sites()              // Get sites being created
 get_by_order_id($order_id)       // Get sites for specific order
 get_by_user_id($user_id)         // Get user's sites
 get_total_count($filters)        // Count with filters
+
+// Demo Site Queries (NEW in v0.0.3)
+get_demo_sites_by_email($email)  // Find demo sites by email for reconciliation
+get_demo_sites_by_user($user_id) // Get user's demo sites
+mark_expired_demos()             // Mark expired demo sites
 
 // Plan Management
 update_plan($site_id, $plan_id, $upgrade_data)
@@ -248,6 +255,310 @@ Standalone site creation functionality.
 - **Form Validation**: Client and server-side validation
 - **Error Handling**: Comprehensive error management
 - **Pool Support**: Handles instant and task-based creation
+- **Demo Site Storage**: Automatic database storage for reconciliation
+
+### 6. Demo Site Storage & Reconciliation
+
+Automatic system for storing demo sites and converting them to paid sites upon purchase.
+
+#### Overview
+
+All sites created via the `[iwp_site_creator]` shortcode are automatically stored in the database with `site_type='demo'`. When a customer makes a purchase, the system finds matching demo sites by email and converts them to paid sites.
+
+#### Database Schema
+
+```sql
+-- Added in version 0.0.3
+site_type varchar(50) DEFAULT 'paid',  -- Values: 'demo', 'paid', 'trial'
+INDEX idx_site_type (site_type)
+```
+
+#### Storage Process
+
+When a site is created via shortcode (`class-iwp-shortcode.php:250-320`):
+
+```php
+private function store_demo_site_in_database($response_data, $email, $site_name, $snapshot_slug, $expiry_hours = null) {
+    try {
+        $user_id = is_user_logged_in() ? get_current_user_id() : 0;
+
+        $site_data = array(
+            'site_id' => $response_data['site_id'],
+            'site_url' => isset($response_data['site_url']) ? $response_data['site_url'] : '',
+            'wp_username' => isset($response_data['admin_username']) ? $response_data['admin_username'] : '',
+            'wp_password' => isset($response_data['admin_password']) ? $response_data['admin_password'] : '',
+            'status' => $response_data['status'],
+            'site_type' => 'demo', // Mark as demo site
+            'user_id' => $user_id, // 0 for guests, user_id for logged-in
+            'source' => 'shortcode',
+            'source_data' => array(
+                'email' => $email, // Store for reconciliation
+                'site_name' => $site_name,
+                'snapshot_slug' => $snapshot_slug,
+                'created_via' => 'shortcode'
+            ),
+            'is_reserved' => !empty($expiry_hours) ? false : true,
+            'expiry_hours' => !empty($expiry_hours) ? intval($expiry_hours) : null,
+        );
+
+        IWP_Sites_Model::init();
+        $db_site_id = IWP_Sites_Model::create($site_data);
+
+        return $db_site_id;
+    } catch (Exception $e) {
+        IWP_Logger::error('Exception storing demo site in database', 'shortcode', array(
+            'site_id' => $response_data['site_id'] ?? 'unknown',
+            'error' => $e->getMessage()
+        ));
+        return false;
+    }
+}
+```
+
+#### Reconciliation Process
+
+Automatic conversion when customer purchases (`class-iwp-woo-order-processor.php:921-1005`):
+
+```php
+private function reconcile_demo_sites_to_order($order) {
+    $billing_email = $order->get_billing_email();
+    $customer_id = $order->get_customer_id();
+    $order_id = $order->get_id();
+
+    if (empty($billing_email)) {
+        return array();
+    }
+
+    // Find demo sites with matching email using JSON_EXTRACT
+    IWP_Sites_Model::init();
+    $demo_sites = IWP_Sites_Model::get_demo_sites_by_email($billing_email);
+
+    if (empty($demo_sites)) {
+        return array();
+    }
+
+    $reconciled_sites = array();
+
+    foreach ($demo_sites as $demo_site) {
+        // Get subscription ID if available
+        $subscription_id = null;
+        if (function_exists('wcs_get_subscriptions_for_order')) {
+            $subscriptions = wcs_get_subscriptions_for_order($order_id);
+            if (!empty($subscriptions)) {
+                $subscription = reset($subscriptions);
+                $subscription_id = $subscription->get_id();
+            }
+        }
+
+        // Update source_data with subscription info
+        $source_data = json_decode($demo_site->source_data, true);
+        $source_data['subscription_id'] = $subscription_id;
+        $source_data['converted_at'] = current_time('mysql');
+        $source_data['converted_from'] = 'demo';
+
+        // Convert demo to paid
+        $success = IWP_Sites_Model::update($demo_site->site_id, array(
+            'site_type' => 'paid',
+            'order_id' => $order_id,
+            'user_id' => $customer_id,
+            'source' => 'demo_to_paid',
+            'source_data' => $source_data,
+        ));
+
+        if ($success) {
+            $reconciled_sites[] = $demo_site->site_id;
+            $this->add_reconciled_site_to_order_meta($order_id, $demo_site);
+            $this->disable_demo_helper_for_site($demo_site);
+        }
+    }
+
+    // Add order note documenting conversion
+    if (!empty($reconciled_sites)) {
+        $order->add_order_note(
+            sprintf(
+                __('Converted %d demo site(s) to paid: %s', 'iwp-wp-integration'),
+                count($reconciled_sites),
+                implode(', ', $reconciled_sites)
+            )
+        );
+    }
+
+    return $reconciled_sites;
+}
+```
+
+#### Query Methods
+
+Email-based reconciliation query (`class-iwp-sites-model.php:453-470`):
+
+```php
+public static function get_demo_sites_by_email($email) {
+    global $wpdb;
+    if (!self::$table_name) {
+        self::init();
+    }
+
+    // Uses MySQL JSON_EXTRACT for email matching
+    $sites = $wpdb->get_results($wpdb->prepare(
+        "SELECT * FROM " . self::$table_name . "
+         WHERE site_type = 'demo'
+         AND order_id IS NULL
+         AND JSON_EXTRACT(source_data, '$.email') = %s
+         ORDER BY created_at DESC",
+        $email
+    ));
+
+    return $sites;
+}
+```
+
+#### Go Live Page Redirect
+
+Prevents users with paid sites from accessing demo creation pages (`class-iwp-golive-page.php`):
+
+```php
+class IWP_GoLive_Page {
+    public function __construct() {
+        add_action('template_redirect', array($this, 'check_golive_page_access'));
+    }
+
+    public function check_golive_page_access() {
+        // Check if user is on Go Live page
+        if (!is_page('go-live') && !is_page('launch-your-demo-site')) {
+            return;
+        }
+
+        // Only redirect logged-in users
+        $user_id = get_current_user_id();
+        if (!$user_id) {
+            return; // Guests can access
+        }
+
+        // Check if user has any paid sites
+        IWP_Sites_Model::init();
+        $user_sites = IWP_Sites_Model::get_by_user_id($user_id);
+
+        $has_paid_site = false;
+        foreach ($user_sites as $site) {
+            if ($site->site_type === 'paid') {
+                $has_paid_site = true;
+                break;
+            }
+        }
+
+        // Redirect to My Account if user has paid site
+        if ($has_paid_site) {
+            if (function_exists('wc_get_page_permalink')) {
+                wp_safe_redirect(wc_get_page_permalink('myaccount'));
+            } else {
+                wp_safe_redirect(home_url('/my-account'));
+            }
+            exit;
+        }
+    }
+}
+```
+
+#### Frontend Display
+
+Demo conversion badge (`class-iwp-frontend.php:560`):
+
+```php
+// Add demo badge if this site was converted from demo
+if ($action === 'reconciled') {
+    echo '<span class="iwp-site-badge iwp-demo-badge">' .
+         esc_html__('Converted from Demo', 'iwp-wp-integration') .
+         '</span>';
+}
+```
+
+CSS styling (`assets/css/frontend.css`):
+
+```css
+.iwp-demo-badge {
+    background: #ffa500;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-left: 8px;
+}
+```
+
+#### Database Migration
+
+Automatic version-aware migration system (`class-iwp-installer.php:425`):
+
+```php
+// Database version tracking
+private static $db_updates = array(
+    '0.0.1' => array(...),
+    '2.1.0' => array(...),
+    '0.0.3' => array(
+        array('IWP_Installer', 'add_site_type_column'),
+    ),
+);
+
+public static function add_site_type_column() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'iwp_sites';
+
+    // Check if column already exists (idempotent)
+    $column_exists = $wpdb->get_results("SHOW COLUMNS FROM {$table_name} LIKE 'site_type'");
+
+    if (empty($column_exists)) {
+        // Add site_type column
+        $result = $wpdb->query("ALTER TABLE {$table_name} ADD COLUMN site_type VARCHAR(50) DEFAULT 'paid' AFTER status");
+
+        if ($result !== false) {
+            // Add index for performance
+            $wpdb->query("CREATE INDEX idx_site_type ON {$table_name}(site_type)");
+            error_log('InstaWP Integration: Successfully added site_type column');
+        }
+    }
+}
+
+// Automatic update check on plugin load
+public static function needs_database_update() {
+    $current_db_version = get_option('iwp_db_version', '0.0.0');
+    return version_compare($current_db_version, IWP_VERSION, '<');
+}
+
+public static function update_database() {
+    $current_db_version = get_option('iwp_db_version', '0.0.0');
+
+    foreach (self::$db_updates as $version => $update_callbacks) {
+        if (version_compare($current_db_version, $version, '<')) {
+            foreach ($update_callbacks as $update) {
+                call_user_func($update);
+            }
+        }
+    }
+
+    update_option('iwp_db_version', IWP_VERSION);
+}
+```
+
+Main plugin file initialization (`iwp-wp-integration.php:50-55`):
+
+```php
+// Check if database needs updating
+if (IWP_Installer::needs_database_update()) {
+    IWP_Installer::update_database();
+}
+```
+
+#### Benefits
+
+✅ **No Data Loss**: Demo sites never lost, always tied to customer accounts
+✅ **Seamless Experience**: Customers continue using same site after payment
+✅ **Multiple Sites**: All demo sites with matching email converted
+✅ **Email Matching**: Works even if customer creates account after demo
+✅ **Zero Config**: Automatic - no setup required
+✅ **Backward Compatible**: Existing sites default to `site_type='paid'`
+✅ **Idempotent Migrations**: Safe to run multiple times
 
 ## WooCommerce Integration
 
@@ -555,7 +866,8 @@ Efficient queries with proper indexing:
 ```sql
 -- Key Indexes
 INDEX idx_site_id (site_id)      -- Primary lookups
-INDEX idx_status (status)        -- Status filtering  
+INDEX idx_status (status)        -- Status filtering
+INDEX idx_site_type (site_type)  -- NEW in v0.0.3: Demo/paid filtering
 INDEX idx_order_id (order_id)    -- Order associations
 INDEX idx_user_id (user_id)      -- User queries
 INDEX idx_created_at (created_at) -- Time-based queries

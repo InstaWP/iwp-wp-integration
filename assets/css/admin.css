@@ -821,3 +821,52 @@
     background: #e2e3e5;
     color: #6c757d;
 }
+
+.iwp-status-expired {
+    background: #dc3232;
+    color: #ffffff;
+}
+
+/* Expiry time indicators */
+.iwp-expiry-info {
+    font-size: 10px;
+    color: #666;
+    font-weight: normal;
+    white-space: nowrap;
+}
+
+.iwp-expiry-warning {
+    font-size: 10px;
+    color: #dc3232;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+/* Source Column Badges */
+.iwp-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-left: 5px;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.iwp-badge-converted {
+    background: #ff9800;
+    color: white;
+}
+
+.iwp-badge-upgraded {
+    background: #28a745;
+    color: white;
+}
+
+/* Hover effects for badges */
+.iwp-badge-converted:hover,
+.iwp-badge-upgraded:hover {
+    opacity: 0.9;
+}

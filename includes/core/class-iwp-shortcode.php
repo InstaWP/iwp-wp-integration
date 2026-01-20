@@ -234,6 +234,9 @@ class IWP_Shortcode {
                     $this->apply_post_options_update($api_client, $site_id, $response_data);
                 }
 
+                // Store demo site in database for tracking and reconciliation
+                $this->store_demo_site_in_database($response_data, $site_email, $site_name, $snapshot_slug, $expiry_hours);
+
                 wp_send_json_success($response_data);
             } else {
                 wp_send_json_error(array('message' => __('Site creation failed: Invalid API response', 'iwp-wp-integration')));
@@ -245,8 +248,124 @@ class IWP_Shortcode {
     }
 
     /**
+     * Store demo site in database for tracking and reconciliation
+     *
+     * @param array $response_data API response data
+     * @param string $email Customer email
+     * @param string $site_name Site name
+     * @param string $snapshot_slug Snapshot slug
+     * @param int $expiry_hours Expiry hours if temporary
+     * @return int|false Database insert ID or false on failure
+     */
+    private function store_demo_site_in_database($response_data, $email, $site_name, $snapshot_slug, $expiry_hours = null) {
+        try {
+            // Get current user ID if logged in
+            $user_id = is_user_logged_in() ? get_current_user_id() : 0;
+
+            // Prepare site data for database
+            $site_data = array(
+                'site_id' => $response_data['site_id'],
+                'site_url' => isset($response_data['site_url']) ? $response_data['site_url'] : '',
+                'wp_username' => isset($response_data['admin_username']) ? $response_data['admin_username'] : '',
+                'wp_password' => isset($response_data['admin_password']) ? $response_data['admin_password'] : '',
+                'wp_admin_url' => isset($response_data['admin_url']) ? $response_data['admin_url'] : '',
+                's_hash' => isset($response_data['s_hash']) ? $response_data['s_hash'] : '',
+                'status' => $response_data['status'], // 'completed' or 'progress'
+                'site_type' => 'demo', // NEW: Mark as demo site
+                'task_id' => $response_data['task_id'] ?? null,
+                'user_id' => $user_id, // 0 for guests, user_id for logged-in
+                'source' => 'shortcode',
+                'source_data' => array(
+                    'email' => $email, // Store for reconciliation
+                    'site_name' => $site_name,
+                    'snapshot_slug' => $snapshot_slug,
+                    'created_via' => 'shortcode'
+                ),
+                'is_pool' => $response_data['is_pool'] ?? false,
+                'is_reserved' => !empty($expiry_hours) ? false : true,
+                'expiry_hours' => !empty($expiry_hours) ? intval($expiry_hours) : null,
+                'api_response' => $response_data // Store full API response
+            );
+
+            // Create database record
+            IWP_Sites_Model::init();
+            $db_site_id = IWP_Sites_Model::create($site_data);
+
+            if ($db_site_id) {
+                IWP_Logger::info('Demo site stored in database', 'shortcode', array(
+                    'db_id' => $db_site_id,
+                    'site_id' => $response_data['site_id'],
+                    'email' => $email,
+                    'user_id' => $user_id
+                ));
+            } else {
+                IWP_Logger::error('Failed to store demo site in database', 'shortcode', array(
+                    'site_id' => $response_data['site_id'],
+                    'email' => $email
+                ));
+            }
+
+            return $db_site_id;
+        } catch (Exception $e) {
+            // Log the error but don't fail the site creation
+            IWP_Logger::error('Exception storing demo site in database', 'shortcode', array(
+                'site_id' => $response_data['site_id'] ?? 'unknown',
+                'error' => $e->getMessage()
+            ));
+            return false;
+        }
+    }
+
+    /**
+     * Update demo site details in database after task completion
+     *
+     * @param string $site_id InstaWP site ID
+     * @param array $response_data Processed site details for frontend
+     * @param array $full_api_response Full API response from get_site_details
+     * @return bool True on success, false on failure
+     */
+    private function update_demo_site_details($site_id, $response_data, $full_api_response) {
+        try {
+            IWP_Sites_Model::init();
+
+            // Prepare update data
+            $update_data = array(
+                'site_url' => $response_data['site_url'],
+                'wp_username' => $response_data['admin_username'],
+                'wp_password' => $response_data['admin_password'],
+                'wp_admin_url' => $response_data['admin_url'],
+                's_hash' => $response_data['s_hash'],
+                'status' => 'completed',
+                'api_response' => $full_api_response // Store full API response
+            );
+
+            // Update the database record
+            $success = IWP_Sites_Model::update($site_id, $update_data);
+
+            if ($success) {
+                IWP_Logger::info('Demo site details updated in database after task completion', 'shortcode', array(
+                    'site_id' => $site_id,
+                    'site_url' => $response_data['site_url']
+                ));
+            } else {
+                IWP_Logger::error('Failed to update demo site details in database', 'shortcode', array(
+                    'site_id' => $site_id
+                ));
+            }
+
+            return $success;
+        } catch (Exception $e) {
+            IWP_Logger::error('Exception updating demo site details in database', 'shortcode', array(
+                'site_id' => $site_id,
+                'error' => $e->getMessage()
+            ));
+            return false;
+        }
+    }
+
+    /**
      * Determine site status based on API response (same logic as site manager)
-     * 
+     *
      * @param array $site_data_response API response data
      * @return string Site status (completed, progress, failed)
      */
@@ -456,7 +575,7 @@ class IWP_Shortcode {
                 if ($string_status === 'completed' && isset($status_data['resource_id'])) {
                     $site_id = $status_data['resource_id'];
                     IWP_Logger::info('Task completed, fetching site details', 'shortcode', array('site_id' => $site_id));
-                    
+
                     $site_details = $api_client->get_site_details($site_id);
                     if (!is_wp_error($site_details) && isset($site_details['data'])) {
                         $site_info = $site_details['data'];
@@ -467,8 +586,11 @@ class IWP_Shortcode {
                         $response_data['s_hash'] = isset($site_info['hash']) ? $site_info['hash'] : '';
                         $response_data['site_id'] = $site_id;
                         $response_data['admin_url'] = isset($site_info['wp_admin_url']) ? $site_info['wp_admin_url'] : '';
-                        
+
                         IWP_Logger::info('Site details fetched successfully', 'shortcode', array('site_url' => $response_data['site_url']));
+
+                        // Update database with full site details
+                        $this->update_demo_site_details($site_id, $response_data, $site_details);
                     } else {
                         IWP_Logger::warning('Failed to fetch site details after task completion', 'shortcode', array('site_id' => $site_id));
                     }

@@ -41,6 +41,8 @@ The InstaWP Integration plugin enables you to:
 - Site plan upgrades via URL parameters
 - Custom domain mapping for created sites
 - Magic login integration for seamless admin access
+- Demo site storage and automatic reconciliation to orders
+- Go Live page smart redirects for paid users
 - HPOS (High Performance Order Storage) compatibility
 - Comprehensive error handling and logging
 
@@ -148,6 +150,53 @@ The plugin supports InstaWP team functionality, allowing you to work with multip
 - **Team-Specific Caching**: Each team's data is cached separately for better performance
 - **API Parameter**: Selected team ID is automatically added to API calls as `?team_id={id}`
 - **Persistent Selection**: Your team choice is saved and remembered across sessions
+
+### Demo Site Storage & Reconciliation
+
+The plugin automatically stores demo sites created via the shortcode and reconciles them to customer orders upon payment.
+
+#### How It Works
+
+**1. Demo Site Creation**
+- Customer creates a site using `[iwp_site_creator]` shortcode
+- Site is stored in database with `site_type='demo'`
+- Customer's email is stored for future reconciliation
+- Works for both logged-in users and guests
+
+**2. Automatic Reconciliation**
+- When a customer makes a purchase, the plugin searches for demo sites matching their email
+- All matching demo sites are automatically converted to paid sites
+- Demo sites are associated with the order and customer account
+- Demo helper plugin is automatically disabled
+- Order note is added documenting the conversion
+
+**3. Frontend Display**
+- Reconciled sites display with a "Converted from Demo" badge
+- Sites appear in customer's order details and My Account page
+- Full access to site credentials and admin login
+
+**4. Go Live Page Redirect**
+- Users without paid sites can access Go Live pages normally
+- Users with paid sites are automatically redirected to My Account dashboard
+- Prevents confusion for customers who already have active sites
+
+#### Benefits
+
+✅ **No Data Loss**: Demo sites are never lost, always tied to customer accounts
+✅ **Seamless Experience**: Customers continue using the same site after payment
+✅ **Multiple Sites**: All demo sites with matching email are converted
+✅ **Email Matching**: Works even if customer creates account after demo
+✅ **Zero Config**: Automatic - no setup required
+
+#### Database Storage
+
+Demo sites are stored with the following information:
+- Site ID and URL
+- Admin credentials (username/password)
+- Customer email (for reconciliation)
+- Site status and type (`demo` or `paid`)
+- Creation timestamp and expiry settings
+- Full API response for debugging
 
 ### Admin Features
 
@@ -305,6 +354,63 @@ When reporting issues, please include:
 This plugin is licensed under the GPL v2 or later.
 
 ## Changelog
+
+### Version 0.0.3
+- **NEW: Demo Site Storage & Reconciliation System**
+  - Automatically stores demo sites created via shortcode in database
+  - Site_id-based reconciliation for upgraded demo sites (priority: session → order meta → email)
+  - Email-based reconciliation: converts demo sites to paid when customer purchases
+  - Supports multiple demo sites per customer
+  - Works for both logged-in users and guests
+  - "Converted from Demo" badge displays in order details
+- **NEW: Admin Filters & Search**
+  - Status view links (All, Active, Creating, Failed, Expired) with counts
+  - Source filter dropdown (WooCommerce, Shortcode, etc.)
+  - Search box for URL, username, user, site_id, order_id
+  - Filters work together and maintain state across pagination
+- **NEW: Expiry Status Tracking**
+  - Real-time expiry calculation without API calls
+  - "Expired" status badge for sites past expiry time
+  - Time remaining display (hours/minutes) for active temporary sites
+  - Visual warnings when <1 hour remaining
+- **NEW: Go Live Page Smart Redirect**
+  - Automatically redirects users with paid sites to My Account
+  - Prevents confusion for customers who already purchased
+  - Configurable page slugs (`go-live`, `launch-your-demo-site`)
+- **NEW: Automatic Database Migration System**
+  - Version-aware database updates
+  - Automatic migration on plugin update
+  - Manual migration page: `/wp-admin/admin.php?page=iwp-migrate-db`
+  - Admin notices when updates are available
+  - Safe and idempotent migrations
+- **Database Schema Updates**
+  - Added `site_type` column (VARCHAR 50) to `wp_iwp_sites` table
+  - Added `idx_site_type` index for query performance
+  - Existing sites automatically default to `site_type='paid'`
+- **FIXED: Shortcode Site Creation**
+  - Database now updates after non-pool site task completion
+  - Added `update_demo_site_details()` to store credentials when polling completes
+  - Sites properly store full details (URLs, credentials, s_hash) after task finishes
+- **FIXED: Order Sites Display**
+  - `get_order_sites()` prioritizes database records over stale order meta
+  - Plan upgrades now show updated values instead of old site data
+- **FIXED: Expiry Hours Management**
+  - Expiry hours cleared on demo→paid conversion
+  - Original expiry preserved in source_data for history
+  - Prevents accidentally expiring paid sites converted from demos
+- **API Enhancements**
+  - Added demo site query methods in Sites Model
+  - Added `get_demo_sites_by_email()` for reconciliation
+  - Added `get_demo_sites_by_user()` for user queries
+  - Added `mark_expired_demos()` for cleanup
+- **Code Quality**
+  - Applied DRY principle with helper methods for badge generation
+  - Moved inline CSS to stylesheet
+  - Consistent data structure across database and order meta sites
+- **Frontend Improvements**
+  - Demo badge styling (orange with white text)
+  - Better order details display for reconciled sites
+  - Improved mobile responsiveness
 
 ### Version 0.0.2
 - Fixed WooCommerce Subscription error reported by Fixrunner

@@ -30,6 +30,9 @@ class IWP_Installer {
             array('IWP_Installer', 'cleanup_old_product_meta'),
             array('IWP_Installer', 'set_default_auto_create_setting'),
         ),
+        '0.0.3' => array(
+            array('IWP_Installer', 'add_site_type_column'),
+        ),
     );
 
     /**
@@ -145,6 +148,7 @@ class IWP_Installer {
                 wp_admin_url varchar(255) NULL,
                 s_hash varchar(255) NULL,
                 status varchar(20) NOT NULL DEFAULT 'creating',
+                site_type varchar(50) DEFAULT 'paid',
                 task_id varchar(100) NULL,
                 snapshot_slug varchar(100) NULL,
                 plan_id varchar(100) NULL,
@@ -162,6 +166,7 @@ class IWP_Installer {
                 PRIMARY KEY (id),
                 UNIQUE KEY site_id (site_id),
                 KEY status (status),
+                KEY site_type (site_type),
                 KEY order_id (order_id),
                 KEY user_id (user_id),
                 KEY source (source),
@@ -413,12 +418,44 @@ class IWP_Installer {
      */
     public static function set_default_auto_create_setting() {
         $options = get_option('iwp_options', array());
-        
+
         // Only set if not already configured
         if (!isset($options['auto_create_sites_on_purchase'])) {
             $options['auto_create_sites_on_purchase'] = 'yes';
             update_option('iwp_options', $options);
             error_log('InstaWP Integration: Set default auto-create setting to enabled');
+        }
+    }
+
+    /**
+     * Add site_type column to wp_iwp_sites table
+     * Migration for demo site storage and reconciliation feature
+     */
+    public static function add_site_type_column() {
+        global $wpdb;
+
+        $table_name = $wpdb->prefix . 'iwp_sites';
+
+        error_log('InstaWP Integration: Adding site_type column to database');
+
+        // Check if column already exists
+        $column_exists = $wpdb->get_results("SHOW COLUMNS FROM {$table_name} LIKE 'site_type'");
+
+        if (empty($column_exists)) {
+            // Add the column
+            $result = $wpdb->query("ALTER TABLE {$table_name} ADD COLUMN site_type VARCHAR(50) DEFAULT 'paid' AFTER status");
+
+            if ($result !== false) {
+                error_log('InstaWP Integration: Successfully added site_type column');
+
+                // Add index for better query performance
+                $wpdb->query("CREATE INDEX idx_site_type ON {$table_name}(site_type)");
+                error_log('InstaWP Integration: Successfully added site_type index');
+            } else {
+                error_log('InstaWP Integration: Failed to add site_type column: ' . $wpdb->last_error);
+            }
+        } else {
+            error_log('InstaWP Integration: site_type column already exists, skipping');
         }
     }
 }

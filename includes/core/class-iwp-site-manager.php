@@ -597,17 +597,46 @@ class IWP_Site_Manager {
     public function get_order_sites($order_id) {
         // First, check for any pending sites for this order to ensure we have the latest status
         $this->check_order_pending_sites($order_id);
-        
+
         $all_sites = array();
         $seen_sites = array(); // For deduplication
-        
+
         // Debug logging
         IWP_Logger::debug('Getting sites for order', 'site-manager', array('order_id' => $order_id));
-        
-        // Prioritize the order processor _iwp_sites_created key (includes both created and upgraded)
+
+        // FIRST PRIORITY: Load sites from database (most up-to-date, includes reconciled demo sites)
+        IWP_Sites_Model::init();
+        $db_sites = IWP_Sites_Model::get_by_order_id($order_id);
+        IWP_Logger::debug('Found sites in database', 'site-manager', array('count' => is_array($db_sites) ? count($db_sites) : 0));
+
+        if (is_array($db_sites)) {
+            foreach ($db_sites as $db_site) {
+                // Transform database format to frontend format
+                $site = array(
+                    'site_id' => $db_site->site_id,
+                    'wp_url' => $db_site->site_url,
+                    'wp_username' => $db_site->wp_username,
+                    'wp_password' => $db_site->wp_password,
+                    'wp_admin_url' => $db_site->wp_admin_url,
+                    's_hash' => $db_site->s_hash,
+                    'status' => $db_site->status,
+                    'site_type' => $db_site->site_type ?? 'paid',
+                    'source' => $db_site->source,
+                    'plan_id' => $db_site->plan_id,
+                );
+
+                $unique_key = 'site_' . $db_site->site_id;
+                if (!isset($seen_sites[$unique_key])) {
+                    $all_sites[] = $site;
+                    $seen_sites[$unique_key] = true;
+                }
+            }
+        }
+
+        // SECOND PRIORITY: Load from order meta _iwp_sites_created (backward compatibility)
         $order_sites = get_post_meta($order_id, '_iwp_sites_created', true);
         IWP_Logger::debug('Found sites in _iwp_sites_created', 'site-manager', array('count' => is_array($order_sites) ? count($order_sites) : 0));
-        
+
         if (is_array($order_sites)) {
             foreach ($order_sites as $site_data) {
                 // Transform order processor format to frontend format
@@ -622,7 +651,8 @@ class IWP_Site_Manager {
                     } else {
                         $unique_key = 'index_' . count($all_sites);
                     }
-                    
+
+                    // Only add if not already seen (database sites take priority)
                     if (!isset($seen_sites[$unique_key])) {
                         $all_sites[] = $site;
                         $seen_sites[$unique_key] = true;
