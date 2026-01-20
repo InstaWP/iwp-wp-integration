@@ -89,6 +89,15 @@ class IWP_Sites_List_Table extends WP_List_Table {
         // Get all sites data
         $sites = $this->get_all_sites();
 
+        // Apply search filter
+        $sites = $this->apply_search_filter($sites);
+
+        // Apply status filter
+        $sites = $this->apply_status_filter($sites);
+
+        // Apply source filter
+        $sites = $this->apply_source_filter($sites);
+
         // Handle sorting
         $orderby = (!empty($_GET['orderby'])) ? $_GET['orderby'] : 'created';
         $order = (!empty($_GET['order'])) ? $_GET['order'] : 'desc';
@@ -108,6 +117,233 @@ class IWP_Sites_List_Table extends WP_List_Table {
         ));
 
         $this->items = $sites;
+    }
+
+    /**
+     * Get view links (All, Active, Creating, etc.)
+     *
+     * @return array
+     */
+    protected function get_views() {
+        $all_sites = $this->get_all_sites();
+        $total = count($all_sites);
+
+        // Count by status
+        $status_counts = array(
+            'all' => $total,
+            'completed' => 0,
+            'progress' => 0,
+            'failed' => 0,
+            'expired' => 0,
+        );
+
+        foreach ($all_sites as $site) {
+            // Count expired sites separately
+            if (!empty($site['is_expired'])) {
+                $status_counts['expired']++;
+            } elseif (isset($site['status']) && isset($status_counts[$site['status']])) {
+                $status_counts[$site['status']]++;
+            }
+        }
+
+        $current_status = isset($_GET['status']) ? $_GET['status'] : 'all';
+        $base_url = admin_url('admin.php?page=instawp-sites');
+
+        $views = array();
+
+        // All
+        $class = ($current_status === 'all') ? 'current' : '';
+        $views['all'] = sprintf(
+            '<a href="%s" class="%s">%s <span class="count">(%d)</span></a>',
+            esc_url($base_url),
+            $class,
+            __('All', 'iwp-wp-integration'),
+            $status_counts['all']
+        );
+
+        // Active
+        if ($status_counts['completed'] > 0) {
+            $class = ($current_status === 'completed') ? 'current' : '';
+            $views['completed'] = sprintf(
+                '<a href="%s" class="%s">%s <span class="count">(%d)</span></a>',
+                esc_url(add_query_arg('status', 'completed', $base_url)),
+                $class,
+                __('Active', 'iwp-wp-integration'),
+                $status_counts['completed']
+            );
+        }
+
+        // Creating
+        if ($status_counts['progress'] > 0) {
+            $class = ($current_status === 'progress') ? 'current' : '';
+            $views['progress'] = sprintf(
+                '<a href="%s" class="%s">%s <span class="count">(%d)</span></a>',
+                esc_url(add_query_arg('status', 'progress', $base_url)),
+                $class,
+                __('Creating', 'iwp-wp-integration'),
+                $status_counts['progress']
+            );
+        }
+
+        // Failed
+        if ($status_counts['failed'] > 0) {
+            $class = ($current_status === 'failed') ? 'current' : '';
+            $views['failed'] = sprintf(
+                '<a href="%s" class="%s">%s <span class="count">(%d)</span></a>',
+                esc_url(add_query_arg('status', 'failed', $base_url)),
+                $class,
+                __('Failed', 'iwp-wp-integration'),
+                $status_counts['failed']
+            );
+        }
+
+        // Expired
+        if ($status_counts['expired'] > 0) {
+            $class = ($current_status === 'expired') ? 'current' : '';
+            $views['expired'] = sprintf(
+                '<a href="%s" class="%s">%s <span class="count">(%d)</span></a>',
+                esc_url(add_query_arg('status', 'expired', $base_url)),
+                $class,
+                __('Expired', 'iwp-wp-integration'),
+                $status_counts['expired']
+            );
+        }
+
+        return $views;
+    }
+
+    /**
+     * Display extra tablenav (filters and search)
+     *
+     * @param string $which Top or bottom
+     */
+    protected function extra_tablenav($which) {
+        if ($which !== 'top') {
+            return;
+        }
+        ?>
+        <div class="alignleft actions">
+            <?php $this->source_filter_dropdown(); ?>
+            <?php submit_button(__('Filter', 'iwp-wp-integration'), '', 'filter_action', false); ?>
+        </div>
+        <?php
+    }
+
+    /**
+     * Display source filter dropdown
+     */
+    protected function source_filter_dropdown() {
+        $all_sites = $this->get_all_sites();
+        $sources = array();
+
+        // Collect unique sources
+        foreach ($all_sites as $site) {
+            if (!empty($site['source'])) {
+                $source_key = strtolower(str_replace(' ', '_', $site['source']));
+                if (!isset($sources[$source_key])) {
+                    $sources[$source_key] = $site['source'];
+                }
+            }
+        }
+
+        $current_source = isset($_GET['source_filter']) ? $_GET['source_filter'] : '';
+
+        ?>
+        <select name="source_filter" id="source-filter">
+            <option value=""><?php _e('All Sources', 'iwp-wp-integration'); ?></option>
+            <?php foreach ($sources as $key => $label) : ?>
+                <option value="<?php echo esc_attr($key); ?>" <?php selected($current_source, $key); ?>>
+                    <?php echo esc_html($label); ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+        <?php
+    }
+
+    /**
+     * Apply search filter to sites
+     *
+     * @param array $sites Sites array
+     * @return array Filtered sites
+     */
+    private function apply_search_filter($sites) {
+        if (empty($_GET['s'])) {
+            return $sites;
+        }
+
+        $search = strtolower(trim($_GET['s']));
+
+        return array_filter($sites, function($site) use ($search) {
+            // Search in site URL
+            if (stripos($site['site_url'], $search) !== false) {
+                return true;
+            }
+
+            // Search in username
+            if (stripos($site['username'], $search) !== false) {
+                return true;
+            }
+
+            // Search in user
+            if (stripos($site['user'], $search) !== false) {
+                return true;
+            }
+
+            // Search in site ID
+            if (stripos($site['site_id'], $search) !== false) {
+                return true;
+            }
+
+            // Search in order ID
+            if (!empty($site['order_id']) && stripos((string)$site['order_id'], $search) !== false) {
+                return true;
+            }
+
+            return false;
+        });
+    }
+
+    /**
+     * Apply status filter to sites
+     *
+     * @param array $sites Sites array
+     * @return array Filtered sites
+     */
+    private function apply_status_filter($sites) {
+        if (empty($_GET['status']) || $_GET['status'] === 'all') {
+            return $sites;
+        }
+
+        $status = $_GET['status'];
+
+        return array_filter($sites, function($site) use ($status) {
+            // Handle expired status (calculated, not a database status)
+            if ($status === 'expired') {
+                return !empty($site['is_expired']);
+            }
+
+            // Handle regular database statuses
+            return isset($site['status']) && $site['status'] === $status;
+        });
+    }
+
+    /**
+     * Apply source filter to sites
+     *
+     * @param array $sites Sites array
+     * @return array Filtered sites
+     */
+    private function apply_source_filter($sites) {
+        if (empty($_GET['source_filter'])) {
+            return $sites;
+        }
+
+        $source_filter = strtolower($_GET['source_filter']);
+
+        return array_filter($sites, function($site) use ($source_filter) {
+            $site_source = strtolower(str_replace(' ', '_', $site['source']));
+            return $site_source === $source_filter;
+        });
     }
 
     /**
@@ -193,27 +429,43 @@ class IWP_Sites_List_Table extends WP_List_Table {
                 }
             }
 
-            $source_text = ucfirst($db_site->source);
-            if ($order) {
-                $source_text .= ' Order';
+            // Determine source type and badges
+            $source_type = $this->determine_source_type($db_site->source, $order);
+
+            // Calculate if site is expired (for temporary sites with expiry_hours)
+            $is_expired = false;
+            $hours_remaining = null;
+            if (!empty($db_site->expiry_hours) && !empty($db_site->created_at)) {
+                $created_time = strtotime($db_site->created_at);
+                $current_time = current_time('timestamp');
+                $hours_elapsed = ($current_time - $created_time) / 3600;
+
+                if ($hours_elapsed >= $db_site->expiry_hours) {
+                    $is_expired = true;
+                } else {
+                    $hours_remaining = $db_site->expiry_hours - $hours_elapsed;
+                }
             }
-            $source_text .= $upgrade_info;
 
             $site = array(
                 'site_url'     => $db_site->site_url ?: '',
                 'username'     => $db_site->wp_username ?: '',
                 'password'     => $db_site->wp_password ?: '',
-                'user'         => $this->get_user_display_name($order),
-                'source'       => $source_text,
+                'user'         => $this->get_user_display_name($order, $db_site->user_id),
+                'source'       => $source_type['text'],
                 'source_link'  => $order_link,
                 'source_id'    => $db_site->order_id ?: '',
+                'source_badge' => $source_type['badge'],
                 'status'       => $db_site->status,
                 'created'      => $db_site->created_at,
                 'site_id'      => $db_site->site_id,
                 'order_id'     => $db_site->order_id,
                 's_hash'       => $db_site->s_hash ?: '',
                 'plan_id'      => $db_site->plan_id ?: '',
-                'is_upgraded'  => $is_upgraded
+                'is_upgraded'  => $is_upgraded,
+                'is_expired'   => $is_expired,
+                'hours_remaining' => $hours_remaining,
+                'expiry_hours' => $db_site->expiry_hours
             );
 
             $sites[] = $site;
@@ -326,9 +578,12 @@ class IWP_Sites_List_Table extends WP_List_Table {
             return null; // Skip sites without URL
         }
 
-        $source_display = 'WooCommerce Order';
-        if ($action === 'upgraded') {
-            $source_display .= ' (Upgraded)';
+        // Determine badge based on action
+        $badge = null;
+        if ($action === 'reconciled') {
+            $badge = 'converted_demo';
+        } elseif ($action === 'upgraded') {
+            $badge = 'upgraded';
         }
 
         return array(
@@ -336,10 +591,11 @@ class IWP_Sites_List_Table extends WP_List_Table {
             'username'     => $wp_username,
             'password'     => $wp_password,
             'plan_id'      => $plan_id,
-            'user'         => $this->get_user_display_name($order),
-            'source'       => $source_display,
+            'user'         => $this->get_user_display_name($order, $order->get_user_id()),
+            'source'       => 'WooCommerce',
             'source_link'  => admin_url('post.php?post=' . $order->get_id() . '&action=edit'),
             'source_id'    => $order->get_id(),
+            'source_badge' => $badge,
             'status'       => $status,
             'created'      => $created ?: $order->get_date_created()->format('Y-m-d H:i:s'),
             'site_id'      => $site_id,
@@ -350,42 +606,129 @@ class IWP_Sites_List_Table extends WP_List_Table {
     }
 
     /**
-     * Get user display name from order
+     * Determine source type and badge for a site
      *
-     * @param WC_Order|null $order Order object
-     * @return string User display name
+     * @param string $source Source from database
+     * @param WC_Order|null $order Order object if available
+     * @return array Array with 'text' and 'badge' keys
      */
-    private function get_user_display_name($order) {
-        if (!$order) {
-            return 'Unknown';
-        }
+    private function determine_source_type($source, $order = null) {
+        $result = array(
+            'text' => '',
+            'badge' => null
+        );
 
-        $user_id = $order->get_user_id();
-        
-        if ($user_id) {
-            // Order has a WordPress user
-            $user = get_user_by('id', $user_id);
-            if ($user) {
-                $display_name = $user->display_name;
-                $username = $user->user_login;
-                $email = $user->user_email;
-                
-                // Format: "Display Name (username)"
-                return sprintf('%s (%s)', $display_name, $username);
+        // WooCommerce sources (with or without order)
+        if ($source === 'demo_to_paid' || $source === 'woocommerce') {
+            $result['text'] = 'WooCommerce';
+
+            // Set badge for converted demos
+            if ($source === 'demo_to_paid') {
+                $result['badge'] = 'converted_demo';
             }
         }
-        
-        // Fallback for guest orders - use billing name and email
-        $first_name = $order->get_billing_first_name();
-        $last_name = $order->get_billing_last_name();
-        $email = $order->get_billing_email();
-        
-        if ($first_name || $last_name) {
-            $name = trim($first_name . ' ' . $last_name);
-            return sprintf('%s (guest) <%s>', $name, $email);
+        // Shortcode and other sources
+        else {
+            $result['text'] = $this->format_source_display($source, 'paid');
         }
-        
-        return sprintf('Guest <%s>', $email);
+
+        return $result;
+    }
+
+    /**
+     * Get badge HTML for source column
+     *
+     * @param string $badge_type Type of badge: 'converted_demo', 'upgraded', etc.
+     * @return string Badge HTML
+     */
+    private function get_source_badge_html($badge_type) {
+        switch ($badge_type) {
+            case 'converted_demo':
+                return '<span class="iwp-badge iwp-badge-converted" title="Converted from demo site">Converted Demo</span>';
+
+            case 'upgraded':
+                return '<span class="iwp-badge iwp-badge-upgraded" title="Site plan was upgraded">Upgraded</span>';
+
+            default:
+                return '';
+        }
+    }
+
+    /**
+     * Format source display text based on source type
+     *
+     * @param string $source Source from database
+     * @param string $site_type Site type (demo, paid, trial)
+     * @return string Formatted source display text
+     */
+    private function format_source_display($source, $site_type = 'paid') {
+        // Handle different source types
+        switch ($source) {
+            case 'demo_to_paid':
+                return 'Demo → Paid';
+
+            case 'shortcode':
+                if ($site_type === 'demo') {
+                    return 'Shortcode (Demo)';
+                }
+                return 'Shortcode';
+
+            case 'woocommerce':
+                return 'WooCommerce';
+
+            default:
+                // Fallback: capitalize and replace underscores
+                return ucwords(str_replace('_', ' ', $source));
+        }
+    }
+
+    /**
+     * Get user display name from order or user_id
+     *
+     * @param WC_Order|null $order Order object
+     * @param int|null $user_id WordPress user ID from database
+     * @return string User display name
+     */
+    private function get_user_display_name($order = null, $user_id = null) {
+        // Try to use user_id from database first (more reliable for demo conversions)
+        if ($user_id && $user_id > 0) {
+            $user = get_user_by('id', $user_id);
+            if ($user) {
+                return sprintf('%s (%s)', $user->display_name, $user->user_login);
+            }
+        }
+
+        // Fallback to order if available
+        if ($order) {
+            $order_user_id = $order->get_user_id();
+
+            if ($order_user_id) {
+                // Order has a WordPress user
+                $user = get_user_by('id', $order_user_id);
+                if ($user) {
+                    return sprintf('%s (%s)', $user->display_name, $user->user_login);
+                }
+            }
+
+            // Guest order - use billing information
+            $first_name = $order->get_billing_first_name();
+            $last_name = $order->get_billing_last_name();
+            $email = $order->get_billing_email();
+
+            if ($first_name || $last_name) {
+                $name = trim($first_name . ' ' . $last_name);
+                return sprintf('%s (guest) <%s>', $name, $email);
+            }
+
+            return sprintf('Guest <%s>', $email);
+        }
+
+        // No order and user_id is 0 (guest demo site not yet converted)
+        if ($user_id === 0 || $user_id === '0') {
+            return 'Guest (Demo)';
+        }
+
+        return 'Unknown';
     }
 
     /**
@@ -560,15 +903,27 @@ class IWP_Sites_List_Table extends WP_List_Table {
      * @return string
      */
     public function column_source($item) {
+        $output = '';
+
+        // Build the base source display
         if (!empty($item['source_link'])) {
-            return sprintf(
-                '<a href="%s">%s #%s</a>',
+            // Has order link
+            $output = sprintf(
+                '<a href="%s">Order #%s</a>',
                 esc_url($item['source_link']),
-                esc_html($item['source']),
                 esc_html($item['source_id'])
             );
+        } else {
+            // No order link - just show source text
+            $output = esc_html($item['source']);
         }
-        return esc_html($item['source']);
+
+        // Add badge if present (reusing badge logic)
+        if (!empty($item['source_badge'])) {
+            $output .= ' ' . $this->get_source_badge_html($item['source_badge']);
+        }
+
+        return $output;
     }
 
     /**
@@ -578,6 +933,15 @@ class IWP_Sites_List_Table extends WP_List_Table {
      * @return string
      */
     public function column_status($item) {
+        // Check if site is expired first
+        if (!empty($item['is_expired'])) {
+            return sprintf(
+                '<span class="iwp-status iwp-status-expired" title="%s">%s</span>',
+                esc_attr__('Site has passed its expiry time', 'iwp-wp-integration'),
+                __('Expired', 'iwp-wp-integration')
+            );
+        }
+
         $status = $item['status'];
         $class = '';
         $text = '';
@@ -586,6 +950,23 @@ class IWP_Sites_List_Table extends WP_List_Table {
             case 'completed':
                 $class = 'iwp-status-completed';
                 $text = __('Active', 'iwp-wp-integration');
+
+                // Show time remaining for temporary sites
+                if (!empty($item['hours_remaining']) && !empty($item['expiry_hours'])) {
+                    $hours_remaining = round($item['hours_remaining'], 1);
+                    if ($hours_remaining < 1) {
+                        $minutes_remaining = round($hours_remaining * 60);
+                        $text .= sprintf(' <span class="iwp-expiry-warning" title="%s">(%d min)</span>',
+                            esc_attr__('Time remaining until expiry', 'iwp-wp-integration'),
+                            $minutes_remaining
+                        );
+                    } else {
+                        $text .= sprintf(' <span class="iwp-expiry-info" title="%s">(%d hrs)</span>',
+                            esc_attr__('Time remaining until expiry', 'iwp-wp-integration'),
+                            $hours_remaining
+                        );
+                    }
+                }
                 break;
             case 'progress':
                 $class = 'iwp-status-progress';

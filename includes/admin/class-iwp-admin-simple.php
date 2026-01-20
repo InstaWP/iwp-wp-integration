@@ -118,14 +118,31 @@ class IWP_Admin_Simple {
             // Use the existing sites management functionality
             $sites_table = new IWP_Sites_List_Table();
             $sites_table->prepare_items();
-            
+
             ?>
             <div class="wrap">
-                <h1><?php esc_html_e('InstaWP Sites', 'iwp-wp-integration'); ?></h1>
-                
+                <h1 class="wp-heading-inline"><?php esc_html_e('InstaWP Sites', 'iwp-wp-integration'); ?></h1>
+                <hr class="wp-header-end">
+
+                <?php
+                // Display any admin notices
+                if (isset($_GET['deleted']) && $_GET['deleted'] == '1') {
+                    echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Site deleted successfully.', 'iwp-wp-integration') . '</p></div>';
+                }
+                ?>
+
                 <form method="get">
                     <input type="hidden" name="page" value="instawp-sites" />
-                    <?php $sites_table->display(); ?>
+                    <?php
+                    // Display view links (All, Active, Creating, etc.)
+                    $sites_table->views();
+
+                    // Display search box
+                    $sites_table->search_box(__('Search Sites', 'iwp-wp-integration'), 'iwp-sites');
+
+                    // Display the table
+                    $sites_table->display();
+                    ?>
                 </form>
             </div>
             <?php

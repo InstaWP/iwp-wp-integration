@@ -25,6 +25,7 @@ class IWP_Sites_Model {
 
         $defaults = array(
             'status' => 'creating',
+            'site_type' => 'paid',
             'source' => 'woocommerce',
             'is_pool' => 0,
             'is_reserved' => 1,
@@ -45,6 +46,7 @@ class IWP_Sites_Model {
                 'wp_admin_url' => !empty($site_data['wp_admin_url']) ? esc_url_raw($site_data['wp_admin_url']) : null,
                 's_hash' => !empty($site_data['s_hash']) ? sanitize_text_field($site_data['s_hash']) : null,
                 'status' => sanitize_text_field($site_data['status']),
+                'site_type' => sanitize_text_field($site_data['site_type']),
                 'task_id' => !empty($site_data['task_id']) ? sanitize_text_field($site_data['task_id']) : null,
                 'snapshot_slug' => !empty($site_data['snapshot_slug']) ? sanitize_text_field($site_data['snapshot_slug']) : null,
                 'plan_id' => !empty($site_data['plan_id']) ? sanitize_text_field($site_data['plan_id']) : null,
@@ -447,5 +449,85 @@ class IWP_Sites_Model {
             "SELECT * FROM " . self::$table_name . " WHERE user_id = %d ORDER BY created_at DESC",
             intval($user_id)
         ));
+    }
+
+    /**
+     * Get demo sites by email (for reconciliation)
+     *
+     * @param string $email Email address
+     * @return array Array of site objects
+     */
+    public static function get_demo_sites_by_email($email) {
+        global $wpdb;
+
+        if (!self::$table_name) {
+            self::init();
+        }
+
+        // Query demo sites with matching email in source_data
+        $sites = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM " . self::$table_name . "
+             WHERE site_type = 'demo'
+             AND order_id IS NULL
+             AND JSON_EXTRACT(source_data, '$.email') = %s
+             ORDER BY created_at DESC",
+            $email
+        ));
+
+        return $sites;
+    }
+
+    /**
+     * Get all demo sites for a user
+     *
+     * @param int $user_id User ID
+     * @return array Array of site objects
+     */
+    public static function get_demo_sites_by_user($user_id) {
+        global $wpdb;
+
+        if (!self::$table_name) {
+            self::init();
+        }
+
+        return $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM " . self::$table_name . "
+             WHERE site_type = 'demo'
+             AND user_id = %d
+             ORDER BY created_at DESC",
+            intval($user_id)
+        ));
+    }
+
+    /**
+     * Mark expired demo sites
+     * Updates status of demo sites that have passed their expiry_hours
+     *
+     * @return int Number of sites marked as expired
+     */
+    public static function mark_expired_demos() {
+        global $wpdb;
+
+        if (!self::$table_name) {
+            self::init();
+        }
+
+        // Find demo sites that have expired
+        $result = $wpdb->query(
+            "UPDATE " . self::$table_name . "
+             SET status = 'expired', updated_at = NOW()
+             WHERE site_type = 'demo'
+             AND expiry_hours IS NOT NULL
+             AND TIMESTAMPDIFF(HOUR, created_at, NOW()) > expiry_hours
+             AND status != 'expired'"
+        );
+
+        if ($result !== false && $result > 0) {
+            IWP_Logger::info('Marked expired demo sites', 'sites-model', array(
+                'count' => $result
+            ));
+        }
+
+        return $result !== false ? $result : 0;
     }
 }

@@ -555,6 +555,14 @@ class IWP_Frontend {
         
         echo '</h3>';
         echo '<span class="iwp-site-status">' . esc_html($status_text) . '</span>';
+
+        // Add demo badge if this site was converted from demo
+        if ($action === 'reconciled') {
+            echo '<span class="iwp-site-badge iwp-demo-badge">' .
+                 esc_html__('Converted from Demo', 'iwp-wp-integration') .
+                 '</span>';
+        }
+
         echo '</div>';
 
         echo '<div class="iwp-site-content">';

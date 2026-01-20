@@ -117,7 +117,7 @@ class IWP_Woo_Order_Processor {
         // Check if auto-create is enabled globally
         $options = get_option('iwp_options', array());
         $auto_create_enabled = isset($options['auto_create_sites_on_purchase']) ? $options['auto_create_sites_on_purchase'] : 'yes';
-        
+
         if ($auto_create_enabled !== 'yes') {
             error_log('IWP WooCommerce V2: Auto-create disabled globally, skipping automatic site creation for order: ' . $order_id);
             return;
@@ -132,9 +132,15 @@ class IWP_Woo_Order_Processor {
         }
         $frontend = new IWP_Frontend();
         $upgrade_site_id = $frontend->get_stored_site_id();
-        
+
         if ($upgrade_site_id) {
             error_log('IWP WooCommerce V2: Site upgrade mode detected for site ID: ' . $upgrade_site_id);
+        }
+
+        // Check for demo sites to reconcile before processing order
+        $reconciled_sites = $this->reconcile_demo_sites_to_order($order, $upgrade_site_id);
+        if (!empty($reconciled_sites)) {
+            error_log('IWP WooCommerce V2: Reconciled ' . count($reconciled_sites) . ' demo site(s) to order');
         }
 
         // Process each item in the order
@@ -904,5 +910,211 @@ class IWP_Woo_Order_Processor {
         error_log('IWP WooCommerce V2: Cleared stored site_id after order processing');
 
         error_log('IWP WooCommerce V2: Order processing completed for order: ' . $order_id);
+    }
+
+    /**
+     * Find and reconcile demo sites to the current order
+     * Matches by billing email and converts demo sites to paid
+     *
+     * @param WC_Order $order
+     * @return array Array of reconciled site IDs
+     */
+    private function reconcile_demo_sites_to_order($order, $upgrade_site_id = null) {
+        $billing_email = $order->get_billing_email();
+        $customer_id = $order->get_customer_id();
+        $order_id = $order->get_id();
+
+        IWP_Sites_Model::init();
+        $demo_sites = array();
+
+        // FIRST PRIORITY: Check if there's an upgrade_site_id from session (site upgrade flow)
+        if ($upgrade_site_id) {
+            $existing_site = IWP_Sites_Model::get_by_site_id($upgrade_site_id);
+
+            // If this site is still marked as demo, reconcile it
+            if ($existing_site && $existing_site->site_type === 'demo') {
+                $demo_sites[] = $existing_site;
+                IWP_Logger::info('Found demo site from upgrade session', 'order-processor', array(
+                    'site_id' => $upgrade_site_id,
+                    'order_id' => $order_id
+                ));
+            }
+        }
+
+        // SECOND PRIORITY: Check order meta for upgraded sites (for completed orders)
+        if (empty($demo_sites)) {
+            $order_sites = get_post_meta($order_id, '_iwp_sites_created', true);
+            if (is_array($order_sites)) {
+                foreach ($order_sites as $order_site) {
+                    if (isset($order_site['site_data']['action']) && $order_site['site_data']['action'] === 'upgraded') {
+                        $site_id = $order_site['site_data']['site_id'];
+                        $existing_site = IWP_Sites_Model::get_by_site_id($site_id);
+
+                        // If this site is still marked as demo, reconcile it
+                        if ($existing_site && $existing_site->site_type === 'demo') {
+                            $demo_sites[] = $existing_site;
+                            IWP_Logger::info('Found demo site in order upgrades', 'order-processor', array(
+                                'site_id' => $site_id,
+                                'order_id' => $order_id
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        // THIRD PRIORITY: Email-based matching for new site creation
+        if (empty($demo_sites) && !empty($billing_email)) {
+            $demo_sites = IWP_Sites_Model::get_demo_sites_by_email($billing_email);
+        }
+
+        if (empty($demo_sites)) {
+            IWP_Logger::debug('No demo sites found for reconciliation', 'order-processor', array(
+                'email' => $billing_email,
+                'order_id' => $order_id
+            ));
+            return array();
+        }
+
+        $reconciled_sites = array();
+
+        foreach ($demo_sites as $demo_site) {
+            // Check for subscription ID
+            $subscription_id = null;
+            if (function_exists('wcs_get_subscriptions_for_order')) {
+                $subscriptions = wcs_get_subscriptions_for_order($order_id);
+                if (!empty($subscriptions)) {
+                    $subscription = reset($subscriptions);
+                    $subscription_id = $subscription->get_id();
+                }
+            }
+
+            // Prepare source_data with subscription info and demo history
+            $source_data = json_decode($demo_site->source_data, true);
+            if (!is_array($source_data)) {
+                $source_data = array();
+            }
+
+            // Store original demo information for history
+            $source_data['original_demo_expiry_hours'] = $demo_site->expiry_hours;
+            $source_data['original_demo_created_at'] = $demo_site->created_at;
+            $source_data['original_demo_source'] = $demo_site->source;
+            $source_data['subscription_id'] = $subscription_id;
+            $source_data['converted_at'] = current_time('mysql');
+            $source_data['converted_from'] = 'demo';
+
+            // Convert demo to paid
+            $success = IWP_Sites_Model::update($demo_site->site_id, array(
+                'site_type' => 'paid',
+                'order_id' => $order_id,
+                'user_id' => $customer_id,
+                'source' => 'demo_to_paid', // Track conversion
+                'source_data' => $source_data,
+                'expiry_hours' => null,      // Clear expiry - now permanent
+                'is_reserved' => true,       // Mark as permanent site
+                'updated_at' => current_time('mysql')
+            ));
+
+            if ($success) {
+                $reconciled_sites[] = $demo_site->site_id;
+
+                IWP_Logger::info('Demo site reconciled to order', 'order-processor', array(
+                    'site_id' => $demo_site->site_id,
+                    'demo_email' => $billing_email,
+                    'order_id' => $order_id,
+                    'customer_id' => $customer_id
+                ));
+
+                // Note: We don't add reconciled sites to order meta because they're already
+                // tracked in the database with updated information. Adding stale data to
+                // order meta would cause the admin table to display old values.
+
+                // Disable demo helper plugin if site has one
+                $this->disable_demo_helper_for_site($demo_site);
+            }
+        }
+
+        if (!empty($reconciled_sites)) {
+            // Add order note
+            $order->add_order_note(
+                sprintf(
+                    __('Converted %d demo site(s) to paid: %s', 'iwp-wp-integration'),
+                    count($reconciled_sites),
+                    implode(', ', $reconciled_sites)
+                )
+            );
+        }
+
+        return $reconciled_sites;
+    }
+
+    /**
+     * Add reconciled demo site to order meta
+     *
+     * @param int $order_id
+     * @param object $demo_site
+     */
+    private function add_reconciled_site_to_order_meta($order_id, $demo_site) {
+        $existing_sites = get_post_meta($order_id, '_iwp_sites_created', true);
+        if (!is_array($existing_sites)) {
+            $existing_sites = array();
+        }
+
+        // Add reconciled demo site to order meta
+        $existing_sites[] = array(
+            'site_id' => $demo_site->site_id,
+            'site_url' => $demo_site->site_url,
+            'wp_username' => $demo_site->wp_username,
+            'wp_password' => $demo_site->wp_password,
+            's_hash' => $demo_site->s_hash,
+            'status' => $demo_site->status,
+            'action' => 'reconciled', // Mark as reconciled demo
+            'site_data' => array(
+                'site_id' => $demo_site->site_id,
+                'site_url' => $demo_site->site_url,
+                'wp_username' => $demo_site->wp_username,
+                'wp_password' => $demo_site->wp_password,
+                's_hash' => $demo_site->s_hash,
+            ),
+            'reconciled_at' => current_time('mysql')
+        );
+
+        update_post_meta($order_id, '_iwp_sites_created', $existing_sites);
+    }
+
+    /**
+     * Disable demo helper plugin for converted site
+     *
+     * @param object $demo_site
+     */
+    private function disable_demo_helper_for_site($demo_site) {
+        if (empty($demo_site->site_url)) {
+            return;
+        }
+
+        // Get API key from settings
+        $options = get_option('iwp_options', array());
+        $api_key = isset($options['api_key']) ? $options['api_key'] : '';
+
+        if (empty($api_key)) {
+            IWP_Logger::warning('Cannot disable demo helper - no API key', 'order-processor', array(
+                'site_id' => $demo_site->site_id
+            ));
+            return;
+        }
+
+        $this->api_client->set_api_key($api_key);
+        $result = $this->api_client->disable_demo_helper($demo_site->site_id, $demo_site->site_url);
+
+        if (is_wp_error($result)) {
+            IWP_Logger::warning('Failed to disable demo helper', 'order-processor', array(
+                'site_id' => $demo_site->site_id,
+                'error' => $result->get_error_message()
+            ));
+        } else {
+            IWP_Logger::info('Demo helper disabled for converted site', 'order-processor', array(
+                'site_id' => $demo_site->site_id
+            ));
+        }
     }
 }

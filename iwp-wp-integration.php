@@ -3,7 +3,7 @@
  * Plugin Name: InstaWP Integration
  * Plugin URI: https://instawp.com
  * Description: A comprehensive WordPress integration plugin for InstaWP that provides enhanced functionality, seamless integration, WooCommerce support, and standalone site creation tools.
- * Version: 0.0.2
+ * Version: 0.0.3
  * Author: InstaWP
  * Author URI: https://instawp.com
  * Text Domain: iwp-wp-integration
@@ -24,7 +24,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('IWP_VERSION', '0.0.2');
+define('IWP_VERSION', '0.0.3');
 define('IWP_PLUGIN_FILE', __FILE__);
 define('IWP_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('IWP_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -47,7 +47,12 @@ function iwp_init() {
     require_once IWP_PLUGIN_PATH . 'includes/core/class-iwp-api-client.php';
     require_once IWP_PLUGIN_PATH . 'includes/core/class-iwp-logger.php';
     require_once IWP_PLUGIN_PATH . 'includes/core/class-iwp-service.php';
-    
+
+    // Check if database needs updating
+    if (IWP_Installer::needs_database_update()) {
+        IWP_Installer::update_database();
+    }
+
     // Set default settings if this is a fresh installation or settings are missing
     $options = get_option('iwp_options', array());
     if (empty($options) || !isset($options['enable_integration'])) {
@@ -58,7 +63,13 @@ function iwp_init() {
     if (is_admin()) {
         require_once IWP_PLUGIN_PATH . 'includes/admin/class-iwp-settings-page.php';
         require_once IWP_PLUGIN_PATH . 'includes/admin/class-iwp-admin-simple.php';
-        
+
+        // Load database migration admin page
+        require_once IWP_PLUGIN_PATH . 'admin-migrate.php';
+
+        // Load database update notice
+        require_once IWP_PLUGIN_PATH . 'includes/admin/class-iwp-db-update-notice.php';
+
         // Initialize simple admin
         new IWP_Admin_Simple();
         
@@ -103,10 +114,14 @@ function iwp_init() {
     // Initialize frontend (for customer-facing features)
     if (!is_admin() || wp_doing_ajax()) {
         require_once IWP_PLUGIN_PATH . 'includes/frontend/class-iwp-frontend.php';
-        
+
         // Only initialize if WooCommerce is active
         if (class_exists('WooCommerce')) {
             new IWP_Frontend();
+
+            // Initialize Go Live page redirect handler
+            require_once IWP_PLUGIN_PATH . 'includes/frontend/class-iwp-golive-page.php';
+            new IWP_GoLive_Page();
         }
     }
     
@@ -156,10 +171,16 @@ add_action('plugins_loaded', 'iwp_init');
 register_activation_hook(__FILE__, 'iwp_activate');
 
 function iwp_activate() {
-    // Create necessary database tables or options
-    if (class_exists('IWP_Installer')) {
-        IWP_Installer::install();
+    // Load installer if not loaded
+    if (!class_exists('IWP_Installer')) {
+        require_once plugin_dir_path(__FILE__) . 'includes/core/class-iwp-installer.php';
     }
+
+    // Create necessary database tables or options
+    IWP_Installer::install();
+
+    // Run any pending database migrations
+    IWP_Installer::update_database();
 }
 
 // Deactivation hook
