@@ -33,6 +33,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `needs_database_update()` method checks if migration needed
   - `add_site_type_column()` migration method for v0.0.3 update
 
+- **Admin Filters & Search**
+  - WordPress-standard status view links (All, Active, Creating, Failed, Expired)
+  - Source filter dropdown with all unique sources (WooCommerce, Shortcode, etc.)
+  - Search box for filtering by URL, username, user, site_id, order_id
+  - All filters work together and maintain state across pagination
+  - Dynamic counts update based on filter selection
+  - `get_views()` method for status tabs with counts
+  - `extra_tablenav()` method for filter dropdown
+  - `apply_search_filter()`, `apply_status_filter()`, `apply_source_filter()` methods
+
+- **Expiry Status Tracking**
+  - Real-time expiry calculation without requiring API calls
+  - Display "Expired" status badge for sites past their expiry time
+  - Show time remaining for active temporary sites (hours/minutes)
+  - Visual warnings when sites have <1 hour remaining (red text)
+  - Added "Expired" filter tab in admin Sites table
+  - Expiry calculation based on `expiry_hours` and `created_at` timestamp
+  - Supports both permanent sites (no expiry) and temporary sites
+
 ### Changed
 - **Database Schema Updates**
   - Added `site_type` column (VARCHAR 50, DEFAULT 'paid') to `wp_iwp_sites` table
@@ -46,10 +65,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Store subscription IDs in `source_data` during reconciliation
 
 ### Improved
+- **Admin Sites Table UI**
+  - Added expiry time indicators in Status column (e.g., "Active (12 hrs)")
+  - Color-coded status badges for better visual hierarchy
+  - Enhanced badge system with consistent styling (CSS classes: `.iwp-status-expired`, `.iwp-expiry-warning`, `.iwp-expiry-info`)
+  - Better mobile responsiveness for filters and search
+  - Filter dropdown and search box positioned WordPress-standard way
+  - View links with dynamic counts update based on filtering
+
 - **Frontend Display**
   - Demo badge styling (orange with white text, uppercase)
   - Better order details display for reconciled sites
   - Improved mobile responsiveness for site cards
+
+- **Code Quality**
+  - Applied DRY principle to badge generation with helper methods
+  - `determine_source_type()` - single source of truth for source display logic
+  - `get_source_badge_html()` - centralized badge HTML generation
+  - Moved inline CSS to stylesheet for better maintainability
+  - Made badge system extensible for new badge types
+  - Consistent data structure across database and order meta sites
 
 - **Error Handling**
   - Added try-catch block in `store_demo_site_in_database()` to prevent site creation failures
@@ -57,7 +92,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Graceful handling when database column doesn't exist yet
 
 ### Fixed
-- Parameter passing in `store_demo_site_in_database()` - now passes `$snapshot_slug` as parameter instead of accessing `$_POST` directly
+- **Demo Site Reconciliation**
+  - Fixed reconciliation to use `site_id` for upgraded sites instead of relying only on email matching
+  - Added priority-based reconciliation: 1) `upgrade_site_id` from session, 2) `site_id` from order meta, 3) email matching
+  - Reconciliation now properly handles site upgrade flow when user visits `?site_id=123` and purchases
+  - Fixed issue where upgraded demo sites weren't being converted to paid status
+
+- **Shortcode Site Creation**
+  - Fixed database not being updated after non-pool site task completion
+  - Added `update_demo_site_details()` method to store credentials when AJAX polling completes
+  - Sites now properly store full details (URLs, credentials, s_hash) after task finishes
+  - Fixed issue where site appeared in frontend but credentials missing from database
+
+- **Order Sites Display**
+  - Fixed `get_order_sites()` to prioritize database records over stale order meta
+  - Database sites loaded first for most up-to-date information
+  - Removed adding reconciled sites to order meta (prevents displaying outdated information)
+  - Fixed issue where plan upgrades showed old site data instead of updated values
+
+- **Expiry Hours Management**
+  - Fixed `expiry_hours` not being cleared on demo→paid conversion
+  - Original expiry values now preserved in `source_data` for history tracking
+  - Converted sites properly marked as permanent (`is_reserved=true`, `expiry_hours=null`)
+  - Prevents accidentally expiring paid sites that were converted from demos
+
+- **Parameter Passing**
+  - Fixed parameter passing in `store_demo_site_in_database()` - now passes `$snapshot_slug` as parameter instead of accessing `$_POST` directly
 
 ## [0.0.2] - 2024-08
 
