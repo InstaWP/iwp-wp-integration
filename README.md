@@ -358,10 +358,21 @@ This plugin is licensed under the GPL v2 or later.
 ### Version 0.0.3
 - **NEW: Demo Site Storage & Reconciliation System**
   - Automatically stores demo sites created via shortcode in database
+  - Site_id-based reconciliation for upgraded demo sites (priority: session → order meta → email)
   - Email-based reconciliation: converts demo sites to paid when customer purchases
   - Supports multiple demo sites per customer
   - Works for both logged-in users and guests
   - "Converted from Demo" badge displays in order details
+- **NEW: Admin Filters & Search**
+  - Status view links (All, Active, Creating, Failed, Expired) with counts
+  - Source filter dropdown (WooCommerce, Shortcode, etc.)
+  - Search box for URL, username, user, site_id, order_id
+  - Filters work together and maintain state across pagination
+- **NEW: Expiry Status Tracking**
+  - Real-time expiry calculation without API calls
+  - "Expired" status badge for sites past expiry time
+  - Time remaining display (hours/minutes) for active temporary sites
+  - Visual warnings when <1 hour remaining
 - **NEW: Go Live Page Smart Redirect**
   - Automatically redirects users with paid sites to My Account
   - Prevents confusion for customers who already purchased
@@ -376,11 +387,26 @@ This plugin is licensed under the GPL v2 or later.
   - Added `site_type` column (VARCHAR 50) to `wp_iwp_sites` table
   - Added `idx_site_type` index for query performance
   - Existing sites automatically default to `site_type='paid'`
+- **FIXED: Shortcode Site Creation**
+  - Database now updates after non-pool site task completion
+  - Added `update_demo_site_details()` to store credentials when polling completes
+  - Sites properly store full details (URLs, credentials, s_hash) after task finishes
+- **FIXED: Order Sites Display**
+  - `get_order_sites()` prioritizes database records over stale order meta
+  - Plan upgrades now show updated values instead of old site data
+- **FIXED: Expiry Hours Management**
+  - Expiry hours cleared on demo→paid conversion
+  - Original expiry preserved in source_data for history
+  - Prevents accidentally expiring paid sites converted from demos
 - **API Enhancements**
   - Added demo site query methods in Sites Model
   - Added `get_demo_sites_by_email()` for reconciliation
   - Added `get_demo_sites_by_user()` for user queries
   - Added `mark_expired_demos()` for cleanup
+- **Code Quality**
+  - Applied DRY principle with helper methods for badge generation
+  - Moved inline CSS to stylesheet
+  - Consistent data structure across database and order meta sites
 - **Frontend Improvements**
   - Demo badge styling (orange with white text)
   - Better order details display for reconciled sites
