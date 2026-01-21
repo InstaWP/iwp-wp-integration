@@ -1,0 +1,78 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# PHP files
+*.php text eol=lf
+
+# JavaScript files
+*.js text eol=lf
+*.json text eol=lf
+
+# CSS files
+*.css text eol=lf
+*.scss text eol=lf
+
+# Markdown files
+*.md text eol=lf
+
+# Config files
+*.yml text eol=lf
+*.yaml text eol=lf
+*.xml text eol=lf
+*.ini text eol=lf
+*.conf text eol=lf
+*.config text eol=lf
+
+# Shell scripts
+*.sh text eol=lf
+
+# SQL files
+*.sql text eol=lf
+
+# Exclude from export (GitHub archive/zip)
+.gitattributes export-ignore
+.gitignore export-ignore
+.github export-ignore
+.git export-ignore
+debug-*.php export-ignore
+test.php export-ignore
+DEBUG-SCRIPTS.md export-ignore
+CLAUDE.md export-ignore
+TESTING-PLAN.md export-ignore
+MIGRATION-GUIDE.md export-ignore
+admin-migrate.php export-ignore
+migrate-db.php export-ignore
+phpunit.xml export-ignore
+tests export-ignore
+node_modules export-ignore
+vendor export-ignore
+composer.json export-ignore
+composer.lock export-ignore
+package.json export-ignore
+package-lock.json export-ignore
+*.log export-ignore
+.DS_Store export-ignore
+
+# Binary files
+*.zip binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mov binary
+*.mp4 binary
+*.mp3 binary
+*.flv binary
+*.fla binary
+*.swf binary
+*.gz binary
+*.zip binary
+*.7z binary
+*.ttf binary
+*.eot binary
+*.woff binary
+*.woff2 binary
+*.pyc binary
+*.pdf binary
+*.mo binary
