@@ -64,9 +64,6 @@ function iwp_init() {
         require_once IWP_PLUGIN_PATH . 'includes/admin/class-iwp-settings-page.php';
         require_once IWP_PLUGIN_PATH . 'includes/admin/class-iwp-admin-simple.php';
 
-        // Load database migration admin page
-        require_once IWP_PLUGIN_PATH . 'admin-migrate.php';
-
         // Load database update notice
         require_once IWP_PLUGIN_PATH . 'includes/admin/class-iwp-db-update-notice.php';
 

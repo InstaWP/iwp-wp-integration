@@ -1366,6 +1366,112 @@ Critical data to backup:
 4. **Monitor Logs**: Watch for errors after deployment
 5. **Validate Customer Experience**: Ensure frontend functionality
 
+## Release Workflow
+
+The plugin uses GitHub Actions for automated releases. The workflow is triggered by pushing version tags.
+
+### Release Process
+
+**1. Update Version Number**
+
+Update version in two locations in `iwp-wp-integration.php`:
+
+```php
+// Line 12: Plugin header
+* Version:          0.0.3
+
+// Line 51: Version constant
+define('IWP_VERSION', '0.0.3');
+```
+
+**2. Update Changelogs**
+
+Add release notes to both files:
+
+`CHANGELOG.md`:
+```markdown
+## [0.0.3] - 2025-01-20
+
+### Added
+- Feature descriptions
+
+### Fixed
+- Bug fix descriptions
+```
+
+`README.md`:
+```markdown
+### Version 0.0.3
+- Brief feature summary
+```
+
+**3. Commit and Tag**
+
+```bash
+git add -A
+git commit -m "Bump version to 0.0.3"
+git push origin main
+
+git tag v0.0.3
+git push origin v0.0.3
+```
+
+**4. Automated Build**
+
+The GitHub Action (`.github/workflows/release.yml`) automatically:
+- ✅ Verifies version matches tag
+- ✅ Creates clean plugin directory
+- ✅ Excludes development files
+- ✅ Generates plugin zip file
+- ✅ Creates GitHub release
+- ✅ Uploads zip as release asset
+- ✅ Extracts changelog from CHANGELOG.md
+
+### Files Excluded from Release
+
+The workflow automatically excludes:
+- `CLAUDE.md`, `TESTING-PLAN.md`, `MIGRATION-GUIDE.md`
+- `admin-migrate.php`, `migrate-db.php`
+- `debug-*.php`, `test.php`
+- `.git/`, `.github/`, `tests/`
+- `node_modules/`, `vendor/`
+- `composer.json`, `package.json`
+
+### Files Included in Release
+
+✅ User-facing documentation:
+- `README.md` - User documentation
+- `CHANGELOG.md` - Version history
+
+✅ All production plugin files (PHP, CSS, JS)
+
+### Release Download
+
+The plugin zip will be available at:
+```
+https://github.com/InstaWP/iwp-wp-integration/releases/download/v0.0.3/iwp-wp-integration-0.0.3.zip
+```
+
+### Versioning
+
+This project follows [Semantic Versioning](https://semver.org/):
+- **MAJOR** version (x.0.0): Incompatible API changes
+- **MINOR** version (0.x.0): New functionality (backward compatible)
+- **PATCH** version (0.0.x): Bug fixes (backward compatible)
+
+### Release Checklist
+
+- [ ] Update version in `iwp-wp-integration.php` (header and constant)
+- [ ] Update `CHANGELOG.md` with release notes
+- [ ] Update `README.md` changelog section
+- [ ] Test plugin thoroughly
+- [ ] Commit all changes
+- [ ] Create and push version tag
+- [ ] Verify GitHub Action completed successfully
+- [ ] Download and test release zip
+
+For detailed release documentation, see `.github/RELEASE.md`.
+
 ---
 
 *This documentation reflects the current state of the InstaWP Integration plugin as of January 2025. For the most up-to-date information, refer to the plugin's admin interface and settings pages.*
