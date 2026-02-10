@@ -181,7 +181,7 @@ class IWP_Shortcode {
             
             // Prepare site data
             $site_data = array(
-                'name' => $site_name,
+                'user_name' => $site_name,
                 'email' => $site_email
             );
 
