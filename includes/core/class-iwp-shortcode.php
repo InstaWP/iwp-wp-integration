@@ -193,8 +193,8 @@ class IWP_Shortcode {
                 $site_data['is_reserved'] = true;
             }
 
-            // Add sandbox parameter if specified
-            if (!empty($sandbox) && strtolower($sandbox) === 'true') {
+            // Default to shared/sandbox site, unless explicitly disabled
+            if (empty($sandbox) || strtolower($sandbox) !== 'false') {
                 $site_data['is_shared'] = true;
             }
 
