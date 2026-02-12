@@ -4,7 +4,7 @@
 
 The InstaWP Integration plugin is a comprehensive WordPress plugin that provides seamless integration with InstaWP's site creation and management platform. Originally designed as "IWP WooCommerce Integration v2", it has evolved into a full-featured WordPress plugin supporting multiple integration points and standalone functionality.
 
-**Current Version**: 0.0.3
+**Current Version**: 0.0.4
 **WordPress Compatibility**: 5.0+
 **WooCommerce Compatibility**: 5.0+ (Optional)
 **PHP Requirements**: 7.4+  
@@ -30,7 +30,8 @@ iwp-wp-integration/
 │   │   ├── class-iwp-installer.php  # Installation/activation
 │   │   ├── class-iwp-autoloader.php # PSR-4 autoloader
 │   │   ├── class-iwp-shortcode.php  # Shortcode functionality
-│   │   └── class-iwp-form-helper.php # Form generation
+│   │   ├── class-iwp-form-helper.php # Form generation
+│   │   └── class-iwp-github-updater.php # GitHub auto-updater
 │   ├── admin/                      # Administrative interface
 │   │   ├── class-iwp-admin-simple.php # Simplified admin
 │   │   ├── class-iwp-settings-page.php # Settings management
@@ -42,6 +43,7 @@ iwp-wp-integration/
 │           ├── class-iwp-woo-product-integration.php
 │           ├── class-iwp-woo-order-processor.php
 │           ├── class-iwp-woo-hpos.php
+│           ├── class-iwp-woo-product-fields.php
 │           ├── class-iwp-woo-subscriptions-integration.php
 │           └── class-iwp-woo-subscription-site-manager.php
 └── assets/                         # Static assets
@@ -1366,6 +1368,111 @@ Critical data to backup:
 4. **Monitor Logs**: Watch for errors after deployment
 5. **Validate Customer Experience**: Ensure frontend functionality
 
+## GitHub Auto-Updater
+
+### Overview
+
+The plugin includes a built-in auto-updater (`class-iwp-github-updater.php`) that checks GitHub releases for new versions and integrates with WordPress's native plugin update system.
+
+### How It Works
+
+1. WordPress periodically checks for plugin updates via the `pre_set_site_transient_update_plugins` filter
+2. The updater queries the GitHub API for the latest release: `GET /repos/InstaWP/iwp-wp-integration/releases/latest`
+3. Compares the release tag version (stripped of `v` prefix) against `IWP_VERSION`
+4. If a newer version exists, it registers an update in the WordPress transient
+5. WordPress displays the update notification in the admin dashboard
+
+### Key Features
+
+- **15-minute cache**: GitHub API responses cached via `iwp_github_release` transient to avoid rate limits
+- **Release asset detection**: Prefers `.zip` assets from GitHub Actions over source zipball
+- **Plugin info modal**: Provides version, author, changelog in the WordPress "View Details" popup
+- **Post-install rename**: Ensures the extracted folder matches `iwp-wp-integration` after upgrade
+- **Zero configuration**: Works automatically — no API tokens or settings required
+
+### Implementation
+
+```php
+// Loaded early in iwp-wp-integration.php (before plugins_loaded)
+require_once IWP_PLUGIN_PATH . 'includes/core/class-iwp-github-updater.php';
+new IWP_GitHub_Updater();
+```
+
+### WordPress Hooks Used
+
+| Hook | Purpose |
+|------|---------|
+| `pre_set_site_transient_update_plugins` | Register available update |
+| `plugins_api` | Provide plugin info for "View Details" modal |
+| `upgrader_post_install` | Rename extracted directory after update |
+
+### Transient Keys
+
+```php
+'iwp_github_release'  // Cached GitHub release data (15 min TTL)
+```
+
+## Custom Checkout Fields (Product Page)
+
+### Overview
+
+Customers can optionally choose their WP admin username and site subdomain when purchasing an IWP-enabled product. Both fields are optional — leaving them blank falls back to auto-generation.
+
+### Implementation (`class-iwp-woo-product-fields.php`)
+
+The class hooks into the full WooCommerce custom field chain:
+
+| Hook | Method | Purpose |
+|------|--------|---------|
+| `woocommerce_before_add_to_cart_button` | `render_product_fields()` | Show fields on product page (only if product has `_iwp_selected_snapshot`) |
+| `woocommerce_add_to_cart_validation` | `validate_fields()` | Server-side validation before add-to-cart |
+| `woocommerce_add_cart_item_data` | `add_cart_item_data()` | Store validated values in cart item data |
+| `woocommerce_get_item_data` | `display_cart_item_data()` | Display in cart & checkout review |
+| `woocommerce_checkout_create_order_line_item` | `save_order_item_meta()` | Persist as order item meta |
+
+### Fields
+
+- **Username** — optional, alphanumeric + underscores, 3-20 chars, stored as `_iwp_admin_username`
+- **Subdomain** — optional, alphanumeric + hyphens (no leading/trailing hyphen), 3-30 chars, stored as `_iwp_subdomain`
+
+### Client-Side Validation (`assets/js/product-fields.js`)
+
+- Real-time validation on input with visual feedback (green/red border)
+- Auto-lowercase for subdomain field
+- Prevents form submission if fields are invalid
+- Scrolls to first error on validation failure
+
+### Order Processing Integration
+
+In `class-iwp-woo-order-processor.php`, `create_site_for_product()` reads custom values from order item meta:
+
+```php
+// Subdomain: use custom or auto-generate
+$custom_subdomain = $item->get_meta('_iwp_subdomain');
+if (!empty($custom_subdomain) && preg_match('/^[a-zA-Z0-9]...$/')) {
+    $site_name = sanitize_title($custom_subdomain);
+} else {
+    $site_name = sanitize_title($product->get_name() . '-' . $order->get_id() . '-' . time());
+}
+
+// Username: use custom or billing name
+$custom_username = $item->get_meta('_iwp_admin_username');
+// Falls back to: sanitize_user($first_name . $last_name)
+```
+
+### API Parameter Names
+
+The site creation API (`POST /sites/template`) expects these parameter names:
+
+| Parameter | Description | Source |
+|-----------|-------------|--------|
+| `site_name` | Site subdomain | Custom field or auto-generated |
+| `user_name` | WP admin username | Custom field or billing name |
+| `email` | Admin email | Billing email |
+| `template_slug` | Snapshot identifier | Product meta |
+
+**Note**: These match the shortcode's working implementation. Previous versions incorrectly sent `name`, `admin_username`, `admin_email`.
+
 ## Release Workflow
 
 The plugin uses GitHub Actions for automated releases. The workflow is triggered by pushing version tags.
@@ -1378,10 +1485,10 @@ Update version in two locations in `iwp-wp-integration.php`:
 
 ```php
 // Line 12: Plugin header
-* Version:          0.0.3
+* Version:          0.0.4
 
 // Line 51: Version constant
-define('IWP_VERSION', '0.0.3');
+define('IWP_VERSION', '0.0.4');
 ```
 
 **2. Update Changelogs**
@@ -1390,7 +1497,7 @@ Add release notes to both files:
 
 `CHANGELOG.md`:
 ```markdown
-## [0.0.3] - 2025-01-20
+## [0.0.4] - 2025-02-10
 
 ### Added
 - Feature descriptions
@@ -1401,7 +1508,7 @@ Add release notes to both files:
 
 `README.md`:
 ```markdown
-### Version 0.0.3
+### Version 0.0.4
 - Brief feature summary
 ```
 
@@ -1409,11 +1516,11 @@ Add release notes to both files:
 
 ```bash
 git add -A
-git commit -m "Bump version to 0.0.3"
+git commit -m "Bump version to 0.0.4"
 git push origin main
 
-git tag v0.0.3
-git push origin v0.0.3
+git tag v0.0.4
+git push origin v0.0.4
 ```
 
 **4. Automated Build**
@@ -1449,7 +1556,7 @@ The workflow automatically excludes:
 
 The plugin zip will be available at:
 ```
-https://github.com/InstaWP/iwp-wp-integration/releases/download/v0.0.3/iwp-wp-integration-0.0.3.zip
+https://github.com/InstaWP/iwp-wp-integration/releases/download/v0.0.4/iwp-wp-integration-0.0.4.zip
 ```
 
 ### Versioning
@@ -1474,4 +1581,4 @@ For detailed release documentation, see `.github/RELEASE.md`.
 
 ---
 
-*This documentation reflects the current state of the InstaWP Integration plugin as of January 2025. For the most up-to-date information, refer to the plugin's admin interface and settings pages.*
+*This documentation reflects the current state of the InstaWP Integration plugin as of February 2025. For the most up-to-date information, refer to the plugin's admin interface and settings pages.*
