@@ -20,7 +20,7 @@ jobs:
 
       - name: Verify version matches plugin header
         run: |
-          PLUGIN_VERSION=$(grep -oP "(?<=Version:\s{10})[\d\.]+" iwp-wp-integration.php)
+          PLUGIN_VERSION=$(grep -oP "(?<=Version:\s)[\d\.]+" iwp-wp-integration.php | head -1)
           TAG_VERSION="${{ steps.get_version.outputs.VERSION }}"
           echo "Plugin version: $PLUGIN_VERSION"
           echo "Tag version: $TAG_VERSION"
