@@ -3,7 +3,7 @@
  * Plugin Name: InstaWP Integration
  * Plugin URI: https://instawp.com
  * Description: A comprehensive WordPress integration plugin for InstaWP that provides enhanced functionality, seamless integration, WooCommerce support, and standalone site creation tools.
- * Version: 0.0.3
+ * Version: 0.0.4
  * Author: InstaWP
  * Author URI: https://instawp.com
  * Text Domain: iwp-wp-integration
@@ -24,7 +24,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('IWP_VERSION', '0.0.3');
+define('IWP_VERSION', '0.0.4');
 define('IWP_PLUGIN_FILE', __FILE__);
 define('IWP_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('IWP_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -32,6 +32,10 @@ define('IWP_PLUGIN_BASENAME', plugin_basename(__FILE__));
 
 // Include the autoloader
 require_once IWP_PLUGIN_PATH . 'includes/core/class-iwp-autoloader.php';
+
+// Initialize GitHub auto-updater
+require_once IWP_PLUGIN_PATH . 'includes/core/class-iwp-github-updater.php';
+new IWP_GitHub_Updater();
 
 // Declare HPOS compatibility for WooCommerce integration
 add_action('before_woocommerce_init', function() {
@@ -81,8 +85,10 @@ function iwp_init() {
     if (class_exists('WooCommerce')) {
         require_once IWP_PLUGIN_PATH . 'includes/integrations/woocommerce/class-iwp-woo-order-processor.php';
         require_once IWP_PLUGIN_PATH . 'includes/integrations/woocommerce/class-iwp-woo-hpos.php';
-        
+        require_once IWP_PLUGIN_PATH . 'includes/integrations/woocommerce/class-iwp-woo-product-fields.php';
+
         new IWP_Woo_Order_Processor();
+        new IWP_Woo_Product_Fields();
         
         // Initialize WooCommerce Subscriptions integration if available
         if (class_exists('WC_Subscriptions') || function_exists('wcs_get_subscription')) {

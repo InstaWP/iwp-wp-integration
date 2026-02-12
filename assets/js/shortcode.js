@@ -1,9 +1,25 @@
 jQuery(document).ready(function($) {
     'use strict';
 
-    // Initialize all shortcode forms
+    // Fetch fresh nonce to handle cached pages, then initialize forms
     $('.iwp-site-creator-form').each(function() {
-        initForm($(this));
+        var $form = $(this);
+        $.ajax({
+            url: iwp_shortcode_ajax.ajax_url,
+            type: 'POST',
+            data: { action: 'iwp_refresh_nonce' },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success && response.data.nonce) {
+                    $form.find('input[name="iwp_site_creator_nonce"]').val(response.data.nonce);
+                }
+                initForm($form);
+            },
+            error: function() {
+                // Proceed with existing nonce if refresh fails
+                initForm($form);
+            }
+        });
     });
 
     function initForm($form) {

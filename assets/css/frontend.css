@@ -849,3 +849,106 @@ body.iwp-modal-open {
     text-transform: uppercase;
     margin-left: 8px;
 }
+
+/* Product Page Custom Fields */
+.iwp-product-custom-fields {
+    margin: 15px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+}
+
+.iwp-field-group {
+    margin-bottom: 15px;
+}
+
+.iwp-field-group:last-child {
+    margin-bottom: 0;
+}
+
+.iwp-field-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+}
+
+.iwp-optional {
+    font-weight: 400;
+    color: #888;
+    font-size: 12px;
+}
+
+.iwp-field-group input[type="text"] {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.iwp-field-group input[type="text"]:focus {
+    outline: none;
+    border-color: #0073aa;
+    box-shadow: 0 0 0 2px rgba(0, 115, 170, 0.15);
+}
+
+.iwp-field-group input.iwp-field-valid {
+    border-color: #28a745;
+}
+
+.iwp-field-group input.iwp-field-invalid {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.15);
+}
+
+.iwp-field-hint {
+    display: block;
+    margin-top: 4px;
+    color: #888;
+    font-size: 12px;
+}
+
+.iwp-field-error {
+    display: none;
+    margin-top: 4px;
+    color: #dc3545;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+/* Dashboard Card Enhancements */
+.iwp-site-url-link {
+    margin: 4px 0 8px;
+    font-size: 13px;
+    line-height: 1.4;
+    word-break: break-all;
+}
+
+.iwp-site-url-link a {
+    color: #0073aa;
+    text-decoration: none;
+}
+
+.iwp-site-url-link a:hover {
+    text-decoration: underline;
+}
+
+.iwp-btn-magic-login {
+    background: #6f42c1;
+}
+
+.iwp-btn-magic-login:hover {
+    background: #5a32a3;
+    color: #fff;
+}
+
+@media (max-width: 768px) {
+    .iwp-product-custom-fields {
+        padding: 12px;
+    }
+}

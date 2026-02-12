@@ -936,20 +936,33 @@ class IWP_Frontend {
         $status = $site['status'] ?? 'unknown';
         $wp_url = $site['wp_url'] ?? '';
         $snapshot_slug = $site['snapshot_slug'] ?? '';
+        $site_name = $site['site_name'] ?? '';
         $order_id = $site['order_id'] ?? '';
         $order_number = $site['order_number'] ?? '';
+        $s_hash = $site['s_hash'] ?? '';
 
         $status_class = 'iwp-status-' . esc_attr($status);
+        $display_name = $site_name ?: ($snapshot_slug ?: __('Site', 'iwp-wp-integration'));
 
         echo '<div class="iwp-dashboard-site-card ' . esc_attr($status_class) . '">';
         echo '<div class="iwp-site-info">';
-        echo '<h4>' . esc_html($snapshot_slug ?: __('Site', 'iwp-wp-integration')) . '</h4>';
+        echo '<h4>' . esc_html($display_name) . '</h4>';
+
+        if ($status === 'completed' && !empty($wp_url)) {
+            echo '<p class="iwp-site-url-link"><a href="' . esc_url($wp_url) . '" target="_blank" rel="noopener">' . esc_html($wp_url) . '</a></p>';
+        }
+
         echo '<p class="iwp-order-info">' . sprintf(__('From Order #%s', 'iwp-wp-integration'), $order_number) . '</p>';
         echo '</div>';
 
         echo '<div class="iwp-site-actions">';
         if ($status === 'completed' && !empty($wp_url)) {
-            echo '<a href="' . esc_url($wp_url) . '" target="_blank" class="iwp-btn iwp-btn-sm">' . __('Visit Site', 'iwp-wp-integration') . '</a>';
+            echo '<a href="' . esc_url($wp_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-sm">' . __('Visit Site', 'iwp-wp-integration') . '</a>';
+
+            if (!empty($s_hash)) {
+                $magic_login_url = 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($s_hash);
+                echo '<a href="' . esc_url($magic_login_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-sm iwp-btn-magic-login">' . __('Magic Login', 'iwp-wp-integration') . '</a>';
+            }
         }
         if ($order_id) {
             echo '<a href="' . esc_url(wc_get_endpoint_url('view-order', $order_id, wc_get_page_permalink('myaccount'))) . '" class="iwp-btn iwp-btn-sm iwp-btn-secondary">' . __('View Details', 'iwp-wp-integration') . '</a>';

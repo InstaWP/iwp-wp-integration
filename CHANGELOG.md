@@ -5,6 +5,38 @@ All notable changes to the InstaWP Integration plugin will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.4] - 2025-02-10
+
+### Added
+- **Custom Checkout Fields**
+  - Customers can choose their WP admin username on the product page
+  - Customers can choose their site subdomain on the product page
+  - Both fields are optional — left blank falls back to auto-generation
+  - Client-side real-time validation with submit prevention
+  - Values carry through cart → checkout review → order item meta (`_iwp_admin_username`, `_iwp_subdomain`)
+  - New `IWP_Woo_Product_Fields` class handles the full WooCommerce field chain
+
+- **Enhanced My Account Dashboard Cards**
+  - Site URL now displayed as a clickable link directly on dashboard cards
+  - Magic Login button shown on dashboard cards when `s_hash` is available
+  - Better site name display (site name → snapshot slug → fallback)
+
+- **GitHub Auto-Updater**
+  - Plugin now checks GitHub releases for new versions automatically
+  - Update notifications appear in WordPress admin like any other plugin
+  - Downloads release zip assets built by GitHub Actions
+  - New `IWP_GitHub_Updater` class with 15-minute cache
+
+### Fixed
+- **API Parameter Names**
+  - Fixed site creation API call to use correct parameter names (`site_name`, `user_name`, `email`)
+  - Previously sent `name`, `admin_username`, `admin_email` which were ignored by the API
+
+- **Nonce Validation on Cached Pages**
+  - Fixed "Security check failed" error for logged-out users on cached pages
+  - Shortcode form now fetches a fresh nonce via AJAX on page load
+  - New `iwp_refresh_nonce` AJAX endpoint for cache-safe nonce generation
+
 ## [0.0.3] - 2025-01-20
 
 ### Added
@@ -283,6 +315,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Release Date | Key Features |
 |---------|--------------|--------------|
+| 0.0.4   | 2025-02-10   | Custom checkout fields, enhanced dashboard, GitHub auto-updater |
 | 0.0.3   | 2025-01-20   | Demo site storage & reconciliation, automatic migrations |
 | 0.0.2   | 2024-08      | Bug fixes, subscriptions integration, frontend improvements |
 | 0.0.1   | 2024-07      | Initial release, complete refactor, shortcode system |

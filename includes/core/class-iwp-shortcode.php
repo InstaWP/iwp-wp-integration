@@ -23,6 +23,8 @@ class IWP_Shortcode {
         add_action('wp_ajax_nopriv_iwp_check_task_status', array($this, 'handle_ajax_check_task_status'));
         add_action('wp_ajax_iwp_apply_delayed_post_options', array($this, 'handle_ajax_apply_delayed_post_options'));
         add_action('wp_ajax_nopriv_iwp_apply_delayed_post_options', array($this, 'handle_ajax_apply_delayed_post_options'));
+        add_action('wp_ajax_iwp_refresh_nonce', array($this, 'handle_ajax_refresh_nonce'));
+        add_action('wp_ajax_nopriv_iwp_refresh_nonce', array($this, 'handle_ajax_refresh_nonce'));
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
     }
 
@@ -510,6 +512,15 @@ class IWP_Shortcode {
     /**
      * Handle AJAX task status check request
      */
+    /**
+     * Return a fresh nonce for cached pages
+     */
+    public function handle_ajax_refresh_nonce() {
+        wp_send_json_success(array(
+            'nonce' => wp_create_nonce('iwp_site_creator_nonce'),
+        ));
+    }
+
     public function handle_ajax_check_task_status() {
         // Verify nonce
         if (!wp_verify_nonce($_POST['nonce'], 'iwp_check_task_status')) {

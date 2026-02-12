@@ -265,7 +265,13 @@ class IWP_Woo_Order_Processor {
         $billing_first_name = $order->get_billing_first_name();
         $billing_last_name = $order->get_billing_last_name();
         
-        $site_name = sanitize_title($product->get_name() . '-' . $order->get_id() . '-' . time());
+        // Use custom subdomain from order item meta if provided, otherwise auto-generate
+        $custom_subdomain = $item->get_meta('_iwp_subdomain');
+        if (!empty($custom_subdomain) && preg_match('/^[a-zA-Z0-9]([a-zA-Z0-9-]{1,28})[a-zA-Z0-9]$/', $custom_subdomain)) {
+            $site_name = sanitize_title($custom_subdomain);
+        } else {
+            $site_name = sanitize_title($product->get_name() . '-' . $order->get_id() . '-' . time());
+        }
         
         // Get expiry settings from product
         $expiry_type = get_post_meta($product->get_id(), '_iwp_site_expiry_type', true);
@@ -277,11 +283,9 @@ class IWP_Woo_Order_Processor {
         }
         
         $site_data = array(
-            'name' => $site_name,
-            'title' => $product->get_name() . ' - Order #' . $order->get_order_number(),
-            'admin_email' => $billing_email,
-            'admin_username' => sanitize_user($billing_first_name . $billing_last_name),
-            'admin_password' => wp_generate_password(12, false),
+            'site_name' => $site_name,
+            'user_name' => $this->get_admin_username($item, $billing_first_name, $billing_last_name),
+            'email' => $billing_email,
             'order_id' => $order->get_id(),
             'product_id' => $product->get_id(),
             'customer_id' => $order->get_customer_id()
@@ -332,12 +336,27 @@ class IWP_Woo_Order_Processor {
 
         // Store additional data for backward compatibility
         $result['site_credentials'] = array(
-            'admin_username' => $site_data['admin_username'],
-            'admin_password' => $site_data['admin_password'],
-            'admin_email' => $site_data['admin_email']
+            'admin_username' => $site_data['user_name'],
+            'admin_email' => $site_data['email']
         );
 
         return $result;
+    }
+
+    /**
+     * Get admin username from order item meta or fallback to billing name
+     *
+     * @param WC_Order_Item_Product $item
+     * @param string $first_name
+     * @param string $last_name
+     * @return string
+     */
+    private function get_admin_username($item, $first_name, $last_name) {
+        $custom_username = $item->get_meta('_iwp_admin_username');
+        if (!empty($custom_username) && preg_match('/^[a-zA-Z0-9_]{3,20}$/', $custom_username)) {
+            return sanitize_user($custom_username);
+        }
+        return sanitize_user($first_name . $last_name);
     }
 
     /**
