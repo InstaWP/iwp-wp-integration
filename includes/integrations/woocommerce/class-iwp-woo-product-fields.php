@@ -202,8 +202,8 @@ class IWP_Woo_Product_Fields {
             return;
         }
 
-        global $product;
-        if (!$product || !$this->product_has_snapshot($product->get_id())) {
+        $product_id = get_the_ID();
+        if (!$product_id || !$this->product_has_snapshot($product_id)) {
             return;
         }
 
