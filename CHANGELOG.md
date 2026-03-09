@@ -5,6 +5,21 @@ All notable changes to the InstaWP Integration plugin will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.5] - 2026-03-09
+
+### Added
+- **Delay Customer Credentials**
+  - New "Delay Customer Credentials" setting in General Settings
+  - When enabled, login credentials (username, password, magic login) are hidden from all customer-facing pages: thank you page, order details, My Account dashboard
+  - WooCommerce order emails show "Your site is being prepared" message instead of credentials
+  - Customers can still see the site URL and visit the site, but cannot access wp-admin login details
+  - Per-site credential release: admin can send credentials when the site is ready
+  - "Send Credentials" row action in InstaWP > Sites admin table
+  - Clicking "Send Credentials" marks the site as released and sends a styled HTML email with full login details to the customer
+  - "Credentials Sent" badge shown in admin after release
+  - Order note added when credentials are released, documenting who released them
+  - No database migration required — uses existing `source_data` JSON field to store `credentials_released` flag
+
 ## [0.0.4] - 2025-02-10
 
 ### Added
@@ -315,6 +330,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Release Date | Key Features |
 |---------|--------------|--------------|
+| 0.0.5   | 2026-03-09   | Delay customer credentials, admin-controlled credential release |
 | 0.0.4   | 2025-02-10   | Custom checkout fields, enhanced dashboard, GitHub auto-updater |
 | 0.0.3   | 2025-01-20   | Demo site storage & reconciliation, automatic migrations |
 | 0.0.2   | 2024-08      | Bug fixes, subscriptions integration, frontend improvements |

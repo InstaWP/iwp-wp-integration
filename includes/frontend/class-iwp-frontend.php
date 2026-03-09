@@ -31,6 +31,40 @@ class IWP_Frontend {
     }
 
     /**
+     * Check if credentials should be hidden for a given site
+     *
+     * Returns true if the "Delay Customer Credentials" setting is enabled
+     * AND the site's credentials have not yet been released by an admin.
+     *
+     * @param array $site Site data array (must contain 'site_id')
+     * @return bool
+     */
+    private function should_hide_credentials($site) {
+        $options = get_option('iwp_options', array());
+        if (!isset($options['delay_customer_credentials']) || $options['delay_customer_credentials'] !== 'yes') {
+            return false; // Setting not enabled, show credentials normally
+        }
+
+        // Check if credentials have been released for this site
+        $site_id = $site['site_id'] ?? '';
+        if (!empty($site_id)) {
+            if (!class_exists('IWP_Sites_Model')) {
+                require_once IWP_PLUGIN_PATH . 'includes/core/class-iwp-sites-model.php';
+            }
+            IWP_Sites_Model::init();
+            $db_site = IWP_Sites_Model::get_by_site_id($site_id);
+            if ($db_site && !empty($db_site->source_data)) {
+                $source_data = json_decode($db_site->source_data, true);
+                if (is_array($source_data) && !empty($source_data['credentials_released'])) {
+                    return false; // Credentials have been released
+                }
+            }
+        }
+
+        return true; // Hide credentials
+    }
+
+    /**
      * Initialize hooks
      */
     private function init_hooks() {
@@ -592,56 +626,70 @@ class IWP_Frontend {
                 echo '</div>';
             }
             
+            // Check if credentials should be hidden
+            $hide_credentials = $this->should_hide_credentials($site);
+
             echo '<div class="iwp-site-url">';
             echo '<strong>' . __('Site URL:', 'iwp-wp-integration') . '</strong> ';
             echo '<a href="' . esc_url($wp_url) . '" target="_blank" rel="noopener">' . esc_html($wp_url) . '</a>';
             echo '</div>';
 
-            if (!empty($wp_username)) {
-                echo '<div class="iwp-site-credentials">';
-                echo '<div class="iwp-credential-row">';
-                echo '<strong>' . __('Username:', 'iwp-wp-integration') . '</strong> ';
-                echo '<code class="iwp-credential-value">' . esc_html($wp_username) . '</code>';
-                echo '<button type="button" class="iwp-copy-btn" data-copy="' . esc_attr($wp_username) . '" title="' . esc_attr__('Copy to clipboard', 'iwp-wp-integration') . '">📋</button>';
+            if ($hide_credentials) {
+                // Show a pending message instead of credentials
+                echo '<div class="iwp-credentials-pending" style="margin: 15px 0; padding: 12px 16px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; color: #856404;">';
+                echo '<p style="margin: 0;">' . esc_html__('Your site is being prepared. You will receive an email with your login details when everything is ready.', 'iwp-wp-integration') . '</p>';
                 echo '</div>';
 
-                if (!empty($wp_password)) {
+                echo '<div class="iwp-site-actions">';
+                echo '<a href="' . esc_url($wp_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-primary">' . __('Visit Site', 'iwp-wp-integration') . '</a>';
+                echo '</div>';
+            } else {
+                if (!empty($wp_username)) {
+                    echo '<div class="iwp-site-credentials">';
                     echo '<div class="iwp-credential-row">';
-                    echo '<strong>' . __('Password:', 'iwp-wp-integration') . '</strong> ';
-                    echo '<code class="iwp-credential-value iwp-password-hidden" data-password="' . esc_attr($wp_password) . '">••••••••</code>';
-                    echo '<button type="button" class="iwp-show-password-btn" title="' . esc_attr__('Show/Hide password', 'iwp-wp-integration') . '">👁️</button>';
-                    echo '<button type="button" class="iwp-copy-btn" data-copy="' . esc_attr($wp_password) . '" title="' . esc_attr__('Copy to clipboard', 'iwp-wp-integration') . '">📋</button>';
+                    echo '<strong>' . __('Username:', 'iwp-wp-integration') . '</strong> ';
+                    echo '<code class="iwp-credential-value">' . esc_html($wp_username) . '</code>';
+                    echo '<button type="button" class="iwp-copy-btn" data-copy="' . esc_attr($wp_username) . '" title="' . esc_attr__('Copy to clipboard', 'iwp-wp-integration') . '">📋</button>';
+                    echo '</div>';
+
+                    if (!empty($wp_password)) {
+                        echo '<div class="iwp-credential-row">';
+                        echo '<strong>' . __('Password:', 'iwp-wp-integration') . '</strong> ';
+                        echo '<code class="iwp-credential-value iwp-password-hidden" data-password="' . esc_attr($wp_password) . '">••••••••</code>';
+                        echo '<button type="button" class="iwp-show-password-btn" title="' . esc_attr__('Show/Hide password', 'iwp-wp-integration') . '">👁️</button>';
+                        echo '<button type="button" class="iwp-copy-btn" data-copy="' . esc_attr($wp_password) . '" title="' . esc_attr__('Copy to clipboard', 'iwp-wp-integration') . '">📋</button>';
+                        echo '</div>';
+                    }
                     echo '</div>';
                 }
+
+                echo '<div class="iwp-site-actions">';
+                echo '<a href="' . esc_url($wp_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-primary">' . __('Visit Site', 'iwp-wp-integration') . '</a>';
+
+                // Use magic login if s_hash is available, otherwise fall back to regular admin login
+                if (!empty($s_hash)) {
+                    $magic_login_url = 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($s_hash);
+                    echo '<a href="' . esc_url($magic_login_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-secondary">' . __('Magic Login', 'iwp-wp-integration') . '</a>';
+                } else {
+                    // Fallback to regular admin login
+                    $admin_url = '';
+                    if (!empty($wp_admin_url)) {
+                        $admin_url = $wp_admin_url;
+                    } elseif (!empty($wp_url)) {
+                        $admin_url = trailingslashit($wp_url) . 'wp-admin';
+                    }
+
+                    if (!empty($admin_url)) {
+                        echo '<a href="' . esc_url($admin_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-secondary">' . __('Admin Login', 'iwp-wp-integration') . '</a>';
+                    }
+                }
+
+                // Add domain mapping button if site_id is available
+                if (!empty($site_id) && ($context === 'order-details' || $context === 'order-view' || $context === 'thank-you')) {
+                    echo '<button type="button" class="iwp-btn iwp-btn-tertiary iwp-map-domain-btn" data-site-id="' . esc_attr($site_id) . '" data-site-url="' . esc_attr($wp_url) . '">' . __('Map Domain', 'iwp-wp-integration') . '</button>';
+                }
                 echo '</div>';
             }
-
-            echo '<div class="iwp-site-actions">';
-            echo '<a href="' . esc_url($wp_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-primary">' . __('Visit Site', 'iwp-wp-integration') . '</a>';
-            
-            // Use magic login if s_hash is available, otherwise fall back to regular admin login
-            if (!empty($s_hash)) {
-                $magic_login_url = 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($s_hash);
-                echo '<a href="' . esc_url($magic_login_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-secondary">' . __('Magic Login', 'iwp-wp-integration') . '</a>';
-            } else {
-                // Fallback to regular admin login
-                $admin_url = '';
-                if (!empty($wp_admin_url)) {
-                    $admin_url = $wp_admin_url;
-                } elseif (!empty($wp_url)) {
-                    $admin_url = trailingslashit($wp_url) . 'wp-admin';
-                }
-                
-                if (!empty($admin_url)) {
-                    echo '<a href="' . esc_url($admin_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-secondary">' . __('Admin Login', 'iwp-wp-integration') . '</a>';
-                }
-            }
-            
-            // Add domain mapping button if site_id is available
-            if (!empty($site_id) && ($context === 'order-details' || $context === 'order-view' || $context === 'thank-you')) {
-                echo '<button type="button" class="iwp-btn iwp-btn-tertiary iwp-map-domain-btn" data-site-id="' . esc_attr($site_id) . '" data-site-url="' . esc_attr($wp_url) . '">' . __('Map Domain', 'iwp-wp-integration') . '</button>';
-            }
-            echo '</div>';
             echo '</div>';
 
         } elseif ($status === 'progress' || $status === 'creating') {
@@ -794,6 +842,39 @@ class IWP_Frontend {
             return;
         }
 
+        // Check if any sites have credentials delayed
+        $any_delayed = false;
+        foreach ($sites as $site) {
+            if ($this->should_hide_credentials($site)) {
+                $any_delayed = true;
+                break;
+            }
+        }
+
+        // If ALL sites have delayed credentials, show a simple "site being prepared" message
+        // and skip the full credentials block
+        $all_delayed = true;
+        foreach ($sites as $site) {
+            if (!$this->should_hide_credentials($site)) {
+                $all_delayed = false;
+                break;
+            }
+        }
+
+        if ($all_delayed) {
+            if ($plain_text) {
+                echo "\n" . __('YOUR SITES', 'iwp-wp-integration') . "\n";
+                echo str_repeat('=', 50) . "\n\n";
+                echo __('Your site is being prepared. You will receive a separate email with your login details when everything is ready.', 'iwp-wp-integration') . "\n\n";
+            } else {
+                echo '<div class="instawp-integration-email-sites" style="margin: 20px 0; padding: 20px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">';
+                echo '<h2 style="color: #333; margin-top: 0;">' . __('Your Sites', 'iwp-wp-integration') . '</h2>';
+                echo '<p style="color: #856404; background: #fff3cd; padding: 12px; border-radius: 4px;">' . __('Your site is being prepared. You will receive a separate email with your login details when everything is ready.', 'iwp-wp-integration') . '</p>';
+                echo '</div>';
+            }
+            return;
+        }
+
         if ($plain_text) {
             echo "\n" . __('YOUR SITES', 'iwp-wp-integration') . "\n";
             echo str_repeat('=', 50) . "\n\n";
@@ -805,23 +886,28 @@ class IWP_Frontend {
                 $wp_password = $site['wp_password'] ?? '';
                 $s_hash = $site['s_hash'] ?? '';
                 $snapshot_slug = $site['snapshot_slug'] ?? '';
+                $hide_creds = $this->should_hide_credentials($site);
 
                 echo sprintf(__('Site: %s', 'iwp-wp-integration'), $snapshot_slug ?: __('Site', 'iwp-wp-integration')) . "\n";
                 echo sprintf(__('Status: %s', 'iwp-wp-integration'), ucfirst($status)) . "\n";
 
                 if ($status === 'completed' && !empty($wp_url)) {
                     echo sprintf(__('URL: %s', 'iwp-wp-integration'), $wp_url) . "\n";
-                    if (!empty($wp_username)) {
-                        echo sprintf(__('Username: %s', 'iwp-wp-integration'), $wp_username) . "\n";
-                    }
-                    if (!empty($wp_password)) {
-                        echo sprintf(__('Password: %s', 'iwp-wp-integration'), $wp_password) . "\n";
-                    }
-                    // Use magic login if s_hash is available
-                    if (!empty($s_hash)) {
-                        echo sprintf(__('Magic Login: %s', 'iwp-wp-integration'), 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($s_hash)) . "\n";
+                    if ($hide_creds) {
+                        echo __('Login details will be sent in a separate email when your site is ready.', 'iwp-wp-integration') . "\n";
                     } else {
-                        echo sprintf(__('Admin URL: %s', 'iwp-wp-integration'), trailingslashit($wp_url) . 'wp-admin') . "\n";
+                        if (!empty($wp_username)) {
+                            echo sprintf(__('Username: %s', 'iwp-wp-integration'), $wp_username) . "\n";
+                        }
+                        if (!empty($wp_password)) {
+                            echo sprintf(__('Password: %s', 'iwp-wp-integration'), $wp_password) . "\n";
+                        }
+                        // Use magic login if s_hash is available
+                        if (!empty($s_hash)) {
+                            echo sprintf(__('Magic Login: %s', 'iwp-wp-integration'), 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($s_hash)) . "\n";
+                        } else {
+                            echo sprintf(__('Admin URL: %s', 'iwp-wp-integration'), trailingslashit($wp_url) . 'wp-admin') . "\n";
+                        }
                     }
                 } elseif ($status === 'progress') {
                     echo __('Your site is being created. You will receive another email when it\'s ready.', 'iwp-wp-integration') . "\n";
@@ -839,25 +925,31 @@ class IWP_Frontend {
                 $wp_password = $site['wp_password'] ?? '';
                 $s_hash = $site['s_hash'] ?? '';
                 $snapshot_slug = $site['snapshot_slug'] ?? '';
+                $hide_creds = $this->should_hide_credentials($site);
 
                 echo '<div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px; border-left: 4px solid #0073aa;">';
                 echo '<h3 style="margin-top: 0; color: #333;">' . esc_html($snapshot_slug ?: __('Site', 'iwp-wp-integration')) . '</h3>';
 
                 if ($status === 'completed' && !empty($wp_url)) {
                     echo '<p><strong>' . __('Site URL:', 'iwp-wp-integration') . '</strong> <a href="' . esc_url($wp_url) . '" target="_blank">' . esc_html($wp_url) . '</a></p>';
-                    if (!empty($wp_username)) {
-                        echo '<p><strong>' . __('Username:', 'iwp-wp-integration') . '</strong> <code style="background: #f1f1f1; padding: 2px 4px;">' . esc_html($wp_username) . '</code></p>';
-                    }
-                    if (!empty($wp_password)) {
-                        echo '<p><strong>' . __('Password:', 'iwp-wp-integration') . '</strong> <code style="background: #f1f1f1; padding: 2px 4px;">' . esc_html($wp_password) . '</code></p>';
-                    }
-                    
-                    // Use magic login if s_hash is available
-                    if (!empty($s_hash)) {
-                        $magic_login_url = 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($s_hash);
-                        echo '<p><a href="' . esc_url($magic_login_url) . '" target="_blank" style="background: #0073aa; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block;">' . __('Magic Login', 'iwp-wp-integration') . '</a></p>';
+
+                    if ($hide_creds) {
+                        echo '<p style="color: #856404; background: #fff3cd; padding: 10px; border-radius: 4px;">' . __('Your site is being prepared. You will receive a separate email with your login details when everything is ready.', 'iwp-wp-integration') . '</p>';
                     } else {
-                        echo '<p><a href="' . esc_url(trailingslashit($wp_url) . 'wp-admin') . '" target="_blank" style="background: #0073aa; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block;">' . __('Login to Admin', 'iwp-wp-integration') . '</a></p>';
+                        if (!empty($wp_username)) {
+                            echo '<p><strong>' . __('Username:', 'iwp-wp-integration') . '</strong> <code style="background: #f1f1f1; padding: 2px 4px;">' . esc_html($wp_username) . '</code></p>';
+                        }
+                        if (!empty($wp_password)) {
+                            echo '<p><strong>' . __('Password:', 'iwp-wp-integration') . '</strong> <code style="background: #f1f1f1; padding: 2px 4px;">' . esc_html($wp_password) . '</code></p>';
+                        }
+
+                        // Use magic login if s_hash is available
+                        if (!empty($s_hash)) {
+                            $magic_login_url = 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($s_hash);
+                            echo '<p><a href="' . esc_url($magic_login_url) . '" target="_blank" style="background: #0073aa; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block;">' . __('Magic Login', 'iwp-wp-integration') . '</a></p>';
+                        } else {
+                            echo '<p><a href="' . esc_url(trailingslashit($wp_url) . 'wp-admin') . '" target="_blank" style="background: #0073aa; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block;">' . __('Login to Admin', 'iwp-wp-integration') . '</a></p>';
+                        }
                     }
                 } elseif ($status === 'progress') {
                     echo '<p style="color: #856404; background: #fff3cd; padding: 10px; border-radius: 4px;">' . __('Your site is being created. You will receive another email when it\'s ready.', 'iwp-wp-integration') . '</p>';
@@ -955,11 +1047,13 @@ class IWP_Frontend {
         echo '<p class="iwp-order-info">' . sprintf(__('From Order #%s', 'iwp-wp-integration'), $order_number) . '</p>';
         echo '</div>';
 
+        $hide_credentials = $this->should_hide_credentials($site);
+
         echo '<div class="iwp-site-actions">';
         if ($status === 'completed' && !empty($wp_url)) {
             echo '<a href="' . esc_url($wp_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-sm">' . __('Visit Site', 'iwp-wp-integration') . '</a>';
 
-            if (!empty($s_hash)) {
+            if (!$hide_credentials && !empty($s_hash)) {
                 $magic_login_url = 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($s_hash);
                 echo '<a href="' . esc_url($magic_login_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-sm iwp-btn-magic-login">' . __('Magic Login', 'iwp-wp-integration') . '</a>';
             }

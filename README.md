@@ -254,6 +254,7 @@ The plugin includes built-in rate limiting and request throttling to prevent API
 - **Enable Integration**: Master toggle for the plugin
 - **Auto-Create Sites**: Automatically create sites when orders complete
 - **Use site_id Parameter**: Enable site upgrade functionality
+- **Delay Customer Credentials**: Hide login credentials from customers until manually released via admin
 
 ### InstaWP Data
 - **Team Selection**: Choose which team's data to view and manage
@@ -354,6 +355,22 @@ When reporting issues, please include:
 This plugin is licensed under the GPL v2 or later.
 
 ## Changelog
+
+### Version 0.0.5
+- **NEW: Delay Customer Credentials**
+  - New setting to hide login credentials from customers until the store owner is ready
+  - Credentials hidden from thank you page, order details, My Account dashboard, and WooCommerce emails
+  - "Send Credentials" action in admin Sites table to release credentials and email the customer
+  - Per-site release tracking with "Credentials Sent" badge in admin
+  - Styled HTML email sent to customer with site URL, username, password, and magic login link
+  - No database migration required
+
+### Version 0.0.4
+- Custom checkout fields for admin username and site subdomain
+- Enhanced My Account dashboard cards with clickable URLs and Magic Login
+- GitHub auto-updater for seamless plugin updates
+- Fixed API parameter names for site creation
+- Fixed nonce validation on cached pages
 
 ### Version 0.0.3
 - **NEW: Demo Site Storage & Reconciliation System**

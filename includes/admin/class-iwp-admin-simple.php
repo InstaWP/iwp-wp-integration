@@ -49,6 +49,9 @@ class IWP_Admin_Simple {
         // Domain mapping AJAX handlers (for frontend domain mapping)
         add_action('wp_ajax_iwp_add_domain', array($this, 'ajax_add_domain'));
         add_action('wp_ajax_nopriv_iwp_add_domain', array($this, 'ajax_add_domain'));
+
+        // Send credentials AJAX handler
+        add_action('wp_ajax_iwp_send_credentials', array($this, 'ajax_send_credentials'));
     }
 
     /**
@@ -391,8 +394,20 @@ class IWP_Admin_Simple {
             'iwp_settings',
             'iwp_general',
             array(
-                'field' => 'use_site_id_parameter', 
+                'field' => 'use_site_id_parameter',
                 'label' => 'Automatically recognize sites for plan change using site_id parameter'
+            )
+        );
+
+        add_settings_field(
+            'delay_customer_credentials',
+            esc_html__('Delay Customer Credentials', 'iwp-wp-integration'),
+            array($this, 'checkbox_callback'),
+            'iwp_settings',
+            'iwp_general',
+            array(
+                'field' => 'delay_customer_credentials',
+                'label' => 'Hide login credentials from customers until manually released. Use "Send Credentials" action from InstaWP > Sites to share credentials when ready.'
             )
         );
     }
@@ -496,6 +511,9 @@ class IWP_Admin_Simple {
             
             // Use site_id parameter - checkbox, so absence means 'no'
             $sanitized['use_site_id_parameter'] = isset($input['use_site_id_parameter']) && $input['use_site_id_parameter'] === 'yes' ? 'yes' : 'no';
+
+            // Delay customer credentials - checkbox, so absence means 'no'
+            $sanitized['delay_customer_credentials'] = isset($input['delay_customer_credentials']) && $input['delay_customer_credentials'] === 'yes' ? 'yes' : 'no';
         }
         
         // Debug form fields - only process if this is the debug form
@@ -531,7 +549,42 @@ class IWP_Admin_Simple {
         }
 
         wp_enqueue_script('jquery');
-        
+
+        // Send Credentials button handler
+        wp_add_inline_script('jquery', '
+            jQuery(document).ready(function($) {
+                $(document).on("click", ".iwp-send-credentials", function(e) {
+                    e.preventDefault();
+                    var $link = $(this);
+                    var siteId = $link.data("site-id");
+                    var nonce = $link.data("nonce");
+
+                    if (!confirm("Send login credentials to the customer for this site?")) {
+                        return;
+                    }
+
+                    $link.text("Sending...").css("pointer-events", "none");
+
+                    $.post(ajaxurl, {
+                        action: "iwp_send_credentials",
+                        site_id: siteId,
+                        nonce: nonce
+                    }, function(response) {
+                        if (response.success) {
+                            $link.replaceWith("<span style=\"color: #46b450;\">Credentials Sent</span>");
+                            alert(response.data.message);
+                        } else {
+                            $link.text("Send Credentials").css("pointer-events", "");
+                            alert("Error: " + (response.data || "Unknown error"));
+                        }
+                    }).fail(function() {
+                        $link.text("Send Credentials").css("pointer-events", "");
+                        alert("Network error occurred");
+                    });
+                });
+            });
+        ');
+
         // Inline styles for clean tab interface
         wp_add_inline_style('wp-admin', '
             .iwp-admin-tabs { 
@@ -971,5 +1024,157 @@ class IWP_Admin_Simple {
                 });
             }
         }
+    }
+
+    /**
+     * AJAX: Send credentials to customer
+     *
+     * Marks site credentials as released and sends an email to the customer.
+     */
+    public function ajax_send_credentials() {
+        check_ajax_referer('iwp_admin_nonce', 'nonce');
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+
+        $site_id = sanitize_text_field($_POST['site_id'] ?? '');
+        if (empty($site_id)) {
+            wp_send_json_error('Missing site ID');
+        }
+
+        // Get site from database
+        IWP_Sites_Model::init();
+        $site = IWP_Sites_Model::get_by_site_id($site_id);
+
+        if (!$site) {
+            wp_send_json_error('Site not found');
+        }
+
+        // Mark credentials as released in source_data
+        $source_data = !empty($site->source_data) ? json_decode($site->source_data, true) : array();
+        if (!is_array($source_data)) {
+            $source_data = array();
+        }
+        $source_data['credentials_released'] = true;
+        $source_data['credentials_released_at'] = current_time('mysql');
+        $source_data['credentials_released_by'] = get_current_user_id();
+
+        IWP_Sites_Model::update($site_id, array(
+            'source_data' => $source_data,
+        ));
+
+        // Send email to customer
+        $email_sent = $this->send_credentials_email($site);
+
+        // Add order note if order exists
+        if (!empty($site->order_id)) {
+            $order = wc_get_order($site->order_id);
+            if ($order) {
+                $order->add_order_note(
+                    sprintf(
+                        __('Site credentials released and emailed to customer for site %s by %s', 'iwp-wp-integration'),
+                        $site->site_url ?: $site_id,
+                        wp_get_current_user()->display_name
+                    ),
+                    0 // Not customer-visible note
+                );
+            }
+        }
+
+        IWP_Logger::info('Credentials released for site', 'admin', array(
+            'site_id' => $site_id,
+            'email_sent' => $email_sent,
+            'user_id' => get_current_user_id()
+        ));
+
+        wp_send_json_success(array(
+            'message' => $email_sent
+                ? __('Credentials sent to customer successfully!', 'iwp-wp-integration')
+                : __('Credentials released but email could not be sent. Customer can now see credentials in their account.', 'iwp-wp-integration'),
+            'email_sent' => $email_sent,
+        ));
+    }
+
+    /**
+     * Send credentials email to the customer for a site
+     *
+     * @param object $site Database site row
+     * @return bool Whether email was sent
+     */
+    private function send_credentials_email($site) {
+        // Determine recipient email
+        $to = '';
+
+        // Try order billing email first
+        if (!empty($site->order_id)) {
+            $order = wc_get_order($site->order_id);
+            if ($order) {
+                $to = $order->get_billing_email();
+            }
+        }
+
+        // Fallback to user email
+        if (empty($to) && !empty($site->user_id)) {
+            $user = get_user_by('id', $site->user_id);
+            if ($user) {
+                $to = $user->user_email;
+            }
+        }
+
+        // Try source_data email (for demo sites)
+        if (empty($to) && !empty($site->source_data)) {
+            $source_data = json_decode($site->source_data, true);
+            if (!empty($source_data['email'])) {
+                $to = $source_data['email'];
+            }
+        }
+
+        if (empty($to)) {
+            IWP_Logger::warning('Cannot send credentials email: no recipient found', 'admin', array(
+                'site_id' => $site->site_id,
+            ));
+            return false;
+        }
+
+        $site_name = get_option('blogname');
+        $subject = sprintf(__('Your site login details are ready - %s', 'iwp-wp-integration'), $site_name);
+
+        // Build magic login URL
+        $login_url = '';
+        $login_label = '';
+        if (!empty($site->s_hash)) {
+            $login_url = 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($site->s_hash);
+            $login_label = __('Magic Login', 'iwp-wp-integration');
+        } elseif (!empty($site->site_url)) {
+            $login_url = trailingslashit($site->site_url) . 'wp-admin';
+            $login_label = __('Admin Login', 'iwp-wp-integration');
+        }
+
+        // Build HTML email
+        $message = '<div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;">';
+        $message .= '<div style="background: #0073aa; padding: 20px; border-radius: 4px 4px 0 0;">';
+        $message .= '<h1 style="color: white; margin: 0; font-size: 22px;">' . esc_html__('Your Site is Ready!', 'iwp-wp-integration') . '</h1>';
+        $message .= '</div>';
+        $message .= '<div style="padding: 20px; background: #ffffff; border: 1px solid #dee2e6; border-top: none; border-radius: 0 0 4px 4px;">';
+
+        if (!empty($site->site_url)) {
+            $message .= '<p><strong>' . esc_html__('Site URL:', 'iwp-wp-integration') . '</strong> <a href="' . esc_url($site->site_url) . '">' . esc_html($site->site_url) . '</a></p>';
+        }
+        if (!empty($site->wp_username)) {
+            $message .= '<p><strong>' . esc_html__('Username:', 'iwp-wp-integration') . '</strong> <code style="background: #f1f1f1; padding: 2px 6px;">' . esc_html($site->wp_username) . '</code></p>';
+        }
+        if (!empty($site->wp_password)) {
+            $message .= '<p><strong>' . esc_html__('Password:', 'iwp-wp-integration') . '</strong> <code style="background: #f1f1f1; padding: 2px 6px;">' . esc_html($site->wp_password) . '</code></p>';
+        }
+        if (!empty($login_url)) {
+            $message .= '<p style="margin-top: 20px;"><a href="' . esc_url($login_url) . '" style="background: #0073aa; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; display: inline-block;">' . esc_html($login_label) . '</a></p>';
+        }
+
+        $message .= '<p style="color: #666; font-size: 13px; margin-top: 20px;">' . esc_html__('We recommend changing your password after your first login.', 'iwp-wp-integration') . '</p>';
+        $message .= '</div>';
+        $message .= '</div>';
+
+        return IWP_Utilities::send_email($to, $subject, $message);
     }
 }

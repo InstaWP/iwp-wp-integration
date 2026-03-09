@@ -432,6 +432,15 @@ class IWP_Sites_List_Table extends WP_List_Table {
             // Determine source type and badges
             $source_type = $this->determine_source_type($db_site->source, $order);
 
+            // Check if credentials have been released
+            $credentials_released = false;
+            if (!empty($db_site->source_data)) {
+                $source_data_parsed = json_decode($db_site->source_data, true);
+                if (is_array($source_data_parsed) && !empty($source_data_parsed['credentials_released'])) {
+                    $credentials_released = true;
+                }
+            }
+
             // Calculate if site is expired (for temporary sites with expiry_hours)
             $is_expired = false;
             $hours_remaining = null;
@@ -465,7 +474,8 @@ class IWP_Sites_List_Table extends WP_List_Table {
                 'is_upgraded'  => $is_upgraded,
                 'is_expired'   => $is_expired,
                 'hours_remaining' => $hours_remaining,
-                'expiry_hours' => $db_site->expiry_hours
+                'expiry_hours' => $db_site->expiry_hours,
+                'credentials_released' => $credentials_released
             );
 
             $sites[] = $site;
@@ -811,6 +821,24 @@ class IWP_Sites_List_Table extends WP_List_Table {
             $actions['admin_login'] = sprintf('<a href="%s" target="_blank">%s</a>', esc_url($admin_url), __('Admin Login', 'iwp-wp-integration'));
         }
         
+        // Add "Send Credentials" action if delay_customer_credentials is enabled and not yet released
+        $options = get_option('iwp_options', array());
+        if (
+            isset($options['delay_customer_credentials']) && $options['delay_customer_credentials'] === 'yes'
+            && !empty($item['site_id'])
+            && ($item['status'] === 'completed')
+            && empty($item['credentials_released'])
+        ) {
+            $actions['send_credentials'] = sprintf(
+                '<a href="#" class="iwp-send-credentials" data-site-id="%s" data-nonce="%s" style="color: #0073aa; font-weight: 600;">%s</a>',
+                esc_attr($item['site_id']),
+                esc_attr(wp_create_nonce('iwp_admin_nonce')),
+                __('Send Credentials', 'iwp-wp-integration')
+            );
+        } elseif (!empty($item['credentials_released'])) {
+            $actions['credentials_sent'] = '<span style="color: #46b450;">' . __('Credentials Sent', 'iwp-wp-integration') . '</span>';
+        }
+
         // Add delete action if we have a site_id
         if (!empty($item['site_id'])) {
             $delete_url = wp_nonce_url(
