@@ -5,6 +5,22 @@ All notable changes to the InstaWP Integration plugin will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.6] - 2026-03-10
+
+### Added
+- **Toggle Custom Checkout Fields per Product**
+  - New "Show custom fields" checkbox in the InstaWP product tab
+  - When unchecked, username and subdomain fields are hidden from the product page and values are auto-generated
+  - Defaults to enabled for backward compatibility with existing products
+  - Product meta key: `_iwp_show_custom_fields` (`yes`/`no`)
+
+### Fixed
+- **Auto-generated Username Fallback**
+  - Fixed site creation failing when username/subdomain fields are left blank
+  - `get_admin_username()` now sanitizes billing name fallback (strips non-alphanumeric characters)
+  - Generates a valid random username (`user_XXXXX`) when billing name is empty or too short
+  - Prevents API rejection due to empty or invalid `user_name` parameter
+
 ## [0.0.5] - 2026-03-09
 
 ### Added
@@ -330,6 +346,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Release Date | Key Features |
 |---------|--------------|--------------|
+| 0.0.6   | 2026-03-10   | Toggle custom checkout fields, username fallback fix |
 | 0.0.5   | 2026-03-09   | Delay customer credentials, admin-controlled credential release |
 | 0.0.4   | 2025-02-10   | Custom checkout fields, enhanced dashboard, GitHub auto-updater |
 | 0.0.3   | 2025-01-20   | Demo site storage & reconciliation, automatic migrations |

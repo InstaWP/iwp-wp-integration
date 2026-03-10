@@ -46,6 +46,10 @@ class IWP_Woo_Product_Integration {
         
         // Enqueue admin scripts
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
+
+        // Variable subscription support: variation-level plan fields
+        add_action('woocommerce_product_after_variable_attributes', array($this, 'add_variation_plan_fields'), 10, 3);
+        add_action('woocommerce_save_product_variation', array($this, 'save_variation_plan_fields'), 10, 2);
     }
 
     /**
@@ -132,7 +136,26 @@ class IWP_Woo_Product_Integration {
         echo '</p>';
         
         echo '</div>'; // .options_group
-        
+
+        // Custom Fields section
+        echo '<div class="options_group">';
+        echo '<h4>' . __('Custom Checkout Fields', 'iwp-wp-integration') . '</h4>';
+
+        $show_custom_fields = get_post_meta($post->ID, '_iwp_show_custom_fields', true);
+        // Default to 'yes' for backward compatibility
+        if ($show_custom_fields === '') {
+            $show_custom_fields = 'yes';
+        }
+
+        woocommerce_wp_checkbox(array(
+            'id'          => '_iwp_show_custom_fields',
+            'label'       => __('Show custom fields', 'iwp-wp-integration'),
+            'description' => __('Show username and subdomain fields on the product page. When unchecked, values are auto-generated.', 'iwp-wp-integration'),
+            'value'       => $show_custom_fields,
+        ));
+
+        echo '</div>'; // .options_group
+
         // Site Expiry section
         echo '<div class="options_group">';
         echo '<h4>' . __('Site Expiry Settings', 'iwp-wp-integration') . '</h4>';
@@ -202,6 +225,10 @@ class IWP_Woo_Product_Integration {
         $selected_plan = isset($_POST['_iwp_selected_plan']) ? sanitize_text_field($_POST['_iwp_selected_plan']) : '';
         update_post_meta($post_id, '_iwp_selected_plan', $selected_plan);
         
+        // Save show custom fields setting
+        $show_custom_fields = isset($_POST['_iwp_show_custom_fields']) ? 'yes' : 'no';
+        update_post_meta($post_id, '_iwp_show_custom_fields', $show_custom_fields);
+
         // Save site expiry type
         $expiry_type = isset($_POST['_iwp_site_expiry_type']) ? sanitize_text_field($_POST['_iwp_site_expiry_type']) : 'permanent';
         update_post_meta($post_id, '_iwp_site_expiry_type', $expiry_type);
@@ -391,6 +418,73 @@ class IWP_Woo_Product_Integration {
      */
     public function get_product_plan($product_id) {
         return get_post_meta($product_id, '_iwp_selected_plan', true);
+    }
+
+    /**
+     * Add InstaWP plan selection to each variation
+     *
+     * @param int $loop Variation loop index
+     * @param array $variation_data Variation data
+     * @param WP_Post $variation Variation post object
+     */
+    public function add_variation_plan_fields($loop, $variation_data, $variation) {
+        $variation_plan = get_post_meta($variation->ID, '_iwp_selected_plan', true);
+        $variation_snapshot = get_post_meta($variation->ID, '_iwp_selected_snapshot', true);
+
+        echo '<div class="iwp-variation-fields">';
+        echo '<p class="form-row form-row-full"><strong>' . esc_html__("InstaWP Settings", "iwp-wp-integration") . '</strong></p>';
+
+        // Plan dropdown
+        woocommerce_wp_select(array(
+            'id'          => '_iwp_variation_plan[' . $loop . ']',
+            'name'        => '_iwp_variation_plan[' . $loop . ']',
+            'label'       => __("InstaWP Plan", "iwp-wp-integration"),
+            'description' => __("Select the InstaWP plan for this variation. Leave empty to inherit from parent product.", "iwp-wp-integration"),
+            'desc_tip'    => true,
+            'options'     => $this->get_plans_for_dropdown(),
+            'value'       => $variation_plan,
+            'wrapper_class' => 'form-row form-row-first',
+        ));
+
+        // Snapshot dropdown
+        woocommerce_wp_select(array(
+            'id'          => '_iwp_variation_snapshot[' . $loop . ']',
+            'name'        => '_iwp_variation_snapshot[' . $loop . ']',
+            'label'       => __("InstaWP Snapshot", "iwp-wp-integration"),
+            'description' => __("Select a snapshot for this variation. Leave empty to inherit from parent product.", "iwp-wp-integration"),
+            'desc_tip'    => true,
+            'options'     => $this->get_snapshot_options(),
+            'value'       => $variation_snapshot,
+            'wrapper_class' => 'form-row form-row-last',
+        ));
+
+        echo '</div>';
+    }
+
+    /**
+     * Save variation-level plan and snapshot fields
+     *
+     * @param int $variation_id
+     * @param int $loop
+     */
+    public function save_variation_plan_fields($variation_id, $loop) {
+        // Save plan
+        if (isset($_POST['_iwp_variation_plan'][$loop])) {
+            $plan_id = sanitize_text_field($_POST['_iwp_variation_plan'][$loop]);
+            update_post_meta($variation_id, '_iwp_selected_plan', $plan_id);
+        }
+
+        // Save snapshot
+        if (isset($_POST['_iwp_variation_snapshot'][$loop])) {
+            $snapshot = sanitize_text_field($_POST['_iwp_variation_snapshot'][$loop]);
+            update_post_meta($variation_id, '_iwp_selected_snapshot', $snapshot);
+        }
+
+        IWP_Logger::debug("Saved variation InstaWP fields", "product-integration", array(
+            "variation_id" => $variation_id,
+            "plan" => $plan_id ?? "",
+            "snapshot" => $snapshot ?? "",
+        ));
     }
 
     /**

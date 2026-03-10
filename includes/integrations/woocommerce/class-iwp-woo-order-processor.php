@@ -356,7 +356,19 @@ class IWP_Woo_Order_Processor {
         if (!empty($custom_username) && preg_match('/^[a-zA-Z0-9_]{3,20}$/', $custom_username)) {
             return sanitize_user($custom_username);
         }
-        return sanitize_user($first_name . $last_name);
+
+        // Fallback to billing name
+        $username = sanitize_user($first_name . $last_name);
+
+        // Remove any non-alphanumeric characters and ensure minimum length
+        $username = preg_replace('/[^a-zA-Z0-9_]/', '', $username);
+
+        if (strlen($username) < 3) {
+            // Generate a valid username from email or random
+            $username = 'user_' . wp_rand(10000, 99999);
+        }
+
+        return $username;
     }
 
     /**

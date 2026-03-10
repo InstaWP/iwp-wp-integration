@@ -61,12 +61,30 @@ class IWP_Woo_Product_Fields {
     }
 
     /**
+     * Check if custom fields should be shown for this product
+     *
+     * @param int $product_id
+     * @return bool
+     */
+    private function should_show_fields($product_id) {
+        if (!$this->product_has_snapshot($product_id)) {
+            return false;
+        }
+        $show_fields = get_post_meta($product_id, '_iwp_show_custom_fields', true);
+        // Default to 'yes' for backward compatibility
+        if ($show_fields === '') {
+            return true;
+        }
+        return $show_fields === 'yes';
+    }
+
+    /**
      * Render username and subdomain fields on the product page
      */
     public function render_product_fields() {
         global $product;
 
-        if (!$product || !$this->product_has_snapshot($product->get_id())) {
+        if (!$product || !$this->should_show_fields($product->get_id())) {
             return;
         }
 
@@ -203,7 +221,7 @@ class IWP_Woo_Product_Fields {
         }
 
         $product_id = get_the_ID();
-        if (!$product_id || !$this->product_has_snapshot($product_id)) {
+        if (!$product_id || !$this->should_show_fields($product_id)) {
             return;
         }
 

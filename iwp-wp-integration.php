@@ -3,7 +3,7 @@
  * Plugin Name: InstaWP Integration
  * Plugin URI: https://instawp.com
  * Description: A comprehensive WordPress integration plugin for InstaWP that provides enhanced functionality, seamless integration, WooCommerce support, and standalone site creation tools.
- * Version: 0.0.5
+ * Version: 0.0.6
  * Author: InstaWP
  * Author URI: https://instawp.com
  * Text Domain: iwp-wp-integration
@@ -24,7 +24,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('IWP_VERSION', '0.0.5');
+define('IWP_VERSION', '0.0.6');
 define('IWP_PLUGIN_FILE', __FILE__);
 define('IWP_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('IWP_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -96,6 +96,10 @@ function iwp_init() {
             require_once IWP_PLUGIN_PATH . 'includes/integrations/woocommerce/class-iwp-woo-subscription-site-manager.php';
             
             new IWP_Woo_Subscriptions_Integration();
+            
+            // Initialize subscription switch handler (upgrade/downgrade)
+            require_once IWP_PLUGIN_PATH . 'includes/integrations/woocommerce/class-iwp-woo-subscription-switch-handler.php';
+            new IWP_Woo_Subscription_Switch_Handler();
             
             // Schedule health checks
             add_action('iwp_subscription_health_check', array('IWP_Woo_Subscription_Site_Manager', 'run_health_check'));
