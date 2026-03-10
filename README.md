@@ -124,6 +124,15 @@ The InstaWP Integration plugin enables you to:
 - **`expiry_hours`** (optional): Hours until site expires
 - **`sandbox`** (optional): Set to "true" for shared/sandbox sites
 
+### Delay Customer Credentials
+
+Hide login credentials from customers until you've finished building their site:
+
+1. **Enable**: Check **"Delay Customer Credentials"** in InstaWP → Settings
+2. **What happens**: Customers see "Your site is being prepared" instead of credentials on the thank you page, order emails, and My Account
+3. **When ready**: Go to **InstaWP → Sites**, find the site, and click **"Send Credentials"**
+4. **Result**: Customer receives an email with their login details, and credentials become visible in their account
+
 ### Site Plan Upgrades
 
 Enable customers to upgrade existing sites instead of creating new ones:

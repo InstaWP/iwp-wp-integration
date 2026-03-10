@@ -402,12 +402,13 @@ class IWP_Admin_Simple {
         add_settings_field(
             'delay_customer_credentials',
             esc_html__('Delay Customer Credentials', 'iwp-wp-integration'),
-            array($this, 'checkbox_callback'),
+            array($this, 'checkbox_with_description_callback'),
             'iwp_settings',
             'iwp_general',
             array(
                 'field' => 'delay_customer_credentials',
-                'label' => 'Hide login credentials from customers until manually released. Use "Send Credentials" action from InstaWP > Sites to share credentials when ready.'
+                'label' => 'Hide login credentials from customers until manually released',
+                'description' => 'When enabled, customers will not see their site username, password, or login links on the thank you page, order details, My Account, or in order emails. Instead they see a "site is being prepared" message. When you are ready, go to <strong>InstaWP &rarr; Sites</strong> and click <strong>"Send Credentials"</strong> to email the customer their login details.'
             )
         );
     }
@@ -472,6 +473,30 @@ class IWP_Admin_Simple {
             $checked,
             esc_html($args['label'])
         );
+    }
+
+    /**
+     * Checkbox field with description callback
+     */
+    public function checkbox_with_description_callback($args) {
+        $options = get_option('iwp_options', array());
+        $value = isset($options[$args['field']]) ? $options[$args['field']] : 'no';
+        $checked = $value === 'yes' ? 'checked="checked"' : '';
+
+        printf(
+            '<label><input type="checkbox" name="iwp_options[%s]" value="yes" %s /> %s</label>',
+            esc_attr($args['field']),
+            $checked,
+            esc_html($args['label'])
+        );
+
+        if (!empty($args['description'])) {
+            printf('<p class="description">%s</p>', wp_kses($args['description'], array(
+                'strong' => array(),
+                'em' => array(),
+                'a' => array('href' => array(), 'target' => array()),
+            )));
+        }
     }
 
     /**
