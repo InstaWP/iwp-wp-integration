@@ -52,6 +52,9 @@ class IWP_Admin_Simple {
 
         // Send credentials AJAX handler
         add_action('wp_ajax_iwp_send_credentials', array($this, 'ajax_send_credentials'));
+
+        // Documentation AJAX handler
+        add_action('wp_ajax_iwp_load_doc', array('IWP_Docs_Renderer', 'ajax_load_doc'));
     }
 
     /**
@@ -87,6 +90,16 @@ class IWP_Admin_Simple {
             'manage_options',
             'instawp-settings',
             array($this, 'settings_page')
+        );
+
+        // Add Docs submenu
+        add_submenu_page(
+            'instawp-sites',
+            esc_html__('InstaWP Documentation', 'iwp-wp-integration'),
+            esc_html__('Docs', 'iwp-wp-integration'),
+            'manage_woocommerce',
+            'instawp-docs',
+            array($this, 'docs_page')
         );
     }
 
@@ -340,6 +353,20 @@ class IWP_Admin_Simple {
     }
 
     /**
+     * Render the standalone Docs page
+     */
+    public function docs_page() {
+        $active_doc = isset($_GET['doc']) ? sanitize_key($_GET['doc']) : 'index';
+        $renderer = new IWP_Docs_Renderer();
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e('InstaWP Documentation', 'iwp-wp-integration'); ?></h1>
+            <?php $renderer->render($active_doc); ?>
+        </div>
+        <?php
+    }
+
+    /**
      * Initialize settings
      */
     public function init_settings() {
@@ -402,13 +429,12 @@ class IWP_Admin_Simple {
         add_settings_field(
             'delay_customer_credentials',
             esc_html__('Delay Customer Credentials', 'iwp-wp-integration'),
-            array($this, 'checkbox_with_description_callback'),
+            array($this, 'checkbox_callback'),
             'iwp_settings',
             'iwp_general',
             array(
                 'field' => 'delay_customer_credentials',
-                'label' => 'Hide login credentials from customers until manually released',
-                'description' => 'When enabled, customers will not see their site username, password, or login links on the thank you page, order details, My Account, or in order emails. Instead they see a "site is being prepared" message. When you are ready, go to <strong>InstaWP &rarr; Sites</strong> and click <strong>"Send Credentials"</strong> to email the customer their login details.'
+                'label' => 'Hide login credentials from customers until manually released. Use "Send Credentials" action from InstaWP > Sites to share credentials when ready.'
             )
         );
     }
@@ -473,30 +499,6 @@ class IWP_Admin_Simple {
             $checked,
             esc_html($args['label'])
         );
-    }
-
-    /**
-     * Checkbox field with description callback
-     */
-    public function checkbox_with_description_callback($args) {
-        $options = get_option('iwp_options', array());
-        $value = isset($options[$args['field']]) ? $options[$args['field']] : 'no';
-        $checked = $value === 'yes' ? 'checked="checked"' : '';
-
-        printf(
-            '<label><input type="checkbox" name="iwp_options[%s]" value="yes" %s /> %s</label>',
-            esc_attr($args['field']),
-            $checked,
-            esc_html($args['label'])
-        );
-
-        if (!empty($args['description'])) {
-            printf('<p class="description">%s</p>', wp_kses($args['description'], array(
-                'strong' => array(),
-                'em' => array(),
-                'a' => array('href' => array(), 'target' => array()),
-            )));
-        }
     }
 
     /**

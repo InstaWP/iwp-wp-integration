@@ -142,9 +142,8 @@ class IWP_Woo_Product_Integration {
         echo '<h4>' . __('Custom Checkout Fields', 'iwp-wp-integration') . '</h4>';
 
         $show_custom_fields = get_post_meta($post->ID, '_iwp_show_custom_fields', true);
-        // Default to 'yes' for backward compatibility
         if ($show_custom_fields === '') {
-            $show_custom_fields = 'yes';
+            $show_custom_fields = 'no';
         }
 
         woocommerce_wp_checkbox(array(

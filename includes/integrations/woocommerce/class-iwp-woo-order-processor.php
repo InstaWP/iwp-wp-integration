@@ -107,6 +107,13 @@ class IWP_Woo_Order_Processor {
             return;
         }
 
+        // Skip subscription switch orders — the switch handler manages plan changes,
+        // not the order processor. Without this check, a switch order creates a new site.
+        if (function_exists('wcs_order_contains_switch') && wcs_order_contains_switch($order_id)) {
+            error_log('IWP WooCommerce V2: Skipping switch order (handled by subscription switch handler): ' . $order_id);
+            return;
+        }
+
         // Check if we've already processed this order
         $processed = get_post_meta($order_id, '_iwp_processed', true);
         if ($processed) {
@@ -146,15 +153,26 @@ class IWP_Woo_Order_Processor {
         // Process each item in the order
         foreach ($order->get_items() as $item_id => $item) {
             $product_id = $item->get_product_id();
+            $variation_id = $item->get_variation_id();
             $product = wc_get_product($product_id);
-            
+
             if (!$product) {
                 continue;
             }
 
-            // Check if this product has a snapshot or plan
-            $snapshot_slug = get_post_meta($product->get_id(), '_iwp_selected_snapshot', true);
-            $plan_id = get_post_meta($product->get_id(), '_iwp_selected_plan', true);
+            // For variations, check variation-level meta first, fall back to parent product
+            $snapshot_slug = '';
+            $plan_id = '';
+            if ($variation_id) {
+                $snapshot_slug = get_post_meta($variation_id, '_iwp_selected_snapshot', true);
+                $plan_id = get_post_meta($variation_id, '_iwp_selected_plan', true);
+            }
+            if (empty($snapshot_slug)) {
+                $snapshot_slug = get_post_meta($product_id, '_iwp_selected_snapshot', true);
+            }
+            if (empty($plan_id)) {
+                $plan_id = get_post_meta($product_id, '_iwp_selected_plan', true);
+            }
             
             // If we have a site_id for upgrade and a plan_id, upgrade the site instead of creating new one
             if ($upgrade_site_id && !empty($plan_id)) {
@@ -253,7 +271,7 @@ class IWP_Woo_Order_Processor {
         // Get API key from settings
         $options = get_option('iwp_options', array());
         $api_key = isset($options['api_key']) ? $options['api_key'] : '';
-        
+
         if (empty($api_key)) {
             return new WP_Error('no_api_key', __('API key not configured', 'iwp-woo-v2'));
         }
@@ -264,18 +282,32 @@ class IWP_Woo_Order_Processor {
         $billing_email = $order->get_billing_email();
         $billing_first_name = $order->get_billing_first_name();
         $billing_last_name = $order->get_billing_last_name();
-        
+
         // Use custom subdomain from order item meta if provided, otherwise auto-generate
         $custom_subdomain = $item->get_meta('_iwp_subdomain');
         if (!empty($custom_subdomain) && preg_match('/^[a-zA-Z0-9]([a-zA-Z0-9-]{1,28})[a-zA-Z0-9]$/', $custom_subdomain)) {
             $site_name = sanitize_title($custom_subdomain);
         } else {
-            $site_name = sanitize_title($product->get_name() . '-' . $order->get_id() . '-' . time());
+            $suffix = '-' . $order->get_id() . '-' . substr(time(), -5);
+            $max_name_len = 30 - strlen($suffix);
+            $site_name = substr(sanitize_title($product->get_name()), 0, $max_name_len) . $suffix;
         }
-        
-        // Get expiry settings from product
-        $expiry_type = get_post_meta($product->get_id(), '_iwp_site_expiry_type', true);
-        $expiry_hours = get_post_meta($product->get_id(), '_iwp_site_expiry_hours', true);
+
+        // Get expiry settings — check variation first, then parent product
+        $variation_id = $item->get_variation_id();
+        $product_id = $product->get_id();
+        $expiry_type = '';
+        $expiry_hours = '';
+        if ($variation_id) {
+            $expiry_type = get_post_meta($variation_id, '_iwp_site_expiry_type', true);
+            $expiry_hours = get_post_meta($variation_id, '_iwp_site_expiry_hours', true);
+        }
+        if (empty($expiry_type)) {
+            $expiry_type = get_post_meta($product_id, '_iwp_site_expiry_type', true);
+        }
+        if (empty($expiry_hours)) {
+            $expiry_hours = get_post_meta($product_id, '_iwp_site_expiry_hours', true);
+        }
         
         // Default to permanent if not set
         if (empty($expiry_type)) {

@@ -73,6 +73,13 @@ class IWP_Main {
     public $order_processor = null;
 
     /**
+     * Subscription Switch Handler instance
+     *
+     * @var IWP_Woo_Subscription_Switch_Handler
+     */
+    public $switch_handler = null;
+
+    /**
      * Shortcode instance
      *
      * @var IWP_Shortcode
@@ -209,6 +216,11 @@ class IWP_Main {
             if ($this->product_integration) {
                 $this->order_processor->set_product_integration($this->product_integration);
             }
+        }
+
+        // Initialize subscription switch handler (only if WooCommerce + WCS are active)
+        if ($this->is_woocommerce_active()) {
+            $this->switch_handler = new IWP_Woo_Subscription_Switch_Handler();
         }
 
         // Initialize site manager (always needed for site tracking)

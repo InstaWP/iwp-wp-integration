@@ -256,36 +256,9 @@ class IWP_Settings_Page {
      * Render Documentation tab content
      */
     private function render_documentation_tab() {
-        ?>
-        <div class="iwp-docs-section">
-            <h3><?php esc_html_e('Plugin Documentation', 'iwp-wp-integration'); ?></h3>
-            
-            <div class="iwp-docs-grid">
-                <div class="iwp-docs-box">
-                    <h4><?php esc_html_e('Shortcode Usage', 'iwp-wp-integration'); ?></h4>
-                    <p><?php esc_html_e('Use the iwp_site_creator shortcode to create standalone site creation forms:', 'iwp-wp-integration'); ?></p>
-                    <code>[iwp_site_creator snapshot_slug="your-snapshot-slug"]</code>
-                    
-                    <h5><?php esc_html_e('Parameters:', 'iwp-wp-integration'); ?></h5>
-                    <ul>
-                        <li><code>snapshot_slug</code> - Required: The InstaWP snapshot to use</li>
-                        <li><code>email</code> - Optional: Pre-fill email field</li>
-                        <li><code>name</code> - Optional: Pre-fill site name field</li>
-                        <li><code>expiry_hours</code> - Optional: Hours until site expires</li>
-                    </ul>
-                </div>
-                
-                <div class="iwp-docs-box">
-                    <h4><?php esc_html_e('Useful Links', 'iwp-wp-integration'); ?></h4>
-                    <ul>
-                        <li><a href="https://app.instawp.io/user/api-tokens" target="_blank"><?php esc_html_e('Get Your API Key', 'iwp-wp-integration'); ?></a></li>
-                        <li><a href="https://instawp.com/docs/" target="_blank"><?php esc_html_e('InstaWP Documentation', 'iwp-wp-integration'); ?></a></li>
-                        <li><a href="<?php echo admin_url('admin.php?page=instawp-sites'); ?>"><?php esc_html_e('Manage Sites', 'iwp-wp-integration'); ?></a></li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-        <?php
+        $active_doc = isset($_GET['doc']) ? sanitize_key($_GET['doc']) : 'index';
+        $renderer = new IWP_Docs_Renderer();
+        $renderer->render($active_doc);
     }
 
     /**
@@ -739,17 +712,18 @@ class IWP_Settings_Page {
             height: 32px;
         }
         
+        /* Documentation Viewer styles are rendered by IWP_Docs_Renderer */
+
         @media (max-width: 768px) {
-            .iwp-data-grid,
-            .iwp-docs-grid {
+            .iwp-data-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .iwp-team-dropdown-container {
                 flex-direction: column;
                 align-items: flex-start;
             }
-            
+
             .iwp-team-select {
                 width: 100%;
                 min-width: auto;
