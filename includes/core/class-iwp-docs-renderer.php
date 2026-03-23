@@ -50,7 +50,9 @@ class IWP_Docs_Renderer {
             require_once IWP_PLUGIN_PATH . 'includes/core/lib/Parsedown.php';
         }
         $this->parsedown = new Parsedown();
-        $this->parsedown->setSafeMode(true);
+        if (method_exists($this->parsedown, 'setSafeMode')) {
+            $this->parsedown->setSafeMode(true);
+        }
     }
 
     /**
