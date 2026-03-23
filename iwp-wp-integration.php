@@ -100,6 +100,10 @@ function iwp_init() {
             // Initialize subscription switch handler (upgrade/downgrade)
             require_once IWP_PLUGIN_PATH . 'includes/integrations/woocommerce/class-iwp-woo-subscription-switch-handler.php';
             new IWP_Woo_Subscription_Switch_Handler();
+
+            // Initialize subscription switch UI (radio buttons instead of quantity inputs)
+            require_once IWP_PLUGIN_PATH . 'includes/integrations/woocommerce/class-iwp-woo-subscription-switch-ui.php';
+            new IWP_Woo_Subscription_Switch_UI();
             
             // Schedule health checks
             add_action('iwp_subscription_health_check', array('IWP_Woo_Subscription_Site_Manager', 'run_health_check'));
