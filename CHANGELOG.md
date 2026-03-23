@@ -5,6 +5,38 @@ All notable changes to the InstaWP Integration plugin will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.7] - 2026-03-23
+
+### Added
+- **Subscription Switch Thank-You Page**
+  - Switch orders now display upgrade confirmation on the order-received page
+  - Shows site details, new plan, and "Plan Successfully Upgraded" card
+  - Failure cases show error message with support guidance
+  - Stores `_iwp_sites_created` meta on switch orders for frontend display
+
+- **Subscription Switch UI**
+  - Radio-button plan selector replaces default WooCommerce grouped product table during subscription switches
+  - "Current plan", "Upgrade", and "Downgrade" badges based on plan hierarchy
+  - Clean card-based responsive design
+
+### Fixed
+- **Variable Product Site Creation**
+  - Order processor now checks variation-level meta (snapshot, plan, expiry) before falling back to parent product
+  - Previously, variable products silently skipped site creation because meta was only checked on the parent product ID
+
+- **Site Name API Limit**
+  - Auto-generated site names now truncated to 30 characters to respect InstaWP API limit
+  - Previously caused 422 errors for products with long names
+
+- **Subscription Switch Site Lookup**
+  - Fixed `find_subscription_sites()` to extract `site_id` from nested `site_data` structure in `_iwp_sites_created` meta
+  - Previously returned empty results, causing subscription switches to silently skip plan changes
+
+### Changed
+- **Custom Checkout Fields Default**
+  - New products now default to custom fields hidden (auto-generated values)
+  - Existing products with saved settings are not affected
+
 ## [0.0.6] - 2026-03-10
 
 ### Added
@@ -346,6 +378,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Release Date | Key Features |
 |---------|--------------|--------------|
+| 0.0.7   | 2026-03-23   | Variable product fix, subscription switch display, site name limit |
 | 0.0.6   | 2026-03-10   | Toggle custom checkout fields, username fallback fix |
 | 0.0.5   | 2026-03-09   | Delay customer credentials, admin-controlled credential release |
 | 0.0.4   | 2025-02-10   | Custom checkout fields, enhanced dashboard, GitHub auto-updater |
