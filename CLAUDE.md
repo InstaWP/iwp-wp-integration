@@ -4,10 +4,10 @@
 
 The InstaWP Integration plugin is a comprehensive WordPress plugin that provides seamless integration with InstaWP's site creation and management platform. Originally designed as "IWP WooCommerce Integration v2", it has evolved into a full-featured WordPress plugin supporting multiple integration points and standalone functionality.
 
-**Current Version**: 0.0.4
+**Current Version**: 0.0.8
 **WordPress Compatibility**: 5.0+
 **WooCommerce Compatibility**: 5.0+ (Optional)
-**PHP Requirements**: 7.4+  
+**PHP Requirements**: 7.4+
 
 ## Architecture
 
@@ -999,7 +999,29 @@ if (!empty($errors)) {
 }
 ```
 
-## Recent Bug Fixes and Improvements
+## Recent Bug Fixes and Improvements (v0.0.7)
+
+### Variable Product Support
+
+Order processor must check **variation-level** meta before parent product meta. For WooCommerce Variable Products, `$item->get_product_id()` returns the parent ID, but IWP settings (snapshot, plan, expiry) may be stored on the variation via `add_variation_plan_fields()`. The fix in `process_order()` and `create_site_for_product()` uses `$item->get_variation_id()` to check variation meta first, falling back to parent.
+
+### Site Name 30-Character API Limit
+
+The InstaWP API rejects site names > 30 chars (HTTP 422). Auto-generated names use: `substr(product_name, 0, max) + '-' + order_id + '-' + substr(time, -5)` to stay within the limit.
+
+### Subscription Switch Thank-You Page
+
+The switch handler (`process_plan_change()`) now stores `_iwp_sites_created` meta on the **switch order** so the order-received page can display upgrade results. Previously, site data was only on the original parent order, so the switch order's thank-you page was blank.
+
+### find_subscription_sites() — Nested site_id Extraction
+
+The `_iwp_sites_created` order meta stores site_id inside `$site['site_data']['site_id']`, not at `$site['site_id']`. The switch handler's `find_subscription_sites()` was only checking the top level, returning empty results and silently skipping plan changes.
+
+### Parsedown Compatibility
+
+Another plugin on the production server loads an older `Parsedown` class without `setSafeMode()`. The docs renderer now uses `method_exists()` before calling it.
+
+## Older Bug Fixes
 
 ### Fixed wpdb::prepare Array Error
 
@@ -1472,6 +1494,24 @@ The site creation API (`POST /sites/template`) expects these parameter names:
 | `template_slug` | Snapshot identifier | Product meta |
 
 **Note**: These match the shortcode's working implementation. Previous versions incorrectly sent `name`, `admin_username`, `admin_email`.
+
+## Local Build & Deploy
+
+### Quick Build
+
+`build-zip.sh` in the plugin root creates `~/Desktop/iwp-wp-integration.zip` excluding `.git`, `.github`, `node_modules`, `vendor`, `tests`, and `*.sh` files.
+
+```bash
+./build-zip.sh
+```
+
+### SFTP Deploy (Production)
+
+Production server at `161.35.140.36` (user: `instawp`) is SFTP-only (no shell). Plugin path: `public_html/wp-content/plugins/iwp-wp-integration/`. Debug log path is custom: `wp-content/debug-6793626b68217.log`.
+
+### Local Testing
+
+Use `instawp local create --name <name> --no-open --background` for local WordPress instances. The `instawp wp` command is for **remote** sites only — local sites require HTTP-based activation (curl with cookies + nonce).
 
 ## Release Workflow
 

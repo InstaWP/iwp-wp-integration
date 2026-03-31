@@ -52,6 +52,11 @@
     width: 100px;
 }
 
+/* Variation-level InstaWP fields — clear floats so preceding WCS price fields render correctly */
+.iwp-variation-fields {
+    clear: both;
+}
+
 /* Snapshot Preview Styles */
 .iwp-snapshot-preview {
     border: 1px solid #ddd;

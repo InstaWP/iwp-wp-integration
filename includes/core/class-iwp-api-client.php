@@ -183,42 +183,69 @@ class IWP_API_Client {
     public function get_snapshots() {
         // Use team-specific cache key if team is selected
         $cache_key = $this->team_id ? 'iwp_snapshots_team_' . $this->team_id : 'iwp_snapshots';
-        
+
         IWP_Logger::debug('get_snapshots() called', 'api-client', array('team_id' => $this->team_id, 'cache_key' => $cache_key));
-        
+
         $cached_snapshots = get_transient($cache_key);
-        
+
         if (false !== $cached_snapshots) {
             IWP_Logger::debug('Using cached snapshots data', 'api-client', array('cache_key' => $cache_key));
             return $cached_snapshots;
         }
 
         IWP_Logger::debug('No cached snapshots found, making API request', 'api-client', array('cache_key' => $cache_key));
-        $response = $this->make_request('snapshots', array(
-            'method' => 'GET',
-        ));
 
-        if (is_wp_error($response)) {
-            IWP_Logger::error('get_snapshots() failed', 'api-client', array('error' => $response->get_error_message()));
-            return $response;
-        }
+        // Fetch all pages of snapshots (API defaults to 10 per page)
+        $all_snapshots = array();
+        $page = 1;
+        $max_pages = 20; // Safety limit
 
-        // Handle new API response format with status, message, and data fields
-        if (isset($response['data']) && is_array($response['data'])) {
-            $snapshots_data = $response['data'];
-            IWP_Logger::debug('Using snapshots from data field', 'api-client', array('status' => $response['status'] ?? 'unknown', 'message' => $response['message'] ?? 'no message'));
-        } else {
-            // Fallback for legacy response format
-            $snapshots_data = $response;
-            IWP_Logger::debug('Using legacy snapshots response format', 'api-client');
-        }
+        do {
+            $response = $this->make_request('snapshots?per_page=50&page=' . $page, array(
+                'method' => 'GET',
+            ));
+
+            if (is_wp_error($response)) {
+                IWP_Logger::error('get_snapshots() failed', 'api-client', array('error' => $response->get_error_message(), 'page' => $page));
+                return $response;
+            }
+
+            // Handle API response format with status, message, and data fields
+            if (isset($response['data']) && is_array($response['data'])) {
+                // Check if data contains paginated results (data.data) or direct array
+                if (isset($response['data']['data']) && is_array($response['data']['data'])) {
+                    // Paginated: { data: { data: [...], current_page, last_page } }
+                    $page_snapshots = $response['data']['data'];
+                    $last_page = isset($response['data']['last_page']) ? (int) $response['data']['last_page'] : $page;
+                } else {
+                    // Direct array: { data: [...] }
+                    $page_snapshots = $response['data'];
+                    $last_page = $page; // No pagination info, assume single page
+                }
+            } else {
+                // Legacy response format
+                $page_snapshots = is_array($response) ? $response : array();
+                $last_page = $page;
+            }
+
+            $all_snapshots = array_merge($all_snapshots, $page_snapshots);
+
+            IWP_Logger::debug('Fetched snapshots page', 'api-client', array(
+                'page' => $page,
+                'last_page' => $last_page,
+                'count_this_page' => count($page_snapshots),
+                'total_so_far' => count($all_snapshots),
+            ));
+
+            $page++;
+        } while ($page <= $last_page && $page <= $max_pages);
 
         // Cache for configurable duration (default 15 minutes)
         $cache_duration = apply_filters('iwp_snapshots_cache_duration', 15 * MINUTE_IN_SECONDS);
-        set_transient($cache_key, $snapshots_data, $cache_duration);
-        IWP_Logger::info('Snapshots cached', 'api-client', array('cache_key' => $cache_key, 'duration_minutes' => $cache_duration / 60));
+        set_transient($cache_key, $all_snapshots, $cache_duration);
+        IWP_Logger::info('Snapshots cached', 'api-client', array('cache_key' => $cache_key, 'duration_minutes' => $cache_duration / 60, 'total_snapshots' => count($all_snapshots)));
 
-        return $snapshots_data;
+        return $all_snapshots;
     }
 
     /**

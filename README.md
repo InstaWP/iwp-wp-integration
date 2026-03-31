@@ -356,6 +356,17 @@ This plugin is licensed under the GPL v2 or later.
 
 ## Changelog
 
+### Version 0.0.8
+- **FIXED: Only 10 snapshots visible in admin** — API client now fetches all pages instead of just the first page (default 10 per page)
+- **FIXED: Variation fields CSS** — WCS price fields now render correctly above InstaWP variation fields
+
+### Version 0.0.7
+- **FIXED: Variable product site creation** — checks variation-level meta before parent product
+- **FIXED: Site name API limit** — auto-generated names truncated to 30 characters
+- **FIXED: Subscription switch display** — switch orders now show upgrade results on thank-you page
+- **FIXED: Subscription site lookup** — extracts site_id from nested structure in order meta
+- **NEW: Subscription switch UI** — radio-button plan selector with current/upgrade/downgrade badges
+
 ### Version 0.0.6
 - **NEW: Toggle Custom Checkout Fields per Product**
   - New "Show custom fields" checkbox in InstaWP product tab to hide username/subdomain fields

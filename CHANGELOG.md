@@ -5,6 +5,19 @@ All notable changes to the InstaWP Integration plugin will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.8] - 2026-03-31
+
+### Fixed
+- **Snapshots Pagination**
+  - Fixed only 10 snapshots showing in admin when team has more (e.g. 33)
+  - API client now paginates through all pages with `per_page=50`
+  - Handles both paginated (`data.data` + `last_page`) and flat (`data: [...]`) API response formats
+  - Safety limit of 20 pages to prevent infinite loops
+
+### Changed
+- **Variation Fields CSS**
+  - Added `clear: both` on `.iwp-variation-fields` so preceding WCS price fields render correctly
+
 ## [0.0.7] - 2026-03-23
 
 ### Added
@@ -378,6 +391,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Release Date | Key Features |
 |---------|--------------|--------------|
+| 0.0.8   | 2026-03-31   | Snapshots pagination fix, variation fields CSS fix |
 | 0.0.7   | 2026-03-23   | Variable product fix, subscription switch display, site name limit |
 | 0.0.6   | 2026-03-10   | Toggle custom checkout fields, username fallback fix |
 | 0.0.5   | 2026-03-09   | Delay customer credentials, admin-controlled credential release |
