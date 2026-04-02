@@ -629,14 +629,21 @@ class IWP_Woo_Order_Processor {
         if ($order) {
             foreach ($order->get_items() as $item) {
                 $product_id = $item->get_product_id();
-                $snapshot_slug = get_post_meta($product_id, '_iwp_selected_snapshot', true);
+                $variation_id = $item->get_variation_id();
+                $snapshot_slug = '';
+                if ($variation_id) {
+                    $snapshot_slug = get_post_meta($variation_id, '_iwp_selected_snapshot', true);
+                }
+                if (empty($snapshot_slug)) {
+                    $snapshot_slug = get_post_meta($product_id, '_iwp_selected_snapshot', true);
+                }
                 if (!empty($snapshot_slug)) {
                     $has_instawp_products = true;
                     break;
                 }
             }
         }
-        
+
         if (!$has_instawp_products) {
             echo '<p>' . __('No site-enabled products in this order.', 'iwp-woo-v2') . '</p>';
             return;
@@ -885,17 +892,28 @@ class IWP_Woo_Order_Processor {
         // Process each item in the order (same logic as process_order)
         foreach ($order->get_items() as $item_id => $item) {
             $product_id = $item->get_product_id();
+            $variation_id = $item->get_variation_id();
             $product = wc_get_product($product_id);
-            
+
             if (!$product) {
                 error_log('IWP WooCommerce V2: Product not found: ' . $product_id);
                 continue;
             }
 
-            // Get snapshot and plan
-            $snapshot_slug = get_post_meta($product_id, '_iwp_selected_snapshot', true);
-            $plan_id = get_post_meta($product_id, '_iwp_selected_plan', true);
-            
+            // For variations, check variation-level meta first, fall back to parent product
+            $snapshot_slug = '';
+            $plan_id = '';
+            if ($variation_id) {
+                $snapshot_slug = get_post_meta($variation_id, '_iwp_selected_snapshot', true);
+                $plan_id = get_post_meta($variation_id, '_iwp_selected_plan', true);
+            }
+            if (empty($snapshot_slug)) {
+                $snapshot_slug = get_post_meta($product_id, '_iwp_selected_snapshot', true);
+            }
+            if (empty($plan_id)) {
+                $plan_id = get_post_meta($product_id, '_iwp_selected_plan', true);
+            }
+
             if (empty($snapshot_slug)) {
                 error_log('IWP WooCommerce V2: No snapshot selected for product ID: ' . $product->get_id());
                 continue;

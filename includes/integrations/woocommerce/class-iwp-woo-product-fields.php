@@ -51,13 +51,30 @@ class IWP_Woo_Product_Fields {
 
     /**
      * Check if a product has InstaWP snapshot configured
+     * For variable products, also checks if any variation has a snapshot.
      *
      * @param int $product_id
      * @return bool
      */
     private function product_has_snapshot($product_id) {
         $snapshot_slug = get_post_meta($product_id, '_iwp_selected_snapshot', true);
-        return !empty($snapshot_slug);
+        if (!empty($snapshot_slug)) {
+            return true;
+        }
+
+        // For variable products, check if any variation has a snapshot
+        $product = wc_get_product($product_id);
+        if ($product && ($product->is_type('variable') || $product->is_type('variable-subscription'))) {
+            $variations = $product->get_children();
+            foreach ($variations as $variation_id) {
+                $var_snapshot = get_post_meta($variation_id, '_iwp_selected_snapshot', true);
+                if (!empty($var_snapshot)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -116,7 +133,9 @@ class IWP_Woo_Product_Fields {
      * @return bool
      */
     public function validate_fields($passed, $product_id, $quantity) {
-        if (!$this->product_has_snapshot($product_id)) {
+        // Check parent product and also variation for snapshot
+        $variation_id = isset($_POST['variation_id']) ? absint($_POST['variation_id']) : 0;
+        if (!$this->product_has_snapshot($product_id) && (!$variation_id || !$this->product_has_snapshot($variation_id))) {
             return $passed;
         }
 
@@ -148,7 +167,8 @@ class IWP_Woo_Product_Fields {
      * @return array
      */
     public function add_cart_item_data($cart_item_data, $product_id, $variation_id) {
-        if (!$this->product_has_snapshot($product_id)) {
+        // Check parent product and also variation for snapshot
+        if (!$this->product_has_snapshot($product_id) && (!$variation_id || !$this->product_has_snapshot($variation_id))) {
             return $cart_item_data;
         }
 

@@ -356,6 +356,11 @@ This plugin is licensed under the GPL v2 or later.
 
 ## Changelog
 
+### Version 0.0.9
+- **FIXED: Variable product custom fields** — username/subdomain fields now show on variable and variable-subscription product pages
+- **FIXED: Subscription order processing** — variable subscription products no longer silently skip site creation
+- **FIXED: Admin metabox detection** — order metabox now detects variable product IWP snapshots
+
 ### Version 0.0.8
 - **FIXED: Only 10 snapshots visible in admin** — API client now fetches all pages instead of just the first page (default 10 per page)
 - **FIXED: Variation fields CSS** — WCS price fields now render correctly above InstaWP variation fields

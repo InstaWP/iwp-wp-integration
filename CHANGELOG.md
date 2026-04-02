@@ -5,6 +5,20 @@ All notable changes to the InstaWP Integration plugin will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.9] - 2026-04-02
+
+### Fixed
+- **Variable product custom fields not showing**
+  - Username and subdomain fields now display on variable and variable-subscription product pages
+  - `product_has_snapshot()` now checks variation-level `_iwp_selected_snapshot` meta, not just parent product
+  - Fixed validation and cart data storage to also recognize variation snapshots
+- **Subscription order processing for variable products**
+  - `process_subscription_order()` now checks variation meta before parent, matching `process_order()` behavior
+  - Previously silently skipped site creation for variable subscription products
+- **Admin metabox for variable product orders**
+  - "Has IWP products" check in order metabox now detects variation-level snapshots
+  - Previously showed "No site-enabled products" for variable product orders
+
 ## [0.0.8] - 2026-03-31
 
 ### Fixed
