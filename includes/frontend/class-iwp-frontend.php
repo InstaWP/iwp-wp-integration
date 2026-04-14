@@ -399,13 +399,83 @@ class IWP_Frontend {
         if (!$order) {
             return;
         }
-        
+
         $order_id = $order->get_id();
         if (!$order_id) {
             return;
         }
-        
+
+        // Display existing sites (if any)
         $this->display_order_sites($order_id, 'order-details');
+
+        // Display deferred onboarding form (if any items still need setup)
+        $this->display_deferred_onboarding($order);
+    }
+
+    /**
+     * Render the credential form for deferred (pending setup) items on this order.
+     *
+     * Uses the same HTML structure as the [iwp_onboarding] shortcode so that
+     * assets/js/onboarding.js handles the interaction automatically.
+     *
+     * @param WC_Order $order
+     */
+    private function display_deferred_onboarding($order) {
+        $order_id       = $order->get_id();
+        $deferred_items = get_post_meta($order_id, '_iwp_deferred_items', true);
+
+        if (empty($deferred_items) || !is_array($deferred_items)) {
+            return;
+        }
+
+        echo '<div class="iwp-onboarding-wrap" data-order-id="' . esc_attr($order_id) . '" data-order-key="' . esc_attr($order->get_order_key()) . '">';
+        echo '<h2 class="iwp-sites-title">' . esc_html__('Set Up Your Site', 'iwp-wp-integration') . '</h2>';
+
+        foreach ($deferred_items as $index => $item) {
+            $product_name = esc_html($item['product_name']);
+            $form_id      = 'iwp-onboarding-form-' . intval($index);
+
+            echo '<div class="iwp-onboarding-site-card iwp-onboarding-pending" id="iwp-onboarding-item-' . intval($index) . '">';
+            echo '<h3>' . $product_name . '</h3>';
+            echo '<p class="iwp-onboarding-description">' . esc_html__('Choose your WordPress admin username and site subdomain. Both are optional — leave blank for auto-generated values.', 'iwp-wp-integration') . '</p>';
+
+            echo '<form class="iwp-onboarding-form" id="' . esc_attr($form_id) . '" data-item-index="' . intval($index) . '">';
+
+            // Username
+            echo '<div class="iwp-onboarding-field">';
+            echo '<label for="' . esc_attr($form_id) . '-username">' . esc_html__('WordPress Admin Username', 'iwp-wp-integration') . '</label>';
+            echo '<input type="text" id="' . esc_attr($form_id) . '-username" name="admin_username" maxlength="20" placeholder="' . esc_attr__('e.g. john_doe', 'iwp-wp-integration') . '" autocomplete="off" />';
+            echo '<span class="iwp-onboarding-field-hint">' . esc_html__('3-20 characters, letters, numbers, underscores only.', 'iwp-wp-integration') . '</span>';
+            echo '<span class="iwp-onboarding-field-error" style="display:none;"></span>';
+            echo '</div>';
+
+            // Subdomain
+            echo '<div class="iwp-onboarding-field">';
+            echo '<label for="' . esc_attr($form_id) . '-subdomain">' . esc_html__('Site Subdomain', 'iwp-wp-integration') . '</label>';
+            echo '<input type="text" id="' . esc_attr($form_id) . '-subdomain" name="subdomain" maxlength="30" placeholder="' . esc_attr__('e.g. my-store', 'iwp-wp-integration') . '" autocomplete="off" />';
+            echo '<span class="iwp-onboarding-field-hint">' . esc_html__('3-30 characters, letters, numbers, hyphens only.', 'iwp-wp-integration') . '</span>';
+            echo '<span class="iwp-onboarding-field-error" style="display:none;"></span>';
+            echo '</div>';
+
+            echo '<div class="iwp-onboarding-form-actions">';
+            echo '<button type="submit" class="iwp-onboarding-btn iwp-onboarding-btn-primary iwp-onboarding-submit">' . esc_html__('Set Up My Site', 'iwp-wp-integration') . '</button>';
+            echo '</div>';
+
+            // Progress area
+            echo '<div class="iwp-onboarding-progress" style="display:none;">';
+            echo '<div class="iwp-onboarding-progress-message"></div>';
+            echo '<div class="iwp-onboarding-progress-bar-wrap"><div class="iwp-onboarding-progress-bar"></div></div>';
+            echo '</div>';
+
+            // Results area (filled by JS after creation)
+            echo '<div class="iwp-onboarding-results" style="display:none;"></div>';
+
+            echo '</form>';
+            echo '</div>';
+        }
+
+        echo '</div>';
+        wp_nonce_field('iwp_onboarding_nonce', 'iwp_onboarding_nonce');
     }
 
     /**
@@ -971,6 +1041,40 @@ class IWP_Frontend {
             return;
         }
 
+        // Check for orders with deferred items (pending setup)
+        $deferred_orders = wc_get_orders(array(
+            'customer_id' => $customer_id,
+            'limit'       => 5,
+            'status'      => array('completed', 'processing'),
+            'meta_key'    => '_iwp_deferred_items',
+            'orderby'     => 'date',
+            'order'       => 'DESC',
+        ));
+
+        // Show pending setup notice with link to order
+        if (!empty($deferred_orders)) {
+            foreach ($deferred_orders as $def_order) {
+                $deferred_items = get_post_meta($def_order->get_id(), '_iwp_deferred_items', true);
+                if (!empty($deferred_items) && is_array($deferred_items)) {
+                    $order_url = $def_order->get_view_order_url();
+                    $count     = count($deferred_items);
+                    echo '<div class="iwp-message iwp-message-info" style="margin-bottom:20px;">';
+                    echo '<p>' . sprintf(
+                        _n(
+                            'You have %d site waiting to be set up from <a href="%s">Order #%s</a>.',
+                            'You have %d sites waiting to be set up from <a href="%s">Order #%s</a>.',
+                            $count,
+                            'iwp-wp-integration'
+                        ),
+                        $count,
+                        esc_url($order_url),
+                        $def_order->get_order_number()
+                    ) . '</p>';
+                    echo '</div>';
+                }
+            }
+        }
+
         // Get customer's orders with sites
         $orders = wc_get_orders(array(
             'customer_id' => $customer_id,
@@ -984,39 +1088,39 @@ class IWP_Frontend {
             )
         ));
 
-        if (empty($orders)) {
+        if (empty($orders) && empty($deferred_orders)) {
             return;
         }
 
         $site_manager = new IWP_Site_Manager();
         $all_sites = array();
 
-        foreach ($orders as $order) {
-            $sites = $site_manager->get_order_sites($order->get_id());
-            if (!empty($sites)) {
-                foreach ($sites as $site) {
-                    $site['order_id'] = $order->get_id();
-                    $site['order_number'] = $order->get_order_number();
-                    $all_sites[] = $site;
+        if (!empty($orders)) {
+            foreach ($orders as $order) {
+                $sites = $site_manager->get_order_sites($order->get_id());
+                if (!empty($sites)) {
+                    foreach ($sites as $site) {
+                        $site['order_id'] = $order->get_id();
+                        $site['order_number'] = $order->get_order_number();
+                        $all_sites[] = $site;
+                    }
                 }
             }
         }
 
-        if (empty($all_sites)) {
-            return;
+        if (!empty($all_sites)) {
+            echo '<div class="instawp-integration-dashboard-sites">';
+            echo '<h2>' . __('Your Sites', 'iwp-wp-integration') . '</h2>';
+            echo '<p>' . sprintf(_n('You have %d site:', 'You have %d sites:', count($all_sites), 'iwp-wp-integration'), count($all_sites)) . '</p>';
+
+            echo '<div class="iwp-sites-grid">';
+            foreach ($all_sites as $site) {
+                $this->render_dashboard_site_card($site);
+            }
+            echo '</div>';
+
+            echo '</div>';
         }
-
-        echo '<div class="instawp-integration-dashboard-sites">';
-        echo '<h2>' . __('Your Sites', 'iwp-wp-integration') . '</h2>';
-        echo '<p>' . sprintf(_n('You have %d site:', 'You have %d sites:', count($all_sites), 'iwp-wp-integration'), count($all_sites)) . '</p>';
-
-        echo '<div class="iwp-sites-grid">';
-        foreach ($all_sites as $site) {
-            $this->render_dashboard_site_card($site);
-        }
-        echo '</div>';
-
-        echo '</div>';
     }
 
     /**

@@ -194,7 +194,34 @@ class IWP_Woo_Product_Integration {
         echo '</p>';
         
         echo '</div>'; // .options_group
-        
+
+        // Post-Purchase Onboarding section
+        echo '<div class="options_group">';
+        echo '<h4>' . __('Post-Purchase Onboarding', 'iwp-wp-integration') . '</h4>';
+
+        $defer_creation = get_post_meta($post->ID, '_iwp_defer_site_creation', true);
+        if ($defer_creation === '') {
+            $defer_creation = 'no';
+        }
+
+        woocommerce_wp_checkbox(array(
+            'id'          => '_iwp_defer_site_creation',
+            'label'       => __('Defer site creation', 'iwp-wp-integration'),
+            'description' => __('Do not auto-create the site on purchase. Collect credentials on a post-purchase onboarding page via the [iwp_onboarding] shortcode.', 'iwp-wp-integration'),
+            'value'       => $defer_creation,
+        ));
+
+        woocommerce_wp_text_input(array(
+            'id'          => '_iwp_onboarding_redirect_url',
+            'label'       => __('Onboarding page URL', 'iwp-wp-integration'),
+            'description' => __('Redirect customers here after purchase. The page should contain the [iwp_onboarding] shortcode. Leave blank to skip redirect.', 'iwp-wp-integration'),
+            'desc_tip'    => true,
+            'value'       => get_post_meta($post->ID, '_iwp_onboarding_redirect_url', true),
+            'placeholder' => 'https://example.com/setup-your-site/',
+        ));
+
+        echo '</div>'; // .options_group
+
         // Snapshot preview section
         // if (!empty($selected_snapshot)) {
         //     echo '<div class="options_group">';
@@ -243,11 +270,20 @@ class IWP_Woo_Product_Integration {
             delete_post_meta($post_id, '_iwp_site_expiry_hours');
         }
         
+        // Save defer site creation setting
+        $defer_creation = isset($_POST['_iwp_defer_site_creation']) ? 'yes' : 'no';
+        update_post_meta($post_id, '_iwp_defer_site_creation', $defer_creation);
+
+        // Save onboarding redirect URL
+        $redirect_url = isset($_POST['_iwp_onboarding_redirect_url']) ? esc_url_raw($_POST['_iwp_onboarding_redirect_url']) : '';
+        update_post_meta($post_id, '_iwp_onboarding_redirect_url', $redirect_url);
+
         IWP_Logger::info('Saved product configuration', 'product-integration', array(
-            'snapshot' => $selected_snapshot, 
+            'snapshot' => $selected_snapshot,
             'plan' => $selected_plan,
             'expiry_type' => $expiry_type,
-            'expiry_hours' => ($expiry_type === 'temporary' ? ($expiry_hours ?? 24) : null)
+            'expiry_hours' => ($expiry_type === 'temporary' ? ($expiry_hours ?? 24) : null),
+            'defer_creation' => $defer_creation,
         ));
     }
 

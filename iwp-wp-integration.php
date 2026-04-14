@@ -3,7 +3,7 @@
  * Plugin Name: InstaWP Integration
  * Plugin URI: https://instawp.com
  * Description: A comprehensive WordPress integration plugin for InstaWP that provides enhanced functionality, seamless integration, WooCommerce support, and standalone site creation tools.
- * Version: 0.0.9
+ * Version: 0.0.10
  * Author: InstaWP
  * Author URI: https://instawp.com
  * Text Domain: iwp-wp-integration
@@ -24,7 +24,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('IWP_VERSION', '0.0.9');
+define('IWP_VERSION', '0.0.10');
 define('IWP_PLUGIN_FILE', __FILE__);
 define('IWP_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('IWP_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -121,6 +121,10 @@ function iwp_init() {
     // Initialize shortcode functionality (both admin and frontend)
     require_once IWP_PLUGIN_PATH . 'includes/core/class-iwp-shortcode.php';
     new IWP_Shortcode();
+
+    // Initialize post-purchase onboarding (deferred site creation)
+    require_once IWP_PLUGIN_PATH . 'includes/frontend/class-iwp-onboarding.php';
+    new IWP_Onboarding();
     
     // Initialize frontend (for customer-facing features)
     if (!is_admin() || wp_doing_ajax()) {

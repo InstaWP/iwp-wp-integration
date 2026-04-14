@@ -132,6 +132,7 @@ class IWP_Woo_Order_Processor {
 
         $sites_created = array();
         $errors = array();
+        $deferred_items = array();
 
         // Check if site_id upgrade mode is active
         if (!class_exists('IWP_Frontend')) {
@@ -205,7 +206,29 @@ class IWP_Woo_Order_Processor {
                 error_log('IWP WooCommerce V2: No snapshot selected for product ID: ' . $product->get_id());
                 continue;
             }
-            
+
+            // Check if site creation is deferred to post-purchase onboarding
+            $defer_creation = false;
+            if ($variation_id) {
+                $defer_creation = get_post_meta($variation_id, '_iwp_defer_site_creation', true) === 'yes';
+            }
+            if (!$defer_creation) {
+                $defer_creation = get_post_meta($product_id, '_iwp_defer_site_creation', true) === 'yes';
+            }
+
+            if ($defer_creation) {
+                $deferred_items[] = array(
+                    'item_id'       => $item_id,
+                    'product_id'    => $product_id,
+                    'variation_id'  => $variation_id,
+                    'product_name'  => $product->get_name(),
+                    'snapshot_slug' => $snapshot_slug,
+                    'plan_id'       => $plan_id,
+                );
+                error_log('IWP WooCommerce V2: Deferred site creation for product ' . $product_id . ' (credentials collected post-purchase)');
+                continue;
+            }
+
             error_log('IWP WooCommerce V2: Processing product with snapshot slug: ' . $snapshot_slug . ', plan ID: ' . $plan_id);
 
             // Create site for this product
@@ -233,9 +256,15 @@ class IWP_Woo_Order_Processor {
         if (!empty($sites_created)) {
             update_post_meta($order_id, '_iwp_sites_created', $sites_created);
         }
-        
+
         if (!empty($errors)) {
             update_post_meta($order_id, '_iwp_creation_errors', $errors);
+        }
+
+        // Store deferred items for post-purchase onboarding
+        if (!empty($deferred_items)) {
+            update_post_meta($order_id, '_iwp_deferred_items', $deferred_items);
+            error_log('IWP WooCommerce V2: Stored ' . count($deferred_items) . ' deferred item(s) for post-purchase onboarding');
         }
 
         // Mark order as processed
@@ -243,7 +272,7 @@ class IWP_Woo_Order_Processor {
         update_post_meta($order_id, '_iwp_processed_date', current_time('mysql'));
 
         // Add order note
-        $note = $this->generate_order_note($sites_created, $errors);
+        $note = $this->generate_order_note($sites_created, $errors, $deferred_items);
         $order->add_order_note($note, 1); // 1 = customer visible
 
         // Always clear stored site_id after processing order (whether upgrade happened or not)
@@ -526,7 +555,7 @@ class IWP_Woo_Order_Processor {
      * @param array $errors
      * @return string
      */
-    private function generate_order_note($sites_created, $errors) {
+    private function generate_order_note($sites_created, $errors, $deferred_items = array()) {
         $note = __('Processing Results:', 'iwp-woo-v2') . "\n\n";
         
         if (!empty($sites_created)) {
@@ -583,6 +612,14 @@ class IWP_Woo_Order_Processor {
             }
         }
         
+        if (!empty($deferred_items)) {
+            $note .= __('Pending Setup (post-purchase onboarding):', 'iwp-woo-v2') . "\n";
+            foreach ($deferred_items as $item) {
+                $note .= sprintf("- %s\n", $item['product_name']);
+            }
+            $note .= "\n";
+        }
+
         if (!empty($errors)) {
             $note .= __('Errors:', 'iwp-woo-v2') . "\n";
             foreach ($errors as $error) {
@@ -593,7 +630,7 @@ class IWP_Woo_Order_Processor {
                 );
             }
         }
-        
+
         return $note;
     }
 

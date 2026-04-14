@@ -5,6 +5,29 @@ All notable changes to the InstaWP Integration plugin will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.10] - 2026-04-14
+
+### Added
+- **Post-Purchase Onboarding (Deferred Site Creation)**
+  - New product setting: "Defer site creation" — skips auto-create on purchase, collects credentials post-purchase
+  - New product setting: "Onboarding page URL" — auto-redirects thank-you page to onboarding page with order params
+  - New `[iwp_onboarding]` shortcode renders a credential form (username + subdomain) and triggers site creation on submit
+  - Shortcode supports `redirect` attribute: `[iwp_onboarding redirect="/my-account/#hosting"]`
+  - Order detection via URL params (`?order_id=X&key=Y`) or current user lookup — supports guest checkout
+  - Real-time progress bar and task polling for non-pool sites
+  - Site results displayed inline with credentials, copy buttons, and Magic Login
+
+- **My Account Integration for Deferred Sites**
+  - Order view page shows credential form for any pending deferred items
+  - Dashboard shows info banner linking to orders with pending site setups
+
+- **Kadence Conversions Compatibility**
+  - Shortcodes now render inside Kadence Conversions popups via `kadence_conversions_output` filter
+
+### Changed
+- Order processor now stores `_iwp_deferred_items` order meta for products with defer enabled
+- Order notes include "Pending Setup" section for deferred items
+
 ## [0.0.9] - 2026-04-02
 
 ### Fixed

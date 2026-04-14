@@ -356,6 +356,12 @@ This plugin is licensed under the GPL v2 or later.
 
 ## Changelog
 
+### Version 0.0.10
+- **NEW: Post-Purchase Onboarding** — defer site creation to after purchase, collect credentials via `[iwp_onboarding]` shortcode
+- **NEW: My Account deferred setup** — pending sites show on order view and dashboard banner
+- **NEW: Kadence Conversions support** — shortcodes render inside Kadence popups
+- **NEW: Redirect attribute** — `[iwp_onboarding redirect="/my-account/"]` redirects after site creation
+
 ### Version 0.0.9
 - **FIXED: Variable product custom fields** — username/subdomain fields now show on variable and variable-subscription product pages
 - **FIXED: Subscription order processing** — variable subscription products no longer silently skip site creation
