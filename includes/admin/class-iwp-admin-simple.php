@@ -294,7 +294,7 @@ class IWP_Admin_Simple {
         $site_url = $site['wp_url'] ?? '#';
         $admin_url = trailingslashit($site_url) . 'wp-admin';
         $magic_login_url = !empty($site['s_hash']) ? 
-            'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($site['s_hash']) : 
+            IWP_PLUGIN_APP_URL . '/wordpress-auto-login?site=' . urlencode($site['s_hash']) :
             $admin_url;
         
         ?>
@@ -479,7 +479,7 @@ class IWP_Admin_Simple {
         );
         
         printf(
-            '<p class="description">%s <a href="https://app.instawp.io/user/api-tokens" target="_blank">%s</a></p>',
+            '<p class="description">%s <a href="' . esc_url(IWP_PLUGIN_APP_URL . '/user/api-tokens') . '" target="_blank">%s</a></p>',
             esc_html__('Enter your InstaWP API key.', 'iwp-wp-integration'),
             esc_html__('Get your API key here', 'iwp-wp-integration')
         );
@@ -1171,7 +1171,7 @@ class IWP_Admin_Simple {
         $login_url = '';
         $login_label = '';
         if (!empty($site->s_hash)) {
-            $login_url = 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($site->s_hash);
+            $login_url = IWP_PLUGIN_APP_URL . '/wordpress-auto-login?site=' . urlencode($site->s_hash);
             $login_label = __('Magic Login', 'iwp-wp-integration');
         } elseif (!empty($site->site_url)) {
             $login_url = trailingslashit($site->site_url) . 'wp-admin';

@@ -145,7 +145,7 @@ class IWP_Admin {
                 'type' => 'password',
                 'description' => sprintf(
                     esc_html__('Enter your API key for authentication. %sGet your API key here%s', 'iwp-wp-integration'),
-                    '<a href="https://app.instawp.io/user/api-tokens" target="_blank" rel="noopener noreferrer">',
+                    '<a href="' . esc_url(IWP_PLUGIN_APP_URL . '/user/api-tokens') . '" target="_blank" rel="noopener noreferrer">',
                     '</a>'
                 )
             )
@@ -790,7 +790,7 @@ class IWP_Admin {
             <div class="form-section">
                 <h4><?php esc_html_e('Useful Links', 'iwp-wp-integration'); ?></h4>
                 <ul>
-                    <li><a href="https://app.instawp.io/user/api-tokens" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Get API Key', 'iwp-wp-integration'); ?></a></li>
+                    <li><a href="<?php echo esc_url(IWP_PLUGIN_APP_URL . '/user/api-tokens'); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Get API Key', 'iwp-wp-integration'); ?></a></li>
                     <li><a href="https://instawp.com/docs" target="_blank" rel="noopener noreferrer"><?php esc_html_e('InstaWP Documentation', 'iwp-wp-integration'); ?></a></li>
                     <li><a href="https://instawp.com/support" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Support', 'iwp-wp-integration'); ?></a></li>
                 </ul>

@@ -738,7 +738,7 @@ class IWP_Frontend {
 
                 // Use magic login if s_hash is available, otherwise fall back to regular admin login
                 if (!empty($s_hash)) {
-                    $magic_login_url = 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($s_hash);
+                    $magic_login_url = IWP_PLUGIN_APP_URL . '/wordpress-auto-login?site=' . urlencode($s_hash);
                     echo '<a href="' . esc_url($magic_login_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-secondary">' . __('Magic Login', 'iwp-wp-integration') . '</a>';
                 } else {
                     // Fallback to regular admin login
@@ -974,7 +974,7 @@ class IWP_Frontend {
                         }
                         // Use magic login if s_hash is available
                         if (!empty($s_hash)) {
-                            echo sprintf(__('Magic Login: %s', 'iwp-wp-integration'), 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($s_hash)) . "\n";
+                            echo sprintf(__('Magic Login: %s', 'iwp-wp-integration'), IWP_PLUGIN_APP_URL . '/wordpress-auto-login?site=' . urlencode($s_hash)) . "\n";
                         } else {
                             echo sprintf(__('Admin URL: %s', 'iwp-wp-integration'), trailingslashit($wp_url) . 'wp-admin') . "\n";
                         }
@@ -1015,7 +1015,7 @@ class IWP_Frontend {
 
                         // Use magic login if s_hash is available
                         if (!empty($s_hash)) {
-                            $magic_login_url = 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($s_hash);
+                            $magic_login_url = IWP_PLUGIN_APP_URL . '/wordpress-auto-login?site=' . urlencode($s_hash);
                             echo '<p><a href="' . esc_url($magic_login_url) . '" target="_blank" style="background: #0073aa; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block;">' . __('Magic Login', 'iwp-wp-integration') . '</a></p>';
                         } else {
                             echo '<p><a href="' . esc_url(trailingslashit($wp_url) . 'wp-admin') . '" target="_blank" style="background: #0073aa; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block;">' . __('Login to Admin', 'iwp-wp-integration') . '</a></p>';
@@ -1158,7 +1158,7 @@ class IWP_Frontend {
             echo '<a href="' . esc_url($wp_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-sm">' . __('Visit Site', 'iwp-wp-integration') . '</a>';
 
             if (!$hide_credentials && !empty($s_hash)) {
-                $magic_login_url = 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($s_hash);
+                $magic_login_url = IWP_PLUGIN_APP_URL . '/wordpress-auto-login?site=' . urlencode($s_hash);
                 echo '<a href="' . esc_url($magic_login_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-sm iwp-btn-magic-login">' . __('Magic Login', 'iwp-wp-integration') . '</a>';
             }
         }

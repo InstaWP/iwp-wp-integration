@@ -21,14 +21,14 @@ class IWP_API_Client {
      *
      * @var string
      */
-    private $api_url = 'https://app.instawp.io/api/v2/';
+    private $api_url = IWP_PLUGIN_APP_URL . '/api/v2/';
 
     /**
      * V1 API base URL (for legacy endpoints like domain mapping)
      *
      * @var string
      */
-    private $api_url_v1 = 'https://app.instawp.io/api/v1/';
+    private $api_url_v1 = IWP_PLUGIN_APP_URL . '/api/v1/';
 
     /**
      * API key

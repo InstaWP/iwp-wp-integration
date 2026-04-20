@@ -365,7 +365,7 @@ class IWP_Form_Helper {
             
             // Admin login button
             if (!empty($site_data['s_hash'])) {
-                $magic_login_url = 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($site_data['s_hash']);
+                $magic_login_url = IWP_PLUGIN_APP_URL . '/wordpress-auto-login?site=' . urlencode($site_data['s_hash']);
                 $output .= '<a href="' . esc_url($magic_login_url) . '" target="_blank" class="iwp-btn iwp-btn-secondary">';
                 $output .= __('Magic Login', 'iwp-wp-integration');
                 $output .= '</a>';

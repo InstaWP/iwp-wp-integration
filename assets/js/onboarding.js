@@ -221,7 +221,7 @@
             // Action buttons
             html += '<div class="iwp-onboarding-actions">';
             if (data.s_hash) {
-                var magicUrl = 'https://app.instawp.io/wordpress-auto-login?site=' + encodeURIComponent(data.s_hash);
+                var magicUrl = iwp_onboarding.app_url + '/wordpress-auto-login?site=' + encodeURIComponent(data.s_hash);
                 html += '<a href="' + escHtml(magicUrl) + '" target="_blank" class="iwp-onboarding-btn iwp-onboarding-btn-primary">Magic Login</a> ';
             }
             if (data.site_url) {

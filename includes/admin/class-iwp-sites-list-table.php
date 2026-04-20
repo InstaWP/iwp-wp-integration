@@ -803,7 +803,7 @@ class IWP_Sites_List_Table extends WP_List_Table {
         // Add "Open in InstaWP" action first (moved from Actions column)
         if (!empty($item['site_id'])) {
             $actions['open_instawp'] = sprintf('<a href="%s" target="_blank">%s</a>', 
-                esc_url('https://app.instawp.io/sites/' . $item['site_id'] . '/dashboard'), 
+                esc_url(IWP_PLUGIN_APP_URL . '/sites/' . $item['site_id'] . '/dashboard'),
                 __('Open in InstaWP', 'iwp-wp-integration')
             );
         }
@@ -813,7 +813,7 @@ class IWP_Sites_List_Table extends WP_List_Table {
         
         // Add Magic Login if s_hash is available
         if (!empty($item['s_hash'])) {
-            $magic_login_url = 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($item['s_hash']);
+            $magic_login_url = IWP_PLUGIN_APP_URL . '/wordpress-auto-login?site=' . urlencode($item['s_hash']);
             $actions['magic_login'] = sprintf('<a href="%s" target="_blank">%s</a>', esc_url($magic_login_url), __('Magic Login', 'iwp-wp-integration'));
         } else {
             // Fallback to regular wp-admin if no s_hash
