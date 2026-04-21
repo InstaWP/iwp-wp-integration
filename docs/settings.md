@@ -58,7 +58,7 @@ Lists all snapshots available in your InstaWP account (filtered by team). Each e
 
 - The slug is what you use when configuring products or shortcodes
 - Click **Refresh Snapshots** to fetch fresh data from InstaWP
-- Snapshots are cached for 15 minutes to reduce API calls
+- Snapshots are cached for 4 hours to reduce API calls (filterable via `iwp_snapshots_cache_duration`)
 
 ### Plans
 

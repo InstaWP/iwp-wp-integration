@@ -432,6 +432,25 @@ class IWP_Site_Manager {
         $order_id = $site_data['order_id'];
         $site_info = $site_data['site_info'];
 
+        // Skip if the local row was deleted (status='trashed'). The remote
+        // task has long since finished — we must not resurrect it. Drop the
+        // legacy entry so we stop polling it every minute too.
+        if (!empty($site_info['site_id'])) {
+            $db_row = IWP_Sites_Model::get_by_site_id($site_info['site_id']);
+            if ($db_row && $db_row->status === 'trashed') {
+                $pending = get_option('iwp_pending_sites', array());
+                if (isset($pending[$task_id])) {
+                    unset($pending[$task_id]);
+                    update_option('iwp_pending_sites', $pending);
+                }
+                IWP_Logger::info('Skipped polled update — row is trashed', 'site-manager', array(
+                    'site_id' => $site_info['site_id'],
+                    'task_id' => $task_id,
+                ));
+                return;
+            }
+        }
+
         if ($status === 'completed' || $status === 'success') {
             // Update site status to completed
             $site_info['status'] = 'completed';
@@ -447,7 +466,7 @@ class IWP_Site_Manager {
                 
                 if (!is_wp_error($site_details_response) && isset($site_details_response['data'])) {
                     $site_details = $site_details_response['data'];
-                    
+
                     // Update site_info with fresh credentials and URLs
                     if (!empty($site_details['url'])) {
                         $site_info['wp_url'] = $site_details['url'];
@@ -465,19 +484,40 @@ class IWP_Site_Manager {
                         $site_info['s_hash'] = $site_details['s_hash'];
                         $db_update_data['s_hash'] = $site_details['s_hash'];
                     }
-                    
+
                     IWP_Logger::info('Updated legacy site with fresh credentials', 'site-manager', array(
                         'site_id' => $site_info['site_id'],
                         'has_username' => !empty($site_info['wp_username']),
                         'has_password' => !empty($site_info['wp_password'])
                     ));
+                } elseif (is_wp_error($site_details_response)) {
+                    $err = $site_details_response->get_error_message();
+                    if (strpos($err, '404') !== false || strpos($err, 'No query results') !== false) {
+                        // Remote site no longer exists. Don't resurrect the local row
+                        // as "completed". Drop the stale pending entry and bail.
+                        $pending = get_option('iwp_pending_sites', array());
+                        if (isset($pending[$task_id])) {
+                            unset($pending[$task_id]);
+                            update_option('iwp_pending_sites', $pending);
+                        }
+                        IWP_Logger::info('Polled task references a deleted remote site; skipping local update', 'site-manager', array(
+                            'site_id' => $site_info['site_id'],
+                            'task_id' => $task_id,
+                            'error' => $err,
+                        ));
+                        return;
+                    }
+                    IWP_Logger::warning('Could not fetch site details for legacy site credentials', 'site-manager', array(
+                        'site_id' => $site_info['site_id'],
+                        'error' => $err,
+                    ));
                 } else {
                     IWP_Logger::warning('Could not fetch site details for legacy site credentials', 'site-manager', array(
                         'site_id' => $site_info['site_id'],
-                        'error' => is_wp_error($site_details_response) ? $site_details_response->get_error_message() : 'No data returned'
+                        'error' => 'No data returned',
                     ));
                 }
-                
+
                 // Update database record
                 IWP_Sites_Model::update($site_info['site_id'], $db_update_data);
                 IWP_Logger::info('Updated database site record to completed', 'site-manager', array(
@@ -686,6 +726,12 @@ class IWP_Site_Manager {
             }
         }
         
+        // Hide soft-deleted (trashed) sites from customer-facing renderers.
+        // The admin Trash tab uses IWP_Sites_List_Table directly and is unaffected.
+        $all_sites = array_values(array_filter($all_sites, function ($s) {
+            return !isset($s['status']) || $s['status'] !== 'trashed';
+        }));
+
         IWP_Logger::debug('Returning total sites for order', 'site-manager', array('order_id' => $order_id, 'total_count' => count($all_sites)));
         return $all_sites;
     }

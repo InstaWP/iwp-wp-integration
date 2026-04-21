@@ -65,6 +65,38 @@ class IWP_Frontend {
     }
 
     /**
+     * Render the site credentials block (username + password with copy/show buttons).
+     *
+     * Shared between the order-details card and the customer dashboard card so both
+     * surfaces use identical markup, escaping, and CSS/JS hooks.
+     *
+     * @param string $wp_username
+     * @param string $wp_password
+     */
+    private function render_site_credentials_block($wp_username, $wp_password) {
+        if (empty($wp_username)) {
+            return;
+        }
+
+        echo '<div class="iwp-site-credentials">';
+        echo '<div class="iwp-credential-row">';
+        echo '<strong>' . __('Username:', 'iwp-wp-integration') . '</strong> ';
+        echo '<code class="iwp-credential-value">' . esc_html($wp_username) . '</code>';
+        echo '<button type="button" class="iwp-copy-btn" data-copy="' . esc_attr($wp_username) . '" data-icon="📋" title="' . esc_attr__('Copy to clipboard', 'iwp-wp-integration') . '">📋</button>';
+        echo '</div>';
+
+        if (!empty($wp_password)) {
+            echo '<div class="iwp-credential-row">';
+            echo '<strong>' . __('Password:', 'iwp-wp-integration') . '</strong> ';
+            echo '<code class="iwp-credential-value iwp-password-hidden" data-password="' . esc_attr($wp_password) . '">••••••••</code>';
+            echo '<button type="button" class="iwp-show-password-btn" title="' . esc_attr__('Show/Hide password', 'iwp-wp-integration') . '">👁️</button>';
+            echo '<button type="button" class="iwp-copy-btn" data-copy="' . esc_attr($wp_password) . '" data-icon="📋" title="' . esc_attr__('Copy to clipboard', 'iwp-wp-integration') . '">📋</button>';
+            echo '</div>';
+        }
+        echo '</div>';
+    }
+
+    /**
      * Initialize hooks
      */
     private function init_hooks() {
@@ -714,24 +746,7 @@ class IWP_Frontend {
                 echo '<a href="' . esc_url($wp_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-primary">' . __('Visit Site', 'iwp-wp-integration') . '</a>';
                 echo '</div>';
             } else {
-                if (!empty($wp_username)) {
-                    echo '<div class="iwp-site-credentials">';
-                    echo '<div class="iwp-credential-row">';
-                    echo '<strong>' . __('Username:', 'iwp-wp-integration') . '</strong> ';
-                    echo '<code class="iwp-credential-value">' . esc_html($wp_username) . '</code>';
-                    echo '<button type="button" class="iwp-copy-btn" data-copy="' . esc_attr($wp_username) . '" title="' . esc_attr__('Copy to clipboard', 'iwp-wp-integration') . '">📋</button>';
-                    echo '</div>';
-
-                    if (!empty($wp_password)) {
-                        echo '<div class="iwp-credential-row">';
-                        echo '<strong>' . __('Password:', 'iwp-wp-integration') . '</strong> ';
-                        echo '<code class="iwp-credential-value iwp-password-hidden" data-password="' . esc_attr($wp_password) . '">••••••••</code>';
-                        echo '<button type="button" class="iwp-show-password-btn" title="' . esc_attr__('Show/Hide password', 'iwp-wp-integration') . '">👁️</button>';
-                        echo '<button type="button" class="iwp-copy-btn" data-copy="' . esc_attr($wp_password) . '" title="' . esc_attr__('Copy to clipboard', 'iwp-wp-integration') . '">📋</button>';
-                        echo '</div>';
-                    }
-                    echo '</div>';
-                }
+                $this->render_site_credentials_block($wp_username, $wp_password);
 
                 echo '<div class="iwp-site-actions">';
                 echo '<a href="' . esc_url($wp_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-primary">' . __('Visit Site', 'iwp-wp-integration') . '</a>';
@@ -1131,6 +1146,8 @@ class IWP_Frontend {
     private function render_dashboard_site_card($site) {
         $status = $site['status'] ?? 'unknown';
         $wp_url = $site['wp_url'] ?? '';
+        $wp_username = $site['wp_username'] ?? '';
+        $wp_password = $site['wp_password'] ?? '';
         $snapshot_slug = $site['snapshot_slug'] ?? '';
         $site_name = $site['site_name'] ?? '';
         $order_id = $site['order_id'] ?? '';
@@ -1139,6 +1156,10 @@ class IWP_Frontend {
 
         $status_class = 'iwp-status-' . esc_attr($status);
         $display_name = $site_name ?: ($snapshot_slug ?: __('Site', 'iwp-wp-integration'));
+        $hide_credentials = $this->should_hide_credentials($site);
+
+        $options = get_option('iwp_options', array());
+        $show_site_credentials_on_dashboard = isset($options['show_site_credentials_on_dashboard']) && $options['show_site_credentials_on_dashboard'] === 'yes';
 
         echo '<div class="iwp-dashboard-site-card ' . esc_attr($status_class) . '">';
         echo '<div class="iwp-site-info">';
@@ -1151,7 +1172,9 @@ class IWP_Frontend {
         echo '<p class="iwp-order-info">' . sprintf(__('From Order #%s', 'iwp-wp-integration'), $order_number) . '</p>';
         echo '</div>';
 
-        $hide_credentials = $this->should_hide_credentials($site);
+        if ($status === 'completed' && !empty($wp_url) && $show_site_credentials_on_dashboard && !$hide_credentials) {
+            $this->render_site_credentials_block($wp_username, $wp_password);
+        }
 
         echo '<div class="iwp-site-actions">';
         if ($status === 'completed' && !empty($wp_url)) {

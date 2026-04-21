@@ -613,21 +613,36 @@
          */
         showCopyFeedback: function($button, message, type) {
             type = type || 'success';
-            
-            var originalTitle = $button.attr('title');
-            var originalText = $button.text();
-            
-            // Update button temporarily
+
+            var iconAttr = $button.attr('data-icon');
+            if (!iconAttr) {
+                iconAttr = $button.data('iwp-original-icon') || $button.text();
+                $button.data('iwp-original-icon', iconAttr);
+            }
+            var originalTitle = $button.data('iwp-original-title');
+            if (!originalTitle) {
+                originalTitle = $button.attr('title');
+                $button.data('iwp-original-title', originalTitle);
+            }
+
+            var pending = $button.data('iwp-feedback-timeout');
+            if (pending) {
+                clearTimeout(pending);
+            }
+
+            var feedbackIcon = type === 'success' ? '✓' : '✗';
             $button.attr('title', message);
-            
-            // Show feedback styling
+            $button.text(feedbackIcon);
             $button.addClass('iwp-copy-' + type);
-            
-            // Reset after 2 seconds
-            setTimeout(function() {
+
+            var timeoutId = setTimeout(function() {
                 $button.attr('title', originalTitle);
+                $button.text(iconAttr);
                 $button.removeClass('iwp-copy-success iwp-copy-error');
+                $button.removeData('iwp-feedback-timeout');
             }, 2000);
+
+            $button.data('iwp-feedback-timeout', timeoutId);
         },
 
         /**

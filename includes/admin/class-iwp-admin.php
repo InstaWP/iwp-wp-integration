@@ -1246,8 +1246,8 @@ class IWP_Admin {
                     $api_client->delete_site($site_id);
                 }
 
-                // Remove from database
-                IWP_Sites_Model::delete($site_id);
+                // Mark local record as trashed so it stays visible under the Trash filter.
+                IWP_Sites_Model::update($site_id, array('status' => 'trashed'));
 
                 // Log the deletion
                 IWP_Logger::info('Site deleted via row action', 'admin', array(
@@ -2269,11 +2269,11 @@ class IWP_Admin {
             ));
         }
 
-        // Also remove from database table if it exists
+        // Mark local record as trashed so it stays visible under the Trash filter.
         $db_site = IWP_Sites_Model::get_by_site_id($site_id);
         if ($db_site) {
-            IWP_Sites_Model::delete($site_id);
-            IWP_Logger::info('Removed site from database table', 'admin', array('site_id' => $site_id));
+            IWP_Sites_Model::update($site_id, array('status' => 'trashed'));
+            IWP_Logger::info('Marked site as trashed in database table', 'admin', array('site_id' => $site_id));
         }
 
         IWP_Logger::info('Site deleted successfully', 'admin', array(

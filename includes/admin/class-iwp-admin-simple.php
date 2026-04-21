@@ -437,6 +437,18 @@ class IWP_Admin_Simple {
                 'label' => 'Hide login credentials from customers until manually released. Use "Send Credentials" action from InstaWP > Sites to share credentials when ready.'
             )
         );
+
+        add_settings_field(
+            'show_site_credentials_on_dashboard',
+            esc_html__('Show Site Credentials on Dashboard', 'iwp-wp-integration'),
+            array($this, 'checkbox_callback'),
+            'iwp_settings',
+            'iwp_general',
+            array(
+                'field' => 'show_site_credentials_on_dashboard',
+                'label' => 'Show ordered site username and password on the WooCommerce My Account dashboard page.'
+            )
+        );
     }
 
     /**
@@ -541,6 +553,9 @@ class IWP_Admin_Simple {
 
             // Delay customer credentials - checkbox, so absence means 'no'
             $sanitized['delay_customer_credentials'] = isset($input['delay_customer_credentials']) && $input['delay_customer_credentials'] === 'yes' ? 'yes' : 'no';
+
+            // Show site credentials on customer dashboard - checkbox, so absence means 'no'
+            $sanitized['show_site_credentials_on_dashboard'] = isset($input['show_site_credentials_on_dashboard']) && $input['show_site_credentials_on_dashboard'] === 'yes' ? 'yes' : 'no';
         }
         
         // Debug form fields - only process if this is the debug form
@@ -1026,8 +1041,8 @@ class IWP_Admin_Simple {
                     $api_client->delete_site($site_id);
                 }
 
-                // Remove from database
-                IWP_Sites_Model::delete($site_id);
+                // Mark local record as trashed so it stays visible under the Trash filter.
+                IWP_Sites_Model::update($site_id, array('status' => 'trashed'));
 
                 // Log the deletion
                 IWP_Logger::info('Site deleted via row action', 'admin', array(
