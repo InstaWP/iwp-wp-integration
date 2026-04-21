@@ -1031,21 +1031,18 @@ class IWP_Admin_Simple {
 
             // Delete the site
             try {
-                // Get API client manually with proper configuration
-                $options = get_option('iwp_options', array());
-                $api_key = $options['api_key'] ?? '';
-                
+                $options    = get_option('iwp_options', array());
+                $api_key    = $options['api_key'] ?? '';
+                $api_client = null;
+
                 if (!empty($api_key)) {
                     $api_client = new IWP_API_Client();
                     $api_client->set_api_key($api_key);
-                    $api_client->delete_site($site_id);
                 }
 
-                // Mark local record as trashed so it stays visible under the Trash filter.
-                IWP_Sites_Model::update($site_id, array('status' => 'trashed'));
+                IWP_Sites_Model::trash($site_id, $api_client);
 
-                // Log the deletion
-                IWP_Logger::info('Site deleted via row action', 'admin', array(
+                IWP_Logger::info('Site moved to trash via row action', 'admin', array(
                     'site_id' => $site_id,
                     'user_id' => get_current_user_id()
                 ));

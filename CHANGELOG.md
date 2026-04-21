@@ -10,20 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Trash filter on the Sites list page**
   - Deleting a site now moves the local record to a new "Trash" status instead of removing the row, so admins can see which sites were deleted.
-  - New **Trash** view alongside All / Active / Creating / Failed / Expired (`get_views()` in `class-iwp-sites-list-table.php`).
-  - On the Trash view, the URL is rendered as plain text and all row actions (Visit Site, Magic Login, Delete, Send Credentials, Open in InstaWP) are suppressed.
-  - On the Trash view, the **Password** and **Status** columns are hidden via `get_columns()`.
+  - New **Trash** view alongside All, Active, Creating, Failed, Expired.
+  - On the Trash view the URL is shown as plain text and all row actions (Visit Site, Magic Login, Delete, Send Credentials, Open in InstaWP) are hidden.
+  - On the Trash view the Password and Status columns are hidden.
+- New **Show Site Credentials on Dashboard** option (off by default). When enabled, each site card on the customer's My Account dashboard shows the WordPress admin username and password.
 
 ### Changed
-- The **All** view now excludes trashed rows (standard WordPress convention) via `apply_status_filter()`.
-- Site delete handlers now call `IWP_Sites_Model::update($site_id, ['status' => 'trashed'])` instead of `IWP_Sites_Model::delete($site_id)`. Affected: `IWP_Admin::handle_sites_page_actions()`, `IWP_Admin::ajax_delete_site()`, `IWP_Admin_Simple::handle_sites_page_actions()`.
-- **Snapshots cache duration increased from 15 minutes to 4 hours** (`iwp_snapshots_cache_duration` default in `IWP_API_Client::get_snapshots()`). Reduces API calls during normal operation; still overridable via the `iwp_snapshots_cache_duration` filter or by clicking **Refresh Snapshots** in Settings → InstaWP Data.
+- The **All** view now excludes trashed sites (standard WordPress convention).
+- Deleting a site no longer removes the local record — it is moved to **Trash** instead. The remote API delete still runs as before.
+- Trashed sites no longer appear in customer-facing views (My Account dashboard, order detail page, order emails). The order detail "Sites" section is hidden entirely when every site for that order has been trashed.
+- **Snapshots cache duration increased from 15 minutes to 4 hours** to reduce API calls during normal operation. Still overridable by clicking **Refresh Snapshots** in Settings → InstaWP Data.
 
 ### Fixed
-- **Trashed sites no longer get resurrected by the legacy pending-sites poller.** `IWP_Site_Manager::check_single_site_status()` now:
-  - Skips the local update entirely when `wp_iwp_sites.status === 'trashed'`, and removes the stale entry from the `iwp_pending_sites` option so it stops being polled.
-  - Treats a 404 / "No query results for model" response from `get_site_details()` as proof the remote site no longer exists, drops the legacy queue entry and bails instead of falling through to a `status='completed'` write.
-  - Previously, the every-minute `iwp_check_pending_sites` cron would re-flip a trashed row back to `completed` whenever a stale `iwp_pending_sites` entry still pointed at the same site_id, which made the deleted site reappear under **All** after any new order.
+- **Trashed sites no longer get resurrected after a new order.** The pending-sites background poller used to re-flip a trashed row back to "Completed" whenever a stale entry in its queue still pointed at the same site, which made the deleted site reappear under **All** after any new order. The poller now skips trashed rows and treats a remote "site not found" response as proof the site has been deleted, dropping the stale queue entry.
 
 ## [0.0.10] - 2026-04-14
 

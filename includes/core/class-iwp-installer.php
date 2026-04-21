@@ -260,6 +260,9 @@ class IWP_Installer {
             'enable_integration' => 'yes',
             'auto_create_sites' => 'yes',
             'use_site_id_parameter' => 'yes',
+            // Customer dashboard credentials are off by default; enable if you
+            // want WP username/password rendered on each site card.
+            'show_site_credentials_on_dashboard' => 'no',
             // Reasonable debug defaults
             'debug_mode' => 'no',
             'log_level' => 'info',

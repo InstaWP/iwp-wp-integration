@@ -51,7 +51,7 @@ class IWP_Sites_List_Table extends WP_List_Table {
         );
 
         // On the Trash view password/status are irrelevant — drop them entirely.
-        if (isset($_GET['status']) && $_GET['status'] === 'trashed') {
+        if (isset($_GET['status']) && sanitize_key(wp_unslash($_GET['status'])) === IWP_Sites_Model::STATUS_TRASHED) {
             unset($columns['password'], $columns['status']);
         }
 
@@ -142,7 +142,7 @@ class IWP_Sites_List_Table extends WP_List_Table {
             'progress' => 0,
             'failed' => 0,
             'expired' => 0,
-            'trashed' => 0,
+            IWP_Sites_Model::STATUS_TRASHED => 0,
         );
 
         foreach ($all_sites as $site) {
@@ -155,7 +155,7 @@ class IWP_Sites_List_Table extends WP_List_Table {
         }
 
         // Exclude trashed from All (WP convention).
-        $status_counts['all'] -= $status_counts['trashed'];
+        $status_counts['all'] -= $status_counts[IWP_Sites_Model::STATUS_TRASHED];
 
         $current_status = isset($_GET['status']) ? $_GET['status'] : 'all';
         $base_url = admin_url('admin.php?page=instawp-sites');
@@ -221,14 +221,15 @@ class IWP_Sites_List_Table extends WP_List_Table {
         }
 
         // Trash
-        if ($status_counts['trashed'] > 0 || $current_status === 'trashed') {
-            $class = ($current_status === 'trashed') ? 'current' : '';
-            $views['trashed'] = sprintf(
+        $trashed_count = $status_counts[IWP_Sites_Model::STATUS_TRASHED];
+        if ($trashed_count > 0 || $current_status === IWP_Sites_Model::STATUS_TRASHED) {
+            $class = ($current_status === IWP_Sites_Model::STATUS_TRASHED) ? 'current' : '';
+            $views[IWP_Sites_Model::STATUS_TRASHED] = sprintf(
                 '<a href="%s" class="%s">%s <span class="count">(%d)</span></a>',
-                esc_url(add_query_arg('status', 'trashed', $base_url)),
+                esc_url(add_query_arg('status', IWP_Sites_Model::STATUS_TRASHED, $base_url)),
                 $class,
                 __('Trash', 'iwp-wp-integration'),
-                $status_counts['trashed']
+                $trashed_count
             );
         }
 
@@ -336,7 +337,7 @@ class IWP_Sites_List_Table extends WP_List_Table {
         if (empty($_GET['status']) || $_GET['status'] === 'all') {
             // Default/All view hides trashed sites (WP convention).
             return array_filter($sites, function ($site) {
-                return !isset($site['status']) || $site['status'] !== 'trashed';
+                return !isset($site['status']) || $site['status'] !== IWP_Sites_Model::STATUS_TRASHED;
             });
         }
 
@@ -823,7 +824,7 @@ class IWP_Sites_List_Table extends WP_List_Table {
         $url = esc_url($item['site_url']);
 
         // Trashed sites are remote-deleted — render URL as plain text, no row actions.
-        if (isset($item['status']) && $item['status'] === 'trashed') {
+        if (isset($item['status']) && $item['status'] === IWP_Sites_Model::STATUS_TRASHED) {
             return sprintf('<strong>%s</strong>', esc_html($item['site_url']));
         }
 
@@ -1036,7 +1037,7 @@ class IWP_Sites_List_Table extends WP_List_Table {
                 $class = 'iwp-status-failed';
                 $text = __('Failed', 'iwp-wp-integration');
                 break;
-            case 'trashed':
+            case IWP_Sites_Model::STATUS_TRASHED:
                 $class = 'iwp-status-trashed';
                 $text = __('Trashed', 'iwp-wp-integration');
                 break;
