@@ -21,14 +21,14 @@ class IWP_API_Client {
      *
      * @var string
      */
-    private $api_url = 'https://app.instawp.io/api/v2/';
+    private $api_url = IWP_PLUGIN_APP_URL . '/api/v2/';
 
     /**
      * V1 API base URL (for legacy endpoints like domain mapping)
      *
      * @var string
      */
-    private $api_url_v1 = 'https://app.instawp.io/api/v1/';
+    private $api_url_v1 = IWP_PLUGIN_APP_URL . '/api/v1/';
 
     /**
      * API key
@@ -241,7 +241,7 @@ class IWP_API_Client {
         } while ($page <= $last_page && $page <= $max_pages);
 
         // Cache for configurable duration (default 15 minutes)
-        $cache_duration = apply_filters('iwp_snapshots_cache_duration', 15 * MINUTE_IN_SECONDS);
+        $cache_duration = apply_filters('iwp_snapshots_cache_duration', 4 * HOUR_IN_SECONDS);
         set_transient($cache_key, $all_snapshots, $cache_duration);
         IWP_Logger::info('Snapshots cached', 'api-client', array('cache_key' => $cache_key, 'duration_minutes' => $cache_duration / 60, 'total_snapshots' => count($all_snapshots)));
 

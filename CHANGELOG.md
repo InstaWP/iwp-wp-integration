@@ -5,6 +5,25 @@ All notable changes to the InstaWP Integration plugin will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.11] - 2026-04-21
+
+### Added
+- **Trash filter on the Sites list page**
+  - Deleting a site now moves the local record to a new "Trash" status instead of removing the row, so admins can see which sites were deleted.
+  - New **Trash** view alongside All, Active, Creating, Failed, Expired.
+  - On the Trash view the URL is shown as plain text and all row actions (Visit Site, Magic Login, Delete, Send Credentials, Open in InstaWP) are hidden.
+  - On the Trash view the Password and Status columns are hidden.
+- New **Show Site Credentials on Dashboard** option (off by default). When enabled, each site card on the customer's My Account dashboard shows the WordPress admin username and password.
+
+### Changed
+- The **All** view now excludes trashed sites (standard WordPress convention).
+- Deleting a site no longer removes the local record — it is moved to **Trash** instead. The remote API delete still runs as before.
+- Trashed sites no longer appear in customer-facing views (My Account dashboard, order detail page, order emails). The order detail "Sites" section is hidden entirely when every site for that order has been trashed.
+- **Snapshots cache duration increased from 15 minutes to 4 hours** to reduce API calls during normal operation. Still overridable by clicking **Refresh Snapshots** in Settings → InstaWP Data.
+
+### Fixed
+- **Trashed sites no longer get resurrected after a new order.** The pending-sites background poller used to re-flip a trashed row back to "Completed" whenever a stale entry in its queue still pointed at the same site, which made the deleted site reappear under **All** after any new order. The poller now skips trashed rows and treats a remote "site not found" response as proof the site has been deleted, dropping the stale queue entry.
+
 ## [0.0.10] - 2026-04-14
 
 ### Added

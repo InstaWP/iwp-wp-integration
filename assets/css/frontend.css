@@ -308,7 +308,7 @@
     background: #f8f9fa;
     border: 1px solid #e9ecef;
     border-radius: 4px;
-    padding: 15px;
+    padding: 15px 10px;
     margin-bottom: 15px;
 }
 
@@ -316,11 +316,19 @@
     display: flex;
     align-items: center;
     margin-bottom: 10px;
-    gap: 10px;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
 .iwp-credential-row:last-child {
     margin-bottom: 0;
+}
+
+.iwp-credential-row strong {
+    font-size: 13px;
+    font-weight: 600;
+    margin: 0;
+    line-height: 1.4;
 }
 
 .iwp-credential-value {
@@ -331,7 +339,11 @@
     font-family: 'Courier New', monospace;
     font-size: 13px;
     color: #333;
-    min-width: 150px;
+    flex: 1 1 70px;
+    min-width: 0;
+    max-width: min(100%, 150px);
+    overflow-wrap: anywhere;
+    word-break: break-all;
 }
 
 .iwp-copy-btn,

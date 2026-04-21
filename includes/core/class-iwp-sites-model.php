@@ -9,6 +9,12 @@ if (!defined('ABSPATH')) {
 }
 
 class IWP_Sites_Model {
+    /**
+     * Status value used to mark a site as soft-deleted (visible under the
+     * admin Trash filter, hidden from customer-facing surfaces).
+     */
+    const STATUS_TRASHED = 'trashed';
+
     private static $table_name;
 
     public static function init() {
@@ -153,9 +159,46 @@ class IWP_Sites_Model {
         );
     }
 
+    /**
+     * Soft-delete a site: optionally fire the remote API delete, then flip
+     * the local row's status to STATUS_TRASHED. The row stays in the table
+     * so it can be reviewed under the admin Trash filter.
+     *
+     * Use this for the standard admin delete flow. For a hard delete that
+     * removes the row entirely, see delete() below.
+     *
+     * @param string              $site_id    InstaWP site identifier.
+     * @param IWP_API_Client|null $api_client Optional configured client; if
+     *                                        provided, delete_site() is
+     *                                        called before the local status
+     *                                        update.
+     * @return bool True on successful local update.
+     */
+    public static function trash($site_id, $api_client = null) {
+        if (empty($site_id)) {
+            return false;
+        }
+
+        if ($api_client instanceof IWP_API_Client) {
+            $api_client->delete_site($site_id);
+        }
+
+        return self::update($site_id, array('status' => self::STATUS_TRASHED));
+    }
+
+    /**
+     * Permanently remove the site row. **Bypasses the Trash filter.**
+     *
+     * Use IWP_Sites_Model::trash($site_id) for the standard admin delete
+     * flow; only call this for cleanup of already-trashed entries (e.g. a
+     * future "Empty Trash" workflow).
+     *
+     * @param string $site_id
+     * @return bool
+     */
     public static function delete($site_id) {
         global $wpdb;
-        
+
         if (!self::$table_name) {
             self::init();
         }

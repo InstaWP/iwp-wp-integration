@@ -38,7 +38,7 @@ class IWP_Sites_List_Table extends WP_List_Table {
      * @return array
      */
     public function get_columns() {
-        return array(
+        $columns = array(
             'site_url'    => __('Site URL', 'iwp-wp-integration'),
             'username'    => __('Username', 'iwp-wp-integration'),
             'password'    => __('Password', 'iwp-wp-integration'),
@@ -49,6 +49,13 @@ class IWP_Sites_List_Table extends WP_List_Table {
             'created'     => __('Created', 'iwp-wp-integration')
             // Removed 'actions' column - action buttons now appear below site URL
         );
+
+        // On the Trash view password/status are irrelevant — drop them entirely.
+        if (isset($_GET['status']) && sanitize_key(wp_unslash($_GET['status'])) === IWP_Sites_Model::STATUS_TRASHED) {
+            unset($columns['password'], $columns['status']);
+        }
+
+        return $columns;
     }
 
     /**
@@ -135,6 +142,7 @@ class IWP_Sites_List_Table extends WP_List_Table {
             'progress' => 0,
             'failed' => 0,
             'expired' => 0,
+            IWP_Sites_Model::STATUS_TRASHED => 0,
         );
 
         foreach ($all_sites as $site) {
@@ -145,6 +153,9 @@ class IWP_Sites_List_Table extends WP_List_Table {
                 $status_counts[$site['status']]++;
             }
         }
+
+        // Exclude trashed from All (WP convention).
+        $status_counts['all'] -= $status_counts[IWP_Sites_Model::STATUS_TRASHED];
 
         $current_status = isset($_GET['status']) ? $_GET['status'] : 'all';
         $base_url = admin_url('admin.php?page=instawp-sites');
@@ -206,6 +217,19 @@ class IWP_Sites_List_Table extends WP_List_Table {
                 $class,
                 __('Expired', 'iwp-wp-integration'),
                 $status_counts['expired']
+            );
+        }
+
+        // Trash
+        $trashed_count = $status_counts[IWP_Sites_Model::STATUS_TRASHED];
+        if ($trashed_count > 0 || $current_status === IWP_Sites_Model::STATUS_TRASHED) {
+            $class = ($current_status === IWP_Sites_Model::STATUS_TRASHED) ? 'current' : '';
+            $views[IWP_Sites_Model::STATUS_TRASHED] = sprintf(
+                '<a href="%s" class="%s">%s <span class="count">(%d)</span></a>',
+                esc_url(add_query_arg('status', IWP_Sites_Model::STATUS_TRASHED, $base_url)),
+                $class,
+                __('Trash', 'iwp-wp-integration'),
+                $trashed_count
             );
         }
 
@@ -311,7 +335,10 @@ class IWP_Sites_List_Table extends WP_List_Table {
      */
     private function apply_status_filter($sites) {
         if (empty($_GET['status']) || $_GET['status'] === 'all') {
-            return $sites;
+            // Default/All view hides trashed sites (WP convention).
+            return array_filter($sites, function ($site) {
+                return !isset($site['status']) || $site['status'] !== IWP_Sites_Model::STATUS_TRASHED;
+            });
         }
 
         $status = $_GET['status'];
@@ -795,15 +822,21 @@ class IWP_Sites_List_Table extends WP_List_Table {
      */
     public function column_site_url($item) {
         $url = esc_url($item['site_url']);
+
+        // Trashed sites are remote-deleted — render URL as plain text, no row actions.
+        if (isset($item['status']) && $item['status'] === IWP_Sites_Model::STATUS_TRASHED) {
+            return sprintf('<strong>%s</strong>', esc_html($item['site_url']));
+        }
+
         $site_link = sprintf('<a href="%s" target="_blank"><strong>%s</strong></a>', $url, esc_html($url));
-        
+
         // Build row actions - consolidating all actions from the removed Actions column
         $actions = array();
         
         // Add "Open in InstaWP" action first (moved from Actions column)
         if (!empty($item['site_id'])) {
             $actions['open_instawp'] = sprintf('<a href="%s" target="_blank">%s</a>', 
-                esc_url('https://app.instawp.io/sites/' . $item['site_id'] . '/dashboard'), 
+                esc_url(IWP_PLUGIN_APP_URL . '/sites/' . $item['site_id'] . '/dashboard'),
                 __('Open in InstaWP', 'iwp-wp-integration')
             );
         }
@@ -813,7 +846,7 @@ class IWP_Sites_List_Table extends WP_List_Table {
         
         // Add Magic Login if s_hash is available
         if (!empty($item['s_hash'])) {
-            $magic_login_url = 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($item['s_hash']);
+            $magic_login_url = IWP_PLUGIN_APP_URL . '/wordpress-auto-login?site=' . urlencode($item['s_hash']);
             $actions['magic_login'] = sprintf('<a href="%s" target="_blank">%s</a>', esc_url($magic_login_url), __('Magic Login', 'iwp-wp-integration'));
         } else {
             // Fallback to regular wp-admin if no s_hash
@@ -1003,6 +1036,10 @@ class IWP_Sites_List_Table extends WP_List_Table {
             case 'failed':
                 $class = 'iwp-status-failed';
                 $text = __('Failed', 'iwp-wp-integration');
+                break;
+            case IWP_Sites_Model::STATUS_TRASHED:
+                $class = 'iwp-status-trashed';
+                $text = __('Trashed', 'iwp-wp-integration');
                 break;
             default:
                 $class = 'iwp-status-unknown';

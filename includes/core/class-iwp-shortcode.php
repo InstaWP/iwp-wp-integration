@@ -710,6 +710,7 @@ class IWP_Shortcode {
 
             wp_localize_script('instawp-integration-shortcode', 'iwp_shortcode_ajax', array(
                 'ajax_url' => admin_url('admin-ajax.php'),
+                'app_url' => IWP_PLUGIN_APP_URL,
                 'nonce_check_status' => wp_create_nonce('iwp_check_task_status'),
                 'nonce_apply_post_options' => wp_create_nonce('iwp_apply_delayed_post_options'),
                 'messages' => array(
