@@ -21,11 +21,12 @@ The Sites page gives you a complete overview of all sites created through the pl
 
 Click the status links above the table to filter:
 
-- **All**: Every site in the system
+- **All**: Every site in the system except trashed ones
 - **Active**: Sites that are live and accessible
 - **Creating**: Sites still being provisioned by InstaWP
 - **Failed**: Sites where an error occurred during creation
 - **Expired**: Temporary sites that have passed their expiry time
+- **Trash**: Sites that have been deleted (kept for reference; remote site is gone)
 
 Each filter shows a count in parentheses.
 
@@ -72,7 +73,17 @@ After credentials are sent, this action is replaced with a green **Credentials S
 
 ### Delete
 
-Removes the site record from your database. You will be asked to confirm before the deletion proceeds. This also sends a request to the InstaWP API to delete the remote site.
+Sends a request to the InstaWP API to delete the remote site, then **moves the local record to the Trash filter** (status set to `trashed`) instead of removing it from the database. You will be asked to confirm before the deletion proceeds.
+
+The trashed row is kept so you can still see which sites were deleted. On the Trash view:
+
+- The site URL is shown as plain text (no link — the remote site is gone).
+- The **Username**, **Password** and **Status** columns are hidden.
+- All row actions (Visit Site, Magic Login, Delete, Send Credentials, Open in InstaWP) are hidden.
+
+Trashed sites are excluded from the **All** view (standard WordPress convention).
+
+> **Note**: Background polling (`iwp_check_pending_sites` cron) will not resurrect a trashed row, even if a leftover legacy queue entry references the same site ID. If the polling task references a remote site that no longer exists (HTTP 404), the stale queue entry is dropped and the local row is left untouched.
 
 ## Badges
 

@@ -145,7 +145,7 @@ class IWP_Admin {
                 'type' => 'password',
                 'description' => sprintf(
                     esc_html__('Enter your API key for authentication. %sGet your API key here%s', 'iwp-wp-integration'),
-                    '<a href="https://app.instawp.io/user/api-tokens" target="_blank" rel="noopener noreferrer">',
+                    '<a href="' . esc_url(IWP_PLUGIN_APP_URL . '/user/api-tokens') . '" target="_blank" rel="noopener noreferrer">',
                     '</a>'
                 )
             )
@@ -790,7 +790,7 @@ class IWP_Admin {
             <div class="form-section">
                 <h4><?php esc_html_e('Useful Links', 'iwp-wp-integration'); ?></h4>
                 <ul>
-                    <li><a href="https://app.instawp.io/user/api-tokens" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Get API Key', 'iwp-wp-integration'); ?></a></li>
+                    <li><a href="<?php echo esc_url(IWP_PLUGIN_APP_URL . '/user/api-tokens'); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Get API Key', 'iwp-wp-integration'); ?></a></li>
                     <li><a href="https://instawp.com/docs" target="_blank" rel="noopener noreferrer"><?php esc_html_e('InstaWP Documentation', 'iwp-wp-integration'); ?></a></li>
                     <li><a href="https://instawp.com/support" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Support', 'iwp-wp-integration'); ?></a></li>
                 </ul>
@@ -1236,21 +1236,18 @@ class IWP_Admin {
 
             // Delete the site
             try {
-                // Get API client
-                $options = get_option('iwp_options', array());
-                $api_key = $options['api_key'] ?? '';
-                
+                $options    = get_option('iwp_options', array());
+                $api_key    = $options['api_key'] ?? '';
+                $api_client = null;
+
                 if (!empty($api_key)) {
                     $api_client = new IWP_API_Client();
                     $api_client->set_api_key($api_key);
-                    $api_client->delete_site($site_id);
                 }
 
-                // Remove from database
-                IWP_Sites_Model::delete($site_id);
+                IWP_Sites_Model::trash($site_id, $api_client);
 
-                // Log the deletion
-                IWP_Logger::info('Site deleted via row action', 'admin', array(
+                IWP_Logger::info('Site moved to trash via row action', 'admin', array(
                     'site_id' => $site_id,
                     'user_id' => get_current_user_id()
                 ));
@@ -2269,11 +2266,11 @@ class IWP_Admin {
             ));
         }
 
-        // Also remove from database table if it exists
-        $db_site = IWP_Sites_Model::get_by_site_id($site_id);
-        if ($db_site) {
-            IWP_Sites_Model::delete($site_id);
-            IWP_Logger::info('Removed site from database table', 'admin', array('site_id' => $site_id));
+        // Remote API delete already succeeded above. Soft-delete the local
+        // row so it stays visible under the Trash filter.
+        if (IWP_Sites_Model::get_by_site_id($site_id)) {
+            IWP_Sites_Model::trash($site_id);
+            IWP_Logger::info('Marked site as trashed in database table', 'admin', array('site_id' => $site_id));
         }
 
         IWP_Logger::info('Site deleted successfully', 'admin', array(

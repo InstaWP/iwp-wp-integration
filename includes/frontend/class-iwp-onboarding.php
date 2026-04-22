@@ -124,7 +124,7 @@ class IWP_Onboarding {
             }
 
             if ($s_hash) {
-                $magic_url = 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($s_hash);
+                $magic_url = IWP_PLUGIN_APP_URL . '/wordpress-auto-login?site=' . urlencode($s_hash);
                 echo '<div class="iwp-onboarding-actions">';
                 echo '<a href="' . esc_url($magic_url) . '" target="_blank" class="iwp-onboarding-btn iwp-onboarding-btn-primary">' . esc_html__('Magic Login', 'iwp-wp-integration') . '</a>';
                 echo '</div>';
@@ -540,6 +540,7 @@ class IWP_Onboarding {
 
             wp_localize_script('iwp-onboarding', 'iwp_onboarding', array(
                 'ajax_url'           => admin_url('admin-ajax.php'),
+                'app_url'            => IWP_PLUGIN_APP_URL,
                 'nonce'              => wp_create_nonce('iwp_onboarding_nonce'),
                 'nonce_check_status' => wp_create_nonce('iwp_check_task_status'),
                 'i18n' => array(

@@ -37,6 +37,10 @@ When enabled, site login credentials (username and password) are hidden from cus
 
 This gives you time to review or customize the site before granting access. When ready, release credentials from the Sites table using the **Send Credentials** action. See [Managing Sites](managing-sites.md) for how to do this.
 
+### Show Site Credentials on Dashboard
+
+Off by default. When enabled, each site card on the customer's My Account → Dashboard shows the WordPress admin username and password (with copy and reveal buttons), in addition to the site URL. Leave off if you only want credentials surfaced on the order detail page.
+
 ### WooCommerce Subscriptions Status
 
 This is not a setting -- it is a status indicator. It shows whether the WooCommerce Subscriptions plugin is detected and active. If you do not use subscriptions, this message is informational only.
@@ -58,7 +62,7 @@ Lists all snapshots available in your InstaWP account (filtered by team). Each e
 
 - The slug is what you use when configuring products or shortcodes
 - Click **Refresh Snapshots** to fetch fresh data from InstaWP
-- Snapshots are cached for 15 minutes to reduce API calls
+- Snapshots are cached for 4 hours to reduce API calls (filterable via `iwp_snapshots_cache_duration`)
 
 ### Plans
 

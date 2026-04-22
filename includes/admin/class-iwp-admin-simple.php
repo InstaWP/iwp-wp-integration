@@ -294,7 +294,7 @@ class IWP_Admin_Simple {
         $site_url = $site['wp_url'] ?? '#';
         $admin_url = trailingslashit($site_url) . 'wp-admin';
         $magic_login_url = !empty($site['s_hash']) ? 
-            'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($site['s_hash']) : 
+            IWP_PLUGIN_APP_URL . '/wordpress-auto-login?site=' . urlencode($site['s_hash']) :
             $admin_url;
         
         ?>
@@ -437,6 +437,18 @@ class IWP_Admin_Simple {
                 'label' => 'Hide login credentials from customers until manually released. Use "Send Credentials" action from InstaWP > Sites to share credentials when ready.'
             )
         );
+
+        add_settings_field(
+            'show_site_credentials_on_dashboard',
+            esc_html__('Show Site Credentials on Dashboard', 'iwp-wp-integration'),
+            array($this, 'checkbox_callback'),
+            'iwp_settings',
+            'iwp_general',
+            array(
+                'field' => 'show_site_credentials_on_dashboard',
+                'label' => 'Show ordered site username and password on the WooCommerce My Account dashboard page.'
+            )
+        );
     }
 
     /**
@@ -479,7 +491,7 @@ class IWP_Admin_Simple {
         );
         
         printf(
-            '<p class="description">%s <a href="https://app.instawp.io/user/api-tokens" target="_blank">%s</a></p>',
+            '<p class="description">%s <a href="' . esc_url(IWP_PLUGIN_APP_URL . '/user/api-tokens') . '" target="_blank">%s</a></p>',
             esc_html__('Enter your InstaWP API key.', 'iwp-wp-integration'),
             esc_html__('Get your API key here', 'iwp-wp-integration')
         );
@@ -541,6 +553,9 @@ class IWP_Admin_Simple {
 
             // Delay customer credentials - checkbox, so absence means 'no'
             $sanitized['delay_customer_credentials'] = isset($input['delay_customer_credentials']) && $input['delay_customer_credentials'] === 'yes' ? 'yes' : 'no';
+
+            // Show site credentials on customer dashboard - checkbox, so absence means 'no'
+            $sanitized['show_site_credentials_on_dashboard'] = isset($input['show_site_credentials_on_dashboard']) && $input['show_site_credentials_on_dashboard'] === 'yes' ? 'yes' : 'no';
         }
         
         // Debug form fields - only process if this is the debug form
@@ -1016,21 +1031,18 @@ class IWP_Admin_Simple {
 
             // Delete the site
             try {
-                // Get API client manually with proper configuration
-                $options = get_option('iwp_options', array());
-                $api_key = $options['api_key'] ?? '';
-                
+                $options    = get_option('iwp_options', array());
+                $api_key    = $options['api_key'] ?? '';
+                $api_client = null;
+
                 if (!empty($api_key)) {
                     $api_client = new IWP_API_Client();
                     $api_client->set_api_key($api_key);
-                    $api_client->delete_site($site_id);
                 }
 
-                // Remove from database
-                IWP_Sites_Model::delete($site_id);
+                IWP_Sites_Model::trash($site_id, $api_client);
 
-                // Log the deletion
-                IWP_Logger::info('Site deleted via row action', 'admin', array(
+                IWP_Logger::info('Site moved to trash via row action', 'admin', array(
                     'site_id' => $site_id,
                     'user_id' => get_current_user_id()
                 ));
@@ -1171,7 +1183,7 @@ class IWP_Admin_Simple {
         $login_url = '';
         $login_label = '';
         if (!empty($site->s_hash)) {
-            $login_url = 'https://app.instawp.io/wordpress-auto-login?site=' . urlencode($site->s_hash);
+            $login_url = IWP_PLUGIN_APP_URL . '/wordpress-auto-login?site=' . urlencode($site->s_hash);
             $login_label = __('Magic Login', 'iwp-wp-integration');
         } elseif (!empty($site->site_url)) {
             $login_url = trailingslashit($site->site_url) . 'wp-admin';

@@ -252,7 +252,7 @@ jQuery(document).ready(function($) {
         // Handle Magic Login vs regular admin login
         if (data.s_hash) {
             // Use Magic Login
-            const magicLoginUrl = 'https://app.instawp.io/wordpress-auto-login?site=' + encodeURIComponent(data.s_hash);
+            const magicLoginUrl = iwp_shortcode_ajax.app_url + '/wordpress-auto-login?site=' + encodeURIComponent(data.s_hash);
             $container.find('.iwp-site-creator-admin-url')
                 .attr('href', magicLoginUrl)
                 .text('Magic Login');
