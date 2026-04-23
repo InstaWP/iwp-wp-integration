@@ -27,15 +27,19 @@ class IWP_Database {
      * @return bool
      */
     public static function append_order_meta($order_id, $meta_key, $data) {
-        $existing_data = get_post_meta($order_id, $meta_key, true);
-        
+        // Route through IWP_Woo_HPOS so the read picks up legacy postmeta-only
+        // values (pre-HPOS-fix writes) and the append persists to whichever
+        // table the active data store owns (wp_wc_orders_meta under HPOS,
+        // wp_postmeta under CPT).
+        $existing_data = IWP_Woo_HPOS::get_order_meta($order_id, $meta_key);
+
         if (!is_array($existing_data)) {
             $existing_data = array();
         }
-        
+
         $existing_data[] = $data;
-        
-        return update_post_meta($order_id, $meta_key, $existing_data);
+
+        return IWP_Woo_HPOS::update_order_meta($order_id, $meta_key, $existing_data);
     }
 
     /**
@@ -48,19 +52,17 @@ class IWP_Database {
      * @return bool
      */
     public static function update_order_meta($order_id, $meta_key, $data, $merge_arrays = false) {
-        // Validate order exists
-        if (!wc_get_order($order_id)) {
-            return false;
-        }
-
         if ($merge_arrays) {
-            $existing_data = get_post_meta($order_id, $meta_key, true);
+            // Helper handles the legacy fallback + active-store read in one call.
+            $existing_data = IWP_Woo_HPOS::get_order_meta($order_id, $meta_key);
             if (is_array($existing_data) && is_array($data)) {
                 $data = array_merge($existing_data, $data);
             }
         }
 
-        return update_post_meta($order_id, $meta_key, $data);
+        // Helper handles order validation + HPOS-safe write; returns false if
+        // the order can't be resolved (same guard the old wc_get_order check gave).
+        return IWP_Woo_HPOS::update_order_meta($order_id, $meta_key, $data);
     }
 
     /**
