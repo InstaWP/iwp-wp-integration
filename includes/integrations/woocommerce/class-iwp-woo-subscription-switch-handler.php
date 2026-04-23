@@ -432,7 +432,7 @@ class IWP_Woo_Subscription_Switch_Handler {
                 // Read via the helper so legacy-postmeta values are picked up
                 // and migrated forward. Write stays on the in-scope $order —
                 // one meta-only save, no order-lifecycle hooks.
-                $existing_sites = IWP_Woo_HPOS::get_order_meta($order->get_id(), '_iwp_sites_created');
+                $existing_sites = IWP_Woo_HPOS::get_order_meta($order, '_iwp_sites_created');
                 if (!is_array($existing_sites)) {
                     $existing_sites = array();
                 }
@@ -488,7 +488,7 @@ class IWP_Woo_Subscription_Switch_Handler {
             // Read via the helper so legacy-postmeta values are picked up and
             // migrated forward. Writes below stay on the $order instance —
             // same object, same data store, one save.
-            $existing_sites = IWP_Woo_HPOS::get_order_meta($order->get_id(), '_iwp_sites_created');
+            $existing_sites = IWP_Woo_HPOS::get_order_meta($order, '_iwp_sites_created');
             if (!is_array($existing_sites)) {
                 $existing_sites = array();
             }

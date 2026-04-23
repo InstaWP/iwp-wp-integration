@@ -41,7 +41,7 @@ class IWP_Woo_Subscription_Site_Manager {
         
         foreach ($orders as $order) {
             // HPOS-safe read — covers both data stores and legacy postmeta values.
-            $order_sites = IWP_Woo_HPOS::get_order_meta($order->get_id(), '_iwp_sites_created');
+            $order_sites = IWP_Woo_HPOS::get_order_meta($order, '_iwp_sites_created');
             if (!empty($order_sites) && is_array($order_sites)) {
                 foreach ($order_sites as $site) {
                     $sites[] = array_merge($site, array(

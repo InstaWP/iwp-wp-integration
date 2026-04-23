@@ -17,6 +17,55 @@ if (!defined('ABSPATH')) {
 class IWP_Woo_HPOS {
 
     /**
+     * Resolve the first argument of the meta helpers to a loaded WC_Abstract_Order.
+     *
+     * Accepts either an order ID (int or numeric string) or an already-loaded
+     * WC_Abstract_Order (which covers WC_Order, WC_Subscription,
+     * WC_Order_Refund). Callers in loops should pass the object directly to
+     * avoid a redundant wc_get_order() lookup per iteration.
+     *
+     * Strict input contract:
+     *   - WC_Abstract_Order instance         → returned as-is.
+     *   - Positive numeric (int or "123")    → loaded; returns false (debug
+     *                                          log) if no order exists.
+     *   - Anything else (empty, 0, negative,
+     *     non-numeric, array, null, object)  → warn-log the bad type, false.
+     *
+     * Assumes WooCommerce is loaded — the class file is only required by
+     * iwp-wp-integration.php inside class_exists('WooCommerce').
+     *
+     * @param int|numeric-string|WC_Abstract_Order $order_or_id
+     * @return WC_Abstract_Order|false
+     */
+    private static function resolve_order_arg($order_or_id) {
+        if ($order_or_id instanceof WC_Abstract_Order) {
+            return $order_or_id;
+        }
+
+        if (is_numeric($order_or_id) && ((int) $order_or_id) > 0) {
+            $order = self::get_order((int) $order_or_id);
+            if ($order instanceof WC_Abstract_Order) {
+                return $order;
+            }
+            if (class_exists('IWP_Logger')) {
+                IWP_Logger::debug('HPOS helper: order not found for ID', 'hpos-compat', array(
+                    'order_id' => (int) $order_or_id,
+                ));
+            }
+            return false;
+        }
+
+        // Anything else is a caller bug — log loud so it surfaces in dev.
+        if (class_exists('IWP_Logger')) {
+            IWP_Logger::warning('HPOS helper: invalid order argument', 'hpos-compat', array(
+                'type'  => is_object($order_or_id) ? get_class($order_or_id) : gettype($order_or_id),
+                'value' => is_scalar($order_or_id) ? (string) $order_or_id : null,
+            ));
+        }
+        return false;
+    }
+
+    /**
      * Constructor
      */
     public function __construct() {
@@ -178,14 +227,16 @@ class IWP_Woo_HPOS {
         $before_count = count($orders);
         $filtered     = array();
         foreach ($orders as $order) {
-            $order_id = $order->get_id();
             foreach ($exists_keys as $meta_key) {
                 // self::get_order_meta() — not $order->get_meta() — so the
                 // wp_postmeta fallback + forward-migrate runs for legacy
-                // values. empty() covers every "not set" shape ('', null, [],
-                // false). The filtered meta keys in this plugin are always
-                // arrays, so the 0 / '0' false-positives of empty() don't bite.
-                if (!empty(self::get_order_meta($order_id, $meta_key))) {
+                // values. We pass the $order object directly; the resolver
+                // short-circuits on the instanceof branch so there's no
+                // redundant wc_get_order() lookup per iteration. empty()
+                // covers every "not set" shape ('', null, [], false) — the
+                // filtered meta keys in this plugin are always arrays, so
+                // the 0 / '0' false-positives of empty() don't bite.
+                if (!empty(self::get_order_meta($order, $meta_key))) {
                     $filtered[] = $order;
                     break; // OR semantics — any match is enough.
                 }
@@ -314,22 +365,17 @@ class IWP_Woo_HPOS {
      *      $order->update_meta_data() + save_meta_data() so subsequent reads
      *      resolve via the active store without re-hitting this fallback.
      *
-     * @param int    $order_id Order ID.
-     * @param string $key      Meta key.
-     * @param bool   $single   Whether to return a single value.
-     * @return mixed The meta value, or false when the order cannot be loaded
-     *               and neither source has a value.
+     * @param int|numeric-string|WC_Abstract_Order $order_or_id
+     *        Order ID or a loaded order object. Pass the object in loops to
+     *        avoid a redundant wc_get_order() lookup per iteration.
+     * @param string $key    Meta key.
+     * @param bool   $single Whether to return a single value.
+     * @return mixed The meta value, or false when the order cannot be
+     *               resolved and neither source has a value.
      */
-    public static function get_order_meta($order_id, $key, $single = true) {
-        $order = self::get_order($order_id);
-
+    public static function get_order_meta($order_or_id, $key, $single = true) {
+        $order = self::resolve_order_arg($order_or_id);
         if (!$order) {
-            if (class_exists('IWP_Logger')) {
-                IWP_Logger::debug('get_order_meta: order not found', 'hpos-compat', array(
-                    'order_id' => $order_id,
-                    'key'      => $key,
-                ));
-            }
             return false;
         }
 
@@ -344,7 +390,8 @@ class IWP_Woo_HPOS {
         // $order->get_meta() returns empty above. Read wp_postmeta directly and,
         // if we find something, migrate it into the active store so the next
         // read resolves cleanly without re-entering this branch.
-        $legacy = get_post_meta($order_id, $key, $single);
+        $order_id = $order->get_id();
+        $legacy   = get_post_meta($order_id, $key, $single);
         if (empty($legacy)) {
             return $value; // Preserve the original empty shape ('' or array()).
         }
@@ -373,21 +420,14 @@ class IWP_Woo_HPOS {
      * to wp_postmeta; under HPOS compat/sync mode WC mirrors to both tables
      * on the same save.
      *
-     * @param int    $order_id Order ID.
-     * @param string $key      Meta key.
-     * @param mixed  $value    Meta value.
-     * @return bool True on success, false when the order cannot be loaded.
+     * @param int|numeric-string|WC_Abstract_Order $order_or_id Order ID or loaded order.
+     * @param string                               $key         Meta key.
+     * @param mixed                                $value       Meta value.
+     * @return bool True on success, false when the order cannot be resolved.
      */
-    public static function update_order_meta($order_id, $key, $value) {
-        $order = self::get_order($order_id);
-
+    public static function update_order_meta($order_or_id, $key, $value) {
+        $order = self::resolve_order_arg($order_or_id);
         if (!$order) {
-            if (class_exists('IWP_Logger')) {
-                IWP_Logger::warning('update_order_meta: order not found', 'hpos-compat', array(
-                    'order_id' => $order_id,
-                    'key'      => $key,
-                ));
-            }
             return false;
         }
 
@@ -396,7 +436,7 @@ class IWP_Woo_HPOS {
 
         if (class_exists('IWP_Logger')) {
             IWP_Logger::debug('Order meta written via active data store', 'hpos-compat', array(
-                'order_id'     => $order_id,
+                'order_id'     => $order->get_id(),
                 'key'          => $key,
                 'hpos_enabled' => self::is_hpos_enabled(),
                 'value_type'   => is_array($value) ? 'array' : gettype($value),
@@ -414,20 +454,13 @@ class IWP_Woo_HPOS {
      * hooks fire. Under HPOS removes from wp_wc_orders_meta; under CPT removes
      * from wp_postmeta; under HPOS compat/sync mode WC mirrors the delete.
      *
-     * @param int    $order_id Order ID.
-     * @param string $key      Meta key.
-     * @return bool True on success, false when the order cannot be loaded.
+     * @param int|numeric-string|WC_Abstract_Order $order_or_id Order ID or loaded order.
+     * @param string                               $key         Meta key.
+     * @return bool True on success, false when the order cannot be resolved.
      */
-    public static function delete_order_meta($order_id, $key) {
-        $order = self::get_order($order_id);
-
+    public static function delete_order_meta($order_or_id, $key) {
+        $order = self::resolve_order_arg($order_or_id);
         if (!$order) {
-            if (class_exists('IWP_Logger')) {
-                IWP_Logger::warning('delete_order_meta: order not found', 'hpos-compat', array(
-                    'order_id' => $order_id,
-                    'key'      => $key,
-                ));
-            }
             return false;
         }
 
@@ -436,7 +469,7 @@ class IWP_Woo_HPOS {
 
         if (class_exists('IWP_Logger')) {
             IWP_Logger::debug('Order meta deleted via active data store', 'hpos-compat', array(
-                'order_id'     => $order_id,
+                'order_id'     => $order->get_id(),
                 'key'          => $key,
                 'hpos_enabled' => self::is_hpos_enabled(),
             ));

@@ -543,12 +543,12 @@ class IWP_Woo_Order_Processor {
 
         // Add this to order meta as well — HPOS-safe read/write so upgrade
         // records survive on both data stores.
-        $existing_upgrades = IWP_Woo_HPOS::get_order_meta($order->get_id(), '_iwp_site_upgrades');
+        $existing_upgrades = IWP_Woo_HPOS::get_order_meta($order, '_iwp_site_upgrades');
         if (!is_array($existing_upgrades)) {
             $existing_upgrades = array();
         }
         $existing_upgrades[] = $upgrade_data;
-        IWP_Woo_HPOS::update_order_meta($order->get_id(), '_iwp_site_upgrades', $existing_upgrades);
+        IWP_Woo_HPOS::update_order_meta($order, '_iwp_site_upgrades', $existing_upgrades);
 
         return $upgrade_data;
     }

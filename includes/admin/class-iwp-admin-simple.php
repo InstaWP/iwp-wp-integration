@@ -278,7 +278,7 @@ class IWP_Admin_Simple {
         foreach ($orders as $order) {
             // HPOS-safe read — handles wp_postmeta fallback + forward-migrate
             // for values written by older plugin builds.
-            $order_sites = IWP_Woo_HPOS::get_order_meta($order->get_id(), '_iwp_created_sites');
+            $order_sites = IWP_Woo_HPOS::get_order_meta($order, '_iwp_created_sites');
             if (is_array($order_sites)) {
                 foreach ($order_sites as $site) {
                     $site['order_id']   = $order->get_id();
@@ -995,7 +995,7 @@ class IWP_Admin_Simple {
         // value still lives in wp_postmeta are picked up (and migrated
         // forward). Write stays on the in-scope $order — one meta-only save,
         // no order-lifecycle hooks.
-        $created_sites = IWP_Woo_HPOS::get_order_meta($order->get_id(), '_iwp_created_sites');
+        $created_sites = IWP_Woo_HPOS::get_order_meta($order, '_iwp_created_sites');
         if (is_array($created_sites)) {
             foreach ($created_sites as $index => $site) {
                 if (isset($site['site_id']) && intval($site['site_id']) === $site_id) {

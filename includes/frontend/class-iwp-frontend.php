@@ -1081,7 +1081,7 @@ class IWP_Frontend {
             foreach ($deferred_orders as $def_order) {
                 // Read via the HPOS-safe helper: covers both wp_wc_orders_meta
                 // and wp_postmeta, with forward-migration for legacy values.
-                $deferred_items = IWP_Woo_HPOS::get_order_meta($def_order->get_id(), '_iwp_deferred_items');
+                $deferred_items = IWP_Woo_HPOS::get_order_meta($def_order, '_iwp_deferred_items');
                 if (!empty($deferred_items) && is_array($deferred_items)) {
                     $order_url = $def_order->get_view_order_url();
                     $count     = count($deferred_items);
