@@ -165,9 +165,10 @@ class IWP_Woo_Subscription_Switch_Handler {
             $this->process_subscription_switch($order, $subscription, $results);
         }
 
-        // Mark as processed
+        // Mark as processed — meta-only save (no order-lifecycle hooks).
+        // $order is already loaded above; no need to re-fetch via the helper.
         $order->update_meta_data('_iwp_switch_processed', 'yes');
-        $order->save();
+        $order->save_meta_data();
 
         IWP_Logger::info('Subscription switch processing complete', 'switch-handler', array(
             'order_id' => $order->get_id(),
@@ -428,12 +429,16 @@ class IWP_Woo_Subscription_Switch_Handler {
                         'plan_id' => $new_plan_id,
                     ),
                 );
-                $existing_sites = get_post_meta($order->get_id(), '_iwp_sites_created', true);
+                // Read via the helper so legacy-postmeta values are picked up
+                // and migrated forward. Write stays on the in-scope $order —
+                // one meta-only save, no order-lifecycle hooks.
+                $existing_sites = IWP_Woo_HPOS::get_order_meta($order->get_id(), '_iwp_sites_created');
                 if (!is_array($existing_sites)) {
                     $existing_sites = array();
                 }
                 $existing_sites[] = $fail_entry;
-                update_post_meta($order->get_id(), '_iwp_sites_created', $existing_sites);
+                $order->update_meta_data('_iwp_sites_created', $existing_sites);
+                $order->save_meta_data();
 
                 // Schedule retry
                 $this->schedule_retry($site_id, $new_plan_id, $subscription->get_id(), $order->get_id());
@@ -480,16 +485,21 @@ class IWP_Woo_Subscription_Switch_Handler {
                     'plan_id' => $new_plan_id,
                 ),
             );
-            $existing_sites = get_post_meta($order->get_id(), '_iwp_sites_created', true);
+            // Read via the helper so legacy-postmeta values are picked up and
+            // migrated forward. Writes below stay on the $order instance —
+            // same object, same data store, one save.
+            $existing_sites = IWP_Woo_HPOS::get_order_meta($order->get_id(), '_iwp_sites_created');
             if (!is_array($existing_sites)) {
                 $existing_sites = array();
             }
             $existing_sites[] = $switch_site_entry;
-            update_post_meta($order->get_id(), '_iwp_sites_created', $existing_sites);
 
-            // Mark per-site as processed
+            // Batch both meta mutations onto the in-scope $order, then flush
+            // with a single meta-only save — no order-lifecycle hooks, and
+            // no redundant order-loading via IWP_Woo_HPOS::get_order().
+            $order->update_meta_data('_iwp_sites_created', $existing_sites);
             $order->update_meta_data('_iwp_switch_processed_' . $site_id, 'yes');
-            $order->save();
+            $order->save_meta_data();
 
             // Add success notes
             $note = sprintf(
@@ -712,10 +722,10 @@ class IWP_Woo_Subscription_Switch_Handler {
     private function find_subscription_sites($subscription) {
         $sites = array();
 
-        // Method 1: Get sites from parent order
+        // Method 1: Get sites from parent order — HPOS-safe read.
         $parent_order_id = $subscription->get_parent_id();
         if ($parent_order_id) {
-            $parent_sites = get_post_meta($parent_order_id, '_iwp_sites_created', true);
+            $parent_sites = IWP_Woo_HPOS::get_order_meta($parent_order_id, '_iwp_sites_created');
             if (!empty($parent_sites) && is_array($parent_sites)) {
                 foreach ($parent_sites as $site) {
                     // site_id may be at top level or nested inside site_data
@@ -746,10 +756,10 @@ class IWP_Woo_Subscription_Switch_Handler {
             }
         }
 
-        // Method 3: Get sites from renewal orders
+        // Method 3: Get sites from renewal orders — HPOS-safe read.
         $related_orders = $subscription->get_related_orders('all', 'renewal');
         foreach ($related_orders as $order_id) {
-            $order_sites = get_post_meta($order_id, '_iwp_sites_created', true);
+            $order_sites = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_sites_created');
             if (!empty($order_sites) && is_array($order_sites)) {
                 foreach ($order_sites as $site) {
                     $site_id = $site['site_id'] ?? $site['id'] ?? '';

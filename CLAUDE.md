@@ -65,6 +65,19 @@ iwp-wp-integration/
 
 Handles all communication with InstaWP's REST API.
 
+#### `IWP_PLUGIN_APP_URL` — no trailing slash
+
+Defined in `iwp-wp-integration.php`. This constant is the base host for every
+URL the plugin builds — API calls, magic-login URLs, dashboard links, values
+passed to localized JS.
+
+**Rule:** store as scheme + host only, no path and no trailing slash
+(`'https://app.instawp.io'`, never `'https://app.instawp.io/'`). All
+consumer code owns the leading slash on its side (`. '/api/v2/...'`,
+`. '/wordpress-auto-login?...'`). Concatenating a trailing-slash base with a
+leading-slash path produces doubled slashes in the resulting URL, which some
+reverse-proxy / router stacks no longer silently normalize.
+
 #### Key Features
 - **Authentication**: Bearer token with API key
 - **Endpoints**: Complete API coverage (v1 and v2)

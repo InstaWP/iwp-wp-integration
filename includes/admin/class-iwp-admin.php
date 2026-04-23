@@ -2194,22 +2194,26 @@ class IWP_Admin {
         
         error_log('IWP WooCommerce V2: Updating site URL to mapped domain: ' . $new_url);
 
-        // Update in _iwp_sites_created (order processor format)
-        $sites_created = get_post_meta($order_id, '_iwp_sites_created', true);
+        // Update in _iwp_sites_created (order processor format).
+        // Route through the HPOS-safe helpers so reads and writes target
+        // whichever table the active data store uses and so any legacy
+        // postmeta-only value is migrated forward on read.
+        $sites_created = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_sites_created');
         if (is_array($sites_created)) {
             foreach ($sites_created as &$site_data) {
                 if (isset($site_data['site_data']['site_id']) && $site_data['site_data']['site_id'] == $site_id) {
                     $site_data['site_data']['site_url'] = $new_url;
-                    $site_data['site_data']['wp_url'] = $new_url;
+                    $site_data['site_data']['wp_url']   = $new_url;
                     error_log('IWP WooCommerce V2: Updated site URL in _iwp_sites_created');
                     break;
                 }
             }
-            update_post_meta($order_id, '_iwp_sites_created', $sites_created);
+            IWP_Woo_HPOS::update_order_meta($order_id, '_iwp_sites_created', $sites_created);
         }
 
-        // Update in _iwp_created_sites (site manager format)
-        $created_sites = get_post_meta($order_id, '_iwp_created_sites', true);
+        // Update in _iwp_created_sites (site manager format) — same HPOS-safe
+        // routing as above.
+        $created_sites = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_created_sites');
         if (is_array($created_sites)) {
             foreach ($created_sites as &$site_info) {
                 if (isset($site_info['site_id']) && $site_info['site_id'] == $site_id) {
@@ -2218,7 +2222,7 @@ class IWP_Admin {
                     break;
                 }
             }
-            update_post_meta($order_id, '_iwp_created_sites', $created_sites);
+            IWP_Woo_HPOS::update_order_meta($order_id, '_iwp_created_sites', $created_sites);
         }
 
         error_log('IWP WooCommerce V2: Site URL update completed for domain: ' . $domain_name);

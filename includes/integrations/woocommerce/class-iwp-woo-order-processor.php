@@ -114,8 +114,10 @@ class IWP_Woo_Order_Processor {
             return;
         }
 
-        // Check if we've already processed this order
-        $processed = get_post_meta($order_id, '_iwp_processed', true);
+        // Check if we've already processed this order.
+        // HPOS-safe read via the helper so the dedupe flag is visible under
+        // both data stores (CPT and authoritative HPOS).
+        $processed = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_processed');
         if ($processed) {
             error_log('IWP WooCommerce V2: Order already processed: ' . $order_id);
             return;
@@ -252,24 +254,26 @@ class IWP_Woo_Order_Processor {
             }
         }
 
-        // Store results in order meta
+        // Store results in order meta via the HPOS-safe helpers so the writes
+        // land in whichever table the active data store owns
+        // (wp_wc_orders_meta under HPOS, wp_postmeta under CPT).
         if (!empty($sites_created)) {
-            update_post_meta($order_id, '_iwp_sites_created', $sites_created);
+            IWP_Woo_HPOS::update_order_meta($order_id, '_iwp_sites_created', $sites_created);
         }
 
         if (!empty($errors)) {
-            update_post_meta($order_id, '_iwp_creation_errors', $errors);
+            IWP_Woo_HPOS::update_order_meta($order_id, '_iwp_creation_errors', $errors);
         }
 
         // Store deferred items for post-purchase onboarding
         if (!empty($deferred_items)) {
-            update_post_meta($order_id, '_iwp_deferred_items', $deferred_items);
+            IWP_Woo_HPOS::update_order_meta($order_id, '_iwp_deferred_items', $deferred_items);
             error_log('IWP WooCommerce V2: Stored ' . count($deferred_items) . ' deferred item(s) for post-purchase onboarding');
         }
 
-        // Mark order as processed
-        update_post_meta($order_id, '_iwp_processed', true);
-        update_post_meta($order_id, '_iwp_processed_date', current_time('mysql'));
+        // Mark order as processed (dedupe flag + timestamp).
+        IWP_Woo_HPOS::update_order_meta($order_id, '_iwp_processed', true);
+        IWP_Woo_HPOS::update_order_meta($order_id, '_iwp_processed_date', current_time('mysql'));
 
         // Add order note
         $note = $this->generate_order_note($sites_created, $errors, $deferred_items);
@@ -537,13 +541,14 @@ class IWP_Woo_Order_Processor {
             $upgrade_data['s_hash'] = $upgrade_site_data['s_hash'];
         }
 
-        // Add this to order meta as well
-        $existing_upgrades = get_post_meta($order->get_id(), '_iwp_site_upgrades', true);
+        // Add this to order meta as well — HPOS-safe read/write so upgrade
+        // records survive on both data stores.
+        $existing_upgrades = IWP_Woo_HPOS::get_order_meta($order->get_id(), '_iwp_site_upgrades');
         if (!is_array($existing_upgrades)) {
             $existing_upgrades = array();
         }
         $existing_upgrades[] = $upgrade_data;
-        update_post_meta($order->get_id(), '_iwp_site_upgrades', $existing_upgrades);
+        IWP_Woo_HPOS::update_order_meta($order->get_id(), '_iwp_site_upgrades', $existing_upgrades);
 
         return $upgrade_data;
     }
@@ -655,9 +660,11 @@ class IWP_Woo_Order_Processor {
      */
     public function render_order_meta_box($post) {
         $order_id = $post->ID;
-        $sites_created = get_post_meta($order_id, '_iwp_sites_created', true);
-        $errors = get_post_meta($order_id, '_iwp_creation_errors', true);
-        $processed = get_post_meta($order_id, '_iwp_processed', true);
+        // HPOS-safe reads via the helper — meta box renders correctly on both
+        // data stores and picks up legacy postmeta-only values.
+        $sites_created = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_sites_created');
+        $errors        = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_creation_errors');
+        $processed     = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_processed');
         
         // Check if order has site-enabled products
         $order = wc_get_order($order_id);
@@ -810,8 +817,10 @@ class IWP_Woo_Order_Processor {
      */
     public function populate_order_columns($column, $post_id) {
         if ('iwp_sites' === $column) {
-            $sites_created = get_post_meta($post_id, '_iwp_sites_created', true);
-            $errors = get_post_meta($post_id, '_iwp_creation_errors', true);
+            // HPOS-safe reads via the helper so the Sites column is correct
+            // on both data stores, including legacy postmeta-only orders.
+            $sites_created = IWP_Woo_HPOS::get_order_meta($post_id, '_iwp_sites_created');
+            $errors        = IWP_Woo_HPOS::get_order_meta($post_id, '_iwp_creation_errors');
             
             if (!empty($sites_created)) {
                 echo '<span style="color: green;">✓ ' . count($sites_created) . ' ' . __('sites', 'iwp-woo-v2') . '</span>';
@@ -839,8 +848,8 @@ class IWP_Woo_Order_Processor {
             );
         }
 
-        // Check if already processed
-        $processed = get_post_meta($order_id, '_iwp_processed', true);
+        // Check if already processed — HPOS-safe dedupe read.
+        $processed = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_processed');
         if ($processed) {
             return array(
                 'success' => false,
@@ -850,13 +859,13 @@ class IWP_Woo_Order_Processor {
 
         // Temporarily enable auto-create for this manual process
         error_log('IWP WooCommerce V2: Manually creating sites for order: ' . $order_id);
-        
+
         // Call the same processing logic but bypass the global setting check
         $this->process_order_internal($order_id, 'manual');
-        
-        // Check results
-        $sites_created = get_post_meta($order_id, '_iwp_sites_created', true);
-        $errors = get_post_meta($order_id, '_iwp_creation_errors', true);
+
+        // Check results via the HPOS-safe helper.
+        $sites_created = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_sites_created');
+        $errors        = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_creation_errors');
         
         if (!empty($sites_created)) {
             $message = sprintf(
@@ -905,8 +914,9 @@ class IWP_Woo_Order_Processor {
             return;
         }
 
-        // Skip the processed check for manual creation, but log it
-        $processed = get_post_meta($order_id, '_iwp_processed', true);
+        // Skip the processed check for manual creation, but log it.
+        // HPOS-safe read so the dedupe flag is visible on both data stores.
+        $processed = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_processed');
         if ($processed && $status !== 'manual') {
             error_log('IWP WooCommerce V2: Order already processed: ' . $order_id);
             return;
@@ -999,18 +1009,18 @@ class IWP_Woo_Order_Processor {
             }
         }
 
-        // Store results
+        // Store results via the HPOS-safe helpers.
         if (!empty($sites_created)) {
-            update_post_meta($order_id, '_iwp_sites_created', $sites_created);
-        }
-        
-        if (!empty($errors)) {
-            update_post_meta($order_id, '_iwp_creation_errors', $errors);
+            IWP_Woo_HPOS::update_order_meta($order_id, '_iwp_sites_created', $sites_created);
         }
 
-        // Mark as processed
-        update_post_meta($order_id, '_iwp_processed', true);
-        update_post_meta($order_id, '_iwp_processed_date', current_time('mysql'));
+        if (!empty($errors)) {
+            IWP_Woo_HPOS::update_order_meta($order_id, '_iwp_creation_errors', $errors);
+        }
+
+        // Mark as processed (dedupe flag + timestamp).
+        IWP_Woo_HPOS::update_order_meta($order_id, '_iwp_processed', true);
+        IWP_Woo_HPOS::update_order_meta($order_id, '_iwp_processed_date', current_time('mysql'));
 
         // Add order note
         $note = $this->generate_order_note($sites_created, $errors);
@@ -1059,9 +1069,10 @@ class IWP_Woo_Order_Processor {
             }
         }
 
-        // SECOND PRIORITY: Check order meta for upgraded sites (for completed orders)
+        // SECOND PRIORITY: Check order meta for upgraded sites (for completed orders).
+        // HPOS-safe read covers both tables + legacy postmeta-only values.
         if (empty($demo_sites)) {
-            $order_sites = get_post_meta($order_id, '_iwp_sites_created', true);
+            $order_sites = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_sites_created');
             if (is_array($order_sites)) {
                 foreach ($order_sites as $order_site) {
                     if (isset($order_site['site_data']['action']) && $order_site['site_data']['action'] === 'upgraded') {
@@ -1173,7 +1184,9 @@ class IWP_Woo_Order_Processor {
      * @param object $demo_site
      */
     private function add_reconciled_site_to_order_meta($order_id, $demo_site) {
-        $existing_sites = get_post_meta($order_id, '_iwp_sites_created', true);
+        // HPOS-safe read so we append to the same list the rest of the plugin
+        // sees, regardless of which table the active data store owns.
+        $existing_sites = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_sites_created');
         if (!is_array($existing_sites)) {
             $existing_sites = array();
         }
@@ -1197,7 +1210,8 @@ class IWP_Woo_Order_Processor {
             'reconciled_at' => current_time('mysql')
         );
 
-        update_post_meta($order_id, '_iwp_sites_created', $existing_sites);
+        // HPOS-safe write.
+        IWP_Woo_HPOS::update_order_meta($order_id, '_iwp_sites_created', $existing_sites);
     }
 
     /**

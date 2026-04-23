@@ -185,8 +185,17 @@ class IWP_Site_Manager {
      * @param array $site_info
      */
     private function store_site_in_order($order_id, $site_info) {
-        // Get existing sites for this order
-        $existing_sites = get_post_meta($order_id, '_iwp_created_sites', true);
+        // Use the IWP_Woo_HPOS wrapper for consistency with the rest of the
+        // plugin's order-loading sites. It's a thin pass-through today but
+        // gives us one place to change order hydration behaviour later.
+        $order = IWP_Woo_HPOS::get_order($order_id);
+        if (!$order) {
+            return;
+        }
+
+        // Read via the helper so pre-HPOS-fix values in wp_postmeta are picked
+        // up and migrated forward into the active data store on first read.
+        $existing_sites = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_created_sites');
         if (!is_array($existing_sites)) {
             $existing_sites = array();
         }
@@ -194,11 +203,12 @@ class IWP_Site_Manager {
         // Add new site to the list
         $existing_sites[] = $site_info;
 
-        // Update order meta
-        update_post_meta($order_id, '_iwp_created_sites', $existing_sites);
+        // Write directly on the $order instance (meta-only save, no
+        // order-lifecycle hooks) — the order note below reuses the same object.
+        $order->update_meta_data('_iwp_created_sites', $existing_sites);
+        $order->save_meta_data();
 
         // Add order note
-        $order = wc_get_order($order_id);
         if ($order) {
             if ($site_info['status'] === 'completed') {
                 $note = sprintf(
@@ -597,7 +607,8 @@ class IWP_Site_Manager {
      * @param array $site_info
      */
     private function update_completed_site($order_id, $site_info) {
-        $existing_sites = get_post_meta($order_id, '_iwp_created_sites', true);
+        // Read via the HPOS-safe helper (handles legacy postmeta fallback + migration).
+        $existing_sites = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_created_sites');
         if (!is_array($existing_sites)) {
             return;
         }
@@ -610,7 +621,8 @@ class IWP_Site_Manager {
             }
         }
 
-        update_post_meta($order_id, '_iwp_created_sites', $existing_sites);
+        // Persist via the HPOS-safe helper so the write reaches the active store.
+        IWP_Woo_HPOS::update_order_meta($order_id, '_iwp_created_sites', $existing_sites);
     }
 
     /**
@@ -688,8 +700,10 @@ class IWP_Site_Manager {
             }
         }
 
-        // SECOND PRIORITY: Load from order meta _iwp_sites_created (backward compatibility)
-        $order_sites = get_post_meta($order_id, '_iwp_sites_created', true);
+        // SECOND PRIORITY: Load from order meta _iwp_sites_created (backward compatibility).
+        // Use the HPOS-safe helper so reads resolve under either data store and
+        // any pre-HPOS-fix postmeta-only value is migrated forward on first read.
+        $order_sites = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_sites_created');
         IWP_Logger::debug('Found sites in _iwp_sites_created', 'site-manager', array('count' => is_array($order_sites) ? count($order_sites) : 0));
 
         if (is_array($order_sites)) {
@@ -717,9 +731,11 @@ class IWP_Site_Manager {
         }
         
         // Only add legacy sites if no sites were found from the order processor
-        // This prevents duplicates while maintaining backward compatibility
+        // This prevents duplicates while maintaining backward compatibility.
+        // HPOS-safe read: helper covers both wp_wc_orders_meta and wp_postmeta
+        // and self-heals postmeta-only values written by older plugin builds.
         if (empty($all_sites)) {
-            $legacy_sites = get_post_meta($order_id, '_iwp_created_sites', true);
+            $legacy_sites = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_created_sites');
             IWP_Logger::debug('Found sites in _iwp_created_sites (legacy)', 'site-manager', array('count' => is_array($legacy_sites) ? count($legacy_sites) : 0));
             if (is_array($legacy_sites)) {
                 foreach ($legacy_sites as $legacy_site) {
