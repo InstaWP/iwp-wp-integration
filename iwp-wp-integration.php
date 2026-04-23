@@ -29,7 +29,7 @@ define('IWP_PLUGIN_FILE', __FILE__);
 define('IWP_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('IWP_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('IWP_PLUGIN_BASENAME', plugin_basename(__FILE__));
-define('IWP_PLUGIN_APP_URL', 'https://app.instawp.io');
+defined( 'IWP_PLUGIN_APP_URL' ) || define('IWP_PLUGIN_APP_URL', 'https://app.instawp.io');
 
 // Include the autoloader
 require_once IWP_PLUGIN_PATH . 'includes/core/class-iwp-autoloader.php';
@@ -64,6 +64,16 @@ function iwp_init() {
         IWP_Installer::set_default_settings();
     }
     
+    // Load the HPOS compat layer before anything that may call it.
+    // IWP_Admin_Simple, IWP_Frontend, IWP_Site_Manager and IWP_Database all
+    // route their order-meta reads/writes through IWP_Woo_HPOS, so its class
+    // must be declared before any of those classes instantiate or call into
+    // it. Methods resolve IWP_Woo_HPOS lazily at runtime today, but keeping
+    // the require_once here removes the dependency on load-order luck.
+    if (class_exists('WooCommerce')) {
+        require_once IWP_PLUGIN_PATH . 'includes/integrations/woocommerce/class-iwp-woo-hpos.php';
+    }
+
     // Initialize admin interface (admin only)
     if (is_admin()) {
         require_once IWP_PLUGIN_PATH . 'includes/admin/class-iwp-settings-page.php';
@@ -74,18 +84,17 @@ function iwp_init() {
 
         // Initialize simple admin
         new IWP_Admin_Simple();
-        
+
         // Initialize WooCommerce product integration (admin only)
         if (class_exists('WooCommerce')) {
             require_once IWP_PLUGIN_PATH . 'includes/integrations/woocommerce/class-iwp-woo-product-integration.php';
             new IWP_Woo_Product_Integration();
         }
     }
-    
+
     // Initialize WooCommerce order processing (both admin and frontend)
     if (class_exists('WooCommerce')) {
         require_once IWP_PLUGIN_PATH . 'includes/integrations/woocommerce/class-iwp-woo-order-processor.php';
-        require_once IWP_PLUGIN_PATH . 'includes/integrations/woocommerce/class-iwp-woo-hpos.php';
         require_once IWP_PLUGIN_PATH . 'includes/integrations/woocommerce/class-iwp-woo-product-fields.php';
 
         new IWP_Woo_Order_Processor();

@@ -17,6 +17,55 @@ if (!defined('ABSPATH')) {
 class IWP_Woo_HPOS {
 
     /**
+     * Resolve the first argument of the meta helpers to a loaded WC_Abstract_Order.
+     *
+     * Accepts either an order ID (int or numeric string) or an already-loaded
+     * WC_Abstract_Order (which covers WC_Order, WC_Subscription,
+     * WC_Order_Refund). Callers in loops should pass the object directly to
+     * avoid a redundant wc_get_order() lookup per iteration.
+     *
+     * Strict input contract:
+     *   - WC_Abstract_Order instance         → returned as-is.
+     *   - Positive numeric (int or "123")    → loaded; returns false (debug
+     *                                          log) if no order exists.
+     *   - Anything else (empty, 0, negative,
+     *     non-numeric, array, null, object)  → warn-log the bad type, false.
+     *
+     * Assumes WooCommerce is loaded — the class file is only required by
+     * iwp-wp-integration.php inside class_exists('WooCommerce').
+     *
+     * @param int|numeric-string|WC_Abstract_Order $order_or_id
+     * @return WC_Abstract_Order|false
+     */
+    private static function resolve_order_arg($order_or_id) {
+        if ($order_or_id instanceof WC_Abstract_Order) {
+            return $order_or_id;
+        }
+
+        if (is_numeric($order_or_id) && ((int) $order_or_id) > 0) {
+            $order = self::get_order((int) $order_or_id);
+            if ($order instanceof WC_Abstract_Order) {
+                return $order;
+            }
+            if (class_exists('IWP_Logger')) {
+                IWP_Logger::debug('HPOS helper: order not found for ID', 'hpos-compat', array(
+                    'order_id' => (int) $order_or_id,
+                ));
+            }
+            return false;
+        }
+
+        // Anything else is a caller bug — log loud so it surfaces in dev.
+        if (class_exists('IWP_Logger')) {
+            IWP_Logger::warning('HPOS helper: invalid order argument', 'hpos-compat', array(
+                'type'  => is_object($order_or_id) ? get_class($order_or_id) : gettype($order_or_id),
+                'value' => is_scalar($order_or_id) ? (string) $order_or_id : null,
+            ));
+        }
+        return false;
+    }
+
+    /**
      * Constructor
      */
     public function __construct() {
@@ -64,27 +113,151 @@ class IWP_Woo_HPOS {
     }
 
     /**
-     * Get orders (HPOS compatible)
+     * Get orders — transparent HPOS/CPT compat wrapper around wc_get_orders().
      *
-     * @param array $args Query arguments
-     * @return WC_Order[]
+     * Callers pass a normal wc_get_orders() arg array, INCLUDING `meta_query`
+     * in its standard WP_Query shape. This wrapper handles the data-store and
+     * legacy-data quirks so callers don't have to branch on is_hpos_enabled().
+     *
+     * Why we don't pass `meta_query` through to wc_get_orders() on either store:
+     *
+     *   - CPT data store: the base `WC_Data_Store_WP::get_wp_query_args()`
+     *     explicitly strips `meta_query` from $query_vars
+     *     (class-wc-data-store-wp.php:284 — `'meta_query' === $key` → continue).
+     *     WC 9.2+ additionally emits _doing_it_wrong when it sees the arg
+     *     (class-wc-order-data-store-cpt.php:1076-1100). So `meta_query`
+     *     never filters anything on CPT via the top-level arg.
+     *
+     *   - HPOS authoritative: `OrdersTableQuery` DOES support `meta_query`
+     *     natively (OrdersTableQuery.php:791-793 → OrdersTableMetaQuery),
+     *     but it only joins wp_wc_orders_meta. Orders whose IWP meta was
+     *     written by pre-HPOS-fix plugin builds (via update_post_meta()) have
+     *     their values in wp_postmeta and get silently skipped by the native
+     *     HPOS query.
+     *
+     * Unified strategy (no branching on data store):
+     *
+     *   1. Extract `meta_query` from $args before calling wc_get_orders().
+     *   2. Fetch orders using only first-class args (customer_id, status, limit, …).
+     *      These are supported identically by both data stores with no notices.
+     *   3. Evaluate the meta filter in PHP via self::get_order_meta(). That
+     *      reader already handles the active-store / legacy-postmeta fallback
+     *      and opportunistically migrates legacy values forward on first read,
+     *      so a legacy order becomes visible once and repairs its own storage
+     *      on the way through.
+     *
+     * Supported meta_query shape: an array of clauses each of the form
+     *   array('key' => '<meta_key>', 'compare' => 'EXISTS')
+     * plus an optional top-level 'relation' key (treated as OR, which is this
+     * plugin's only usage). Clauses with other `compare` operators are logged
+     * and skipped — extend the evaluator when a caller needs richer operators
+     * rather than silently mis-filtering.
+     *
+     * Performance / memory: because the meta filter runs in PHP on the result
+     * of the wc_get_orders() call, callers should bound the query with
+     * first-class args (customer_id, status, limit, date_created, …) before
+     * relying on meta_query. Passing `limit => -1` without any other scope is
+     * safe only for small result sets (e.g. per-customer order lists). For
+     * site-wide queries on large stores, paginate or add a customer/status
+     * scope.
+     *
+     * @param array $args Query arguments.
+     * @return WC_Order[]|int[] WC_Order objects by default; order IDs when the
+     *                          caller passes 'return' => 'ids'.
      */
     public static function get_orders($args = array()) {
         $default_args = array(
-            'limit' => -1,
+            'limit'   => -1,
             'orderby' => 'date',
-            'order' => 'DESC',
-            'return' => 'objects',
+            'order'   => 'DESC',
+            'return'  => 'objects',
         );
 
         $args = wp_parse_args($args, $default_args);
 
-        if (self::is_hpos_enabled()) {
-            return wc_get_orders($args);
-        } else {
-            // Fallback for legacy post-based orders
-            return wc_get_orders($args);
+        // Pull meta_query out before wc_get_orders() runs. Under CPT this
+        // avoids the 9.2 notice; under HPOS this avoids the legacy-postmeta
+        // blind spot. We evaluate it ourselves below.
+        $meta_query = array();
+        if (!empty($args['meta_query']) && is_array($args['meta_query'])) {
+            $meta_query = $args['meta_query'];
+            unset($args['meta_query']);
         }
+
+        // Collect the keys to EXISTS-check. The plugin's meta_query usage is
+        // limited to EXISTS clauses (optionally OR'd), so a flat list is
+        // enough. A non-EXISTS compare indicates a caller this helper isn't
+        // designed for; we log and skip that clause rather than pretend.
+        $exists_keys = array();
+        foreach ($meta_query as $clause_key => $clause) {
+            if ($clause_key === 'relation') {
+                continue; // Top-level relation — we always OR EXISTS keys.
+            }
+            if (!is_array($clause) || !isset($clause['key'])) {
+                continue;
+            }
+            $compare = isset($clause['compare']) ? strtoupper($clause['compare']) : '=';
+            if ($compare !== 'EXISTS') {
+                if (class_exists('IWP_Logger')) {
+                    IWP_Logger::warning('get_orders received unsupported meta_query compare; ignoring clause', 'hpos-compat', array(
+                        'compare' => $compare,
+                        'key'     => $clause['key'],
+                    ));
+                }
+                continue;
+            }
+            $exists_keys[] = $clause['key'];
+        }
+
+        // PHP-side meta filtering needs the hydrated WC_Order. If the caller
+        // asked for 'ids' we temporarily switch to objects, filter, then
+        // project back to IDs at the end.
+        $original_return = isset($args['return']) ? $args['return'] : 'objects';
+        if (!empty($exists_keys)) {
+            $args['return'] = 'objects';
+        }
+
+        $orders = wc_get_orders($args);
+
+        // Fast path: no meta filter requested, or WC returned nothing to filter.
+        if (empty($exists_keys) || empty($orders)) {
+            return $orders;
+        }
+
+        $before_count = count($orders);
+        $filtered     = array();
+        foreach ($orders as $order) {
+            foreach ($exists_keys as $meta_key) {
+                // self::get_order_meta() — not $order->get_meta() — so the
+                // wp_postmeta fallback + forward-migrate runs for legacy
+                // values. We pass the $order object directly; the resolver
+                // short-circuits on the instanceof branch so there's no
+                // redundant wc_get_order() lookup per iteration. empty()
+                // covers every "not set" shape ('', null, [], false) — the
+                // filtered meta keys in this plugin are always arrays, so
+                // the 0 / '0' false-positives of empty() don't bite.
+                if (!empty(self::get_order_meta($order, $meta_key))) {
+                    $filtered[] = $order;
+                    break; // OR semantics — any match is enough.
+                }
+            }
+        }
+
+        if (class_exists('IWP_Logger')) {
+            IWP_Logger::debug('get_orders meta_query filter applied', 'hpos-compat', array(
+                'exists_keys'  => $exists_keys,
+                'hpos_enabled' => self::is_hpos_enabled(),
+                'before_count' => $before_count,
+                'after_count'  => count($filtered),
+            ));
+        }
+
+        // Restore the caller's requested return shape.
+        if ($original_return === 'ids') {
+            return array_map(function ($order) { return $order->get_id(); }, $filtered);
+        }
+
+        return $filtered;
     }
 
     /**
@@ -181,61 +354,127 @@ class IWP_Woo_HPOS {
     }
 
     /**
-     * Get order meta (HPOS compatible)
+     * Get order meta through the active WC data store, with legacy postmeta fallback.
      *
-     * @param int $order_id Order ID
-     * @param string $key Meta key
-     * @param bool $single Whether to return single value
-     * @return mixed
+     * Lookup order:
+     *   1. $order->get_meta($key) — reads from the data store the order was
+     *      hydrated from (wp_wc_orders_meta under HPOS, wp_postmeta under CPT).
+     *   2. get_post_meta($order_id, $key, true) — fallback for values written
+     *      by pre-HPOS-fix plugin builds that used update_post_meta() directly.
+     *      On a hit under HPOS, the value is migrated forward via
+     *      $order->update_meta_data() + save_meta_data() so subsequent reads
+     *      resolve via the active store without re-hitting this fallback.
+     *
+     * @param int|numeric-string|WC_Abstract_Order $order_or_id
+     *        Order ID or a loaded order object. Pass the object in loops to
+     *        avoid a redundant wc_get_order() lookup per iteration.
+     * @param string $key    Meta key.
+     * @param bool   $single Whether to return a single value.
+     * @return mixed The meta value, or false when the order cannot be
+     *               resolved and neither source has a value.
      */
-    public static function get_order_meta($order_id, $key, $single = true) {
-        $order = self::get_order($order_id);
-        
+    public static function get_order_meta($order_or_id, $key, $single = true) {
+        $order = self::resolve_order_arg($order_or_id);
         if (!$order) {
             return false;
         }
 
-        return $order->get_meta($key, $single);
+        // Primary: active data store (HPOS or CPT) via the WC order object.
+        $value = $order->get_meta($key, $single);
+        if (!empty($value)) {
+            return $value;
+        }
+
+        // Legacy fallback: pre-HPOS-fix plugin builds wrote via update_post_meta().
+        // Under authoritative HPOS that data never reached wp_wc_orders_meta, so
+        // $order->get_meta() returns empty above. Read wp_postmeta directly and,
+        // if we find something, migrate it into the active store so the next
+        // read resolves cleanly without re-entering this branch.
+        $order_id = $order->get_id();
+        $legacy   = get_post_meta($order_id, $key, $single);
+        if (empty($legacy)) {
+            return $value; // Preserve the original empty shape ('' or array()).
+        }
+
+        if (class_exists('IWP_Logger')) {
+            IWP_Logger::info('Migrating legacy postmeta to active data store', 'hpos-compat', array(
+                'order_id'     => $order_id,
+                'key'          => $key,
+                'hpos_enabled' => self::is_hpos_enabled(),
+                'value_type'   => is_array($legacy) ? 'array' : gettype($legacy),
+            ));
+        }
+
+        $order->update_meta_data($key, $legacy);
+        $order->save_meta_data();
+
+        return $legacy;
     }
 
     /**
-     * Update order meta (HPOS compatible)
+     * Update order meta through the active WC data store (HPOS-safe).
      *
-     * @param int $order_id Order ID
-     * @param string $key Meta key
-     * @param mixed $value Meta value
-     * @return bool
+     * Uses $order->save_meta_data() rather than $order->save() so only the
+     * meta change is persisted — no status-change or order-update lifecycle
+     * hooks fire. Under HPOS writes to wp_wc_orders_meta; under CPT writes
+     * to wp_postmeta; under HPOS compat/sync mode WC mirrors to both tables
+     * on the same save.
+     *
+     * @param int|numeric-string|WC_Abstract_Order $order_or_id Order ID or loaded order.
+     * @param string                               $key         Meta key.
+     * @param mixed                                $value       Meta value.
+     * @return bool True on success, false when the order cannot be resolved.
      */
-    public static function update_order_meta($order_id, $key, $value) {
-        $order = self::get_order($order_id);
-        
+    public static function update_order_meta($order_or_id, $key, $value) {
+        $order = self::resolve_order_arg($order_or_id);
         if (!$order) {
             return false;
         }
 
         $order->update_meta_data($key, $value);
-        $order->save();
-        
+        $order->save_meta_data();
+
+        if (class_exists('IWP_Logger')) {
+            IWP_Logger::debug('Order meta written via active data store', 'hpos-compat', array(
+                'order_id'     => $order->get_id(),
+                'key'          => $key,
+                'hpos_enabled' => self::is_hpos_enabled(),
+                'value_type'   => is_array($value) ? 'array' : gettype($value),
+            ));
+        }
+
         return true;
     }
 
     /**
-     * Delete order meta (HPOS compatible)
+     * Delete order meta through the active WC data store (HPOS-safe).
      *
-     * @param int $order_id Order ID
-     * @param string $key Meta key
-     * @return bool
+     * Uses $order->save_meta_data() rather than $order->save() so only the
+     * meta removal is persisted — no status-change or order-update lifecycle
+     * hooks fire. Under HPOS removes from wp_wc_orders_meta; under CPT removes
+     * from wp_postmeta; under HPOS compat/sync mode WC mirrors the delete.
+     *
+     * @param int|numeric-string|WC_Abstract_Order $order_or_id Order ID or loaded order.
+     * @param string                               $key         Meta key.
+     * @return bool True on success, false when the order cannot be resolved.
      */
-    public static function delete_order_meta($order_id, $key) {
-        $order = self::get_order($order_id);
-        
+    public static function delete_order_meta($order_or_id, $key) {
+        $order = self::resolve_order_arg($order_or_id);
         if (!$order) {
             return false;
         }
 
         $order->delete_meta_data($key);
-        $order->save();
-        
+        $order->save_meta_data();
+
+        if (class_exists('IWP_Logger')) {
+            IWP_Logger::debug('Order meta deleted via active data store', 'hpos-compat', array(
+                'order_id'     => $order->get_id(),
+                'key'          => $key,
+                'hpos_enabled' => self::is_hpos_enabled(),
+            ));
+        }
+
         return true;
     }
 

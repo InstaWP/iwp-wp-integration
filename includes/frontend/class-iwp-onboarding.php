@@ -53,9 +53,11 @@ class IWP_Onboarding {
                 '</div>';
         }
 
-        $order_id       = $order->get_id();
-        $deferred_items = get_post_meta($order_id, '_iwp_deferred_items', true);
-        $sites_created  = get_post_meta($order_id, '_iwp_sites_created', true);
+        $order_id = $order->get_id();
+        // HPOS-safe reads so the onboarding page resolves correctly under both
+        // data stores and picks up any legacy postmeta-only values.
+        $deferred_items = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_deferred_items');
+        $sites_created  = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_sites_created');
         $redirect_url   = !empty($atts['redirect']) ? esc_url($atts['redirect']) : '';
 
         ob_start();
@@ -211,8 +213,8 @@ class IWP_Onboarding {
             wp_send_json_error(array('message' => __('You do not have permission to access this order.', 'iwp-wp-integration')));
         }
 
-        // Get deferred items
-        $deferred_items = get_post_meta($order_id, '_iwp_deferred_items', true);
+        // Get deferred items — HPOS-safe read covers both data stores.
+        $deferred_items = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_deferred_items');
         if (empty($deferred_items) || !isset($deferred_items[$item_index])) {
             wp_send_json_error(array('message' => __('No pending site setup found for this item.', 'iwp-wp-integration')));
         }
@@ -321,8 +323,8 @@ class IWP_Onboarding {
             wp_send_json_error(array('message' => $result->get_error_message()));
         }
 
-        // Store result in _iwp_sites_created
-        $sites_created = get_post_meta($order_id, '_iwp_sites_created', true);
+        // Store result in _iwp_sites_created — HPOS-safe read/write.
+        $sites_created = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_sites_created');
         if (!is_array($sites_created)) {
             $sites_created = array();
         }
@@ -333,15 +335,16 @@ class IWP_Onboarding {
             'action'       => 'created',
             'source'       => 'onboarding',
         );
-        update_post_meta($order_id, '_iwp_sites_created', $sites_created);
+        IWP_Woo_HPOS::update_order_meta($order_id, '_iwp_sites_created', $sites_created);
 
-        // Remove this item from deferred list
+        // Remove this item from deferred list. Use delete_order_meta when the
+        // list is emptied so we don't leave an orphan empty-array row.
         unset($deferred_items[$item_index]);
         $deferred_items = array_values($deferred_items); // Re-index
         if (empty($deferred_items)) {
-            delete_post_meta($order_id, '_iwp_deferred_items');
+            IWP_Woo_HPOS::delete_order_meta($order_id, '_iwp_deferred_items');
         } else {
-            update_post_meta($order_id, '_iwp_deferred_items', $deferred_items);
+            IWP_Woo_HPOS::update_order_meta($order_id, '_iwp_deferred_items', $deferred_items);
         }
 
         // Add order note
@@ -402,7 +405,8 @@ class IWP_Onboarding {
             return;
         }
 
-        $deferred_items = get_post_meta($order_id, '_iwp_deferred_items', true);
+        // HPOS-safe read of the deferred-items list on the order.
+        $deferred_items = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_deferred_items');
         if (empty($deferred_items) || !is_array($deferred_items)) {
             return;
         }

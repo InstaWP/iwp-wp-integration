@@ -5,6 +5,16 @@ All notable changes to the InstaWP Integration plugin will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **Full compatibility with WooCommerce High-Performance Order Storage (HPOS).**
+  - With HPOS enabled, newly created site records now store and read correctly across all flows — checkout auto-create, manual site creation from the order screen, subscription plan switches, deferred onboarding, and the customer My Account dashboard.
+  - Orders created on older versions of the plugin continue to work. Their site data is migrated forward to the HPOS-aware storage the first time any part of the plugin reads the order.
+  - The My Account "Your Sites" panel now lists every site the customer owns regardless of which data store WooCommerce is configured to use.
+  - The admin "Sites created" statistic reflects real data under HPOS instead of returning zero.
+  - Standard debug-log notices previously emitted by WooCommerce when the plugin issued order queries under HPOS are gone.
+
 ## [0.0.11] - 2026-04-21
 
 ### Added

@@ -429,12 +429,13 @@ class IWP_Woo_Subscriptions_Integration {
      * @return array
      */
     private function get_order_sites($order_id) {
-        $sites_created = get_post_meta($order_id, '_iwp_sites_created', true);
-        
+        // HPOS-safe read — covers both data stores and legacy postmeta values.
+        $sites_created = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_sites_created');
+
         if (empty($sites_created) || !is_array($sites_created)) {
             return array();
         }
-        
+
         return $sites_created;
     }
 
