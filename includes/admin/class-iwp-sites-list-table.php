@@ -526,7 +526,8 @@ class IWP_Sites_List_Table extends WP_List_Table {
         // entries matching one of these are skipped: the DB row is the source
         // of truth (including trashed rows / orphan deletion markers, which
         // the downstream status filter then hides).
-        $db_site_ids = array_column($db_sites, 'site_id');
+        $db_site_ids = empty($db_sites) ? array(): array_column($db_sites, 'site_id');
+        $has_site_ids = count($db_site_ids) > 0;
 
         // One HPOS-aware round trip — returns only orders that actually have
         // one of the IWP meta keys (under either data store, with legacy
@@ -553,7 +554,7 @@ class IWP_Sites_List_Table extends WP_List_Table {
                 if (!$site) {
                     continue;
                 }
-                if (!empty($site['site_id']) && in_array($site['site_id'], $db_site_ids, true)) {
+                if ( $has_site_ids && !empty($site['site_id']) && in_array($site['site_id'], $db_site_ids, true) ) {
                     continue;
                 }
                 $sites[] = $site;
