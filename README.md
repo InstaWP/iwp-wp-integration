@@ -356,7 +356,7 @@ This plugin is licensed under the GPL v2 or later.
 
 ## Changelog
 
-### Unreleased
+### Version 0.0.12
 - **NEW: Show/Hide toggle works on the Sites list Password column** — masked password reveals inline when clicked
 - **FIXED: Orphan sites (in order meta only) can now be deleted from the admin Sites list** — previously they silently reappeared after delete; now hidden via the standard Trash filter and visible under the **Trash** tab
 - **FIXED: Sites list page now sees orders created under HPOS** — the order-meta merge previously ran raw SQL against `wp_posts`/`wp_postmeta`, missing every order under authoritative HPOS; replaced with a new HPOS-aware single-query helper that also UNIONs in legacy postmeta values for full coverage on stores mid-migration
