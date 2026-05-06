@@ -320,7 +320,7 @@ class IWP_Onboarding {
                 'order_id' => $order_id,
                 'error'    => $result->get_error_message(),
             ));
-            wp_send_json_error(array('message' => $result->get_error_message()));
+            wp_send_json_error(array('message' => IWP_API_Client::humanize_error($result)));
         }
 
         // Store result in _iwp_sites_created — HPOS-safe read/write.

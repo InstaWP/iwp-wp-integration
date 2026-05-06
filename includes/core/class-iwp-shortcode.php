@@ -204,15 +204,7 @@ class IWP_Shortcode {
             $result = $api_client->create_site_from_snapshot($snapshot_slug, $site_data);
 
             if (is_wp_error($result)) {
-                $error_message = $result->get_error_message();
-                if (preg_match('/^(.+?) site name is not available\.?$/i', $error_message, $m)) {
-                    $error_message = sprintf(
-                        /* translators: %s is the site name the customer tried to use. */
-                        __('The site name "%s" is already taken. Please choose a different one.', 'iwp-wp-integration'),
-                        $m[1]
-                    );
-                }
-                wp_send_json_error(array('message' => $error_message));
+                wp_send_json_error(array('message' => IWP_API_Client::humanize_error($result)));
             }
 
             // Check if site was created successfully

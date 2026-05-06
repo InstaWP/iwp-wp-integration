@@ -54,6 +54,35 @@ class IWP_API_Client {
     }
 
     /**
+     * Convert a raw API error message into customer-friendly text.
+     *
+     * Single source of truth for InstaWP API error rewrites. Currently
+     * handles the upstream "X site name is not available." response (the
+     * subdomain-already-taken case) and pass-through everything else
+     * verbatim. Add new rewrite rules here so every customer-facing
+     * surface (shortcode JSON responses, WooCommerce checkout WP_Errors,
+     * deferred-onboarding AJAX, subscription-switch order notes) gets
+     * the same humanized text.
+     *
+     * @param WP_Error|string $error WP_Error from this client, or a raw
+     *                               error message string.
+     * @return string Customer-friendly version of the message.
+     */
+    public static function humanize_error($error) {
+        $message = is_wp_error($error) ? $error->get_error_message() : (string) $error;
+
+        if (preg_match('/^(.+?) site name is not available\.?$/i', $message, $m)) {
+            return sprintf(
+                /* translators: %s is the site name the customer tried to use. */
+                __('The site name "%s" is already taken. Please choose a different one.', 'iwp-wp-integration'),
+                $m[1]
+            );
+        }
+
+        return $message;
+    }
+
+    /**
      * Set API key
      *
      * @param string $api_key
