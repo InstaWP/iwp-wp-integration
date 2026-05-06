@@ -261,6 +261,101 @@ class IWP_Woo_HPOS {
     }
 
     /**
+     * Fetch (order_id, meta_key, meta_value) rows for any order that has at
+     * least one of the supplied meta keys, regardless of which order data
+     * store WooCommerce is configured to use. Single round trip in both modes.
+     *
+     * Returns raw stdClass rows so callers can keep their own
+     * maybe_unserialize / format / dedupe loop. This is the high-throughput
+     * sibling of get_orders() — use it on call sites where the matching set
+     * is far smaller than total orders (e.g. admin list pages on stores with
+     * 10k+ orders) and the caller doesn't need every order hydrated as a
+     * WC_Order. get_orders() loads the entire result set into objects before
+     * filtering in PHP; that's appropriate when the meta_query is incidental,
+     * but the wrong tool when the meta is the primary selector.
+     *
+     * Under CPT-authoritative: SELECT against wp_posts + wp_postmeta.
+     * Under HPOS-authoritative: SELECT against wc_orders + wc_orders_meta,
+     *   UNION-ed with wp_posts + wp_postmeta entries that have no
+     *   corresponding wc_orders_meta row. The UNION half catches legacy
+     *   values written by pre-HPOS-fix plugin builds via update_post_meta()
+     *   that haven't been forward-migrated yet, and the NOT EXISTS clause
+     *   de-dupes when sync mode mirrors the same value into both stores.
+     *
+     * @param string[] $meta_keys Meta keys to match (IN list). Caller-
+     *                            provided literals only — values are bound
+     *                            via prepare(). Empty array short-circuits.
+     * @return stdClass[] Each row has order_id (int), meta_key (string),
+     *                    meta_value (string — still serialized; caller
+     *                    decides whether to maybe_unserialize).
+     */
+    public static function get_orders_with_meta(array $meta_keys) {
+        global $wpdb;
+
+        $meta_keys = array_values(array_unique(array_filter($meta_keys, 'is_string')));
+        if (empty($meta_keys)) {
+            return array();
+        }
+
+        $placeholders = implode(',', array_fill(0, count($meta_keys), '%s'));
+
+        if (!self::is_hpos_enabled()) {
+            // CPT path — same shape as the historic raw SQL.
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $sql = $wpdb->prepare(
+                "SELECT p.ID AS order_id, pm.meta_key AS meta_key, pm.meta_value AS meta_value
+                 FROM {$wpdb->posts} p
+                 INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+                 WHERE p.post_type = 'shop_order'
+                   AND pm.meta_key IN ($placeholders)
+                   AND pm.meta_value IS NOT NULL
+                   AND pm.meta_value <> ''",
+                $meta_keys
+            );
+            return (array) $wpdb->get_results($sql);
+        }
+
+        // HPOS path — query the active store, then UNION with wp_postmeta
+        // rows the active store doesn't have. Table names come from
+        // OrderUtil::get_table_for_* (same primitive class-iwp-database.php
+        // already uses), so they're trusted; meta keys are bound via
+        // prepare() (twice — once per IN clause in the UNION).
+        $orders_table = \Automattic\WooCommerce\Utilities\OrderUtil::get_table_for_orders();
+        $meta_table   = \Automattic\WooCommerce\Utilities\OrderUtil::get_table_for_order_meta();
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $sql = $wpdb->prepare(
+            "SELECT o.id AS order_id, m.meta_key AS meta_key, m.meta_value AS meta_value
+             FROM {$orders_table} o
+             INNER JOIN {$meta_table} m ON o.id = m.order_id
+             WHERE o.type = 'shop_order'
+               AND m.meta_key IN ($placeholders)
+               AND m.meta_value IS NOT NULL
+               AND m.meta_value <> ''
+
+             UNION ALL
+
+             SELECT p.ID AS order_id, pm.meta_key AS meta_key, pm.meta_value AS meta_value
+             FROM {$wpdb->posts} p
+             INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+             WHERE p.post_type = 'shop_order'
+               AND pm.meta_key IN ($placeholders)
+               AND pm.meta_value IS NOT NULL
+               AND pm.meta_value <> ''
+               AND NOT EXISTS (
+                   SELECT 1 FROM {$meta_table} m2
+                   WHERE m2.order_id = p.ID
+                     AND m2.meta_key = pm.meta_key
+                     AND m2.meta_value IS NOT NULL
+                     AND m2.meta_value <> ''
+               )",
+            array_merge($meta_keys, $meta_keys)
+        );
+
+        return (array) $wpdb->get_results($sql);
+    }
+
+    /**
      * Get order count (HPOS compatible)
      *
      * @param array $args Query arguments

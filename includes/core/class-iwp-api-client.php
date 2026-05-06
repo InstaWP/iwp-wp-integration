@@ -54,6 +54,35 @@ class IWP_API_Client {
     }
 
     /**
+     * Convert a raw API error message into customer-friendly text.
+     *
+     * Single source of truth for InstaWP API error rewrites. Currently
+     * handles the upstream "X site name is not available." response (the
+     * subdomain-already-taken case) and pass-through everything else
+     * verbatim. Add new rewrite rules here so every customer-facing
+     * surface (shortcode JSON responses, WooCommerce checkout WP_Errors,
+     * deferred-onboarding AJAX, subscription-switch order notes) gets
+     * the same humanized text.
+     *
+     * @param WP_Error|string $error WP_Error from this client, or a raw
+     *                               error message string.
+     * @return string Customer-friendly version of the message.
+     */
+    public static function humanize_error($error) {
+        $message = is_wp_error($error) ? $error->get_error_message() : (string) $error;
+
+        if (preg_match('/^(.+?) site name is not available\.?$/i', $message, $m)) {
+            return sprintf(
+                /* translators: %s is the site name the customer tried to use. */
+                __('The site name "%s" is already taken. Please choose a different one.', 'iwp-wp-integration'),
+                $m[1]
+            );
+        }
+
+        return $message;
+    }
+
+    /**
      * Set API key
      *
      * @param string $api_key
@@ -149,19 +178,31 @@ class IWP_API_Client {
         IWP_Logger::debug('API response body received', 'api-client');
 
         if ($response_code < 200 || $response_code >= 300) {
-            $error_message = sprintf(
-                __('API request failed with status code %d', 'iwp-woo-v2'),
-                $response_code
-            );
-            
-            // Try to get error message from response body
+            // Prefer the upstream body message — it's already a human-readable
+            // explanation (e.g. "john-doe site name is not available."). Fall
+            // back to a generic "status code N" only when no message exists.
             $body_data = json_decode($response_body, true);
-            if (is_array($body_data) && isset($body_data['message'])) {
-                $error_message .= ': ' . sanitize_text_field($body_data['message']);
+            if (is_array($body_data) && !empty($body_data['message'])) {
+                $error_message = sanitize_text_field($body_data['message']);
+            } else {
+                $error_message = sprintf(
+                    __('API request failed with status code %d', 'iwp-woo-v2'),
+                    $response_code
+                );
             }
-            
-            IWP_Logger::error('API request failed', 'api-client', array('error' => $error_message));
-            return new WP_Error('api_request_failed', $error_message);
+
+            // Log the RAW upstream message so support / debug context
+            // still captures exactly what the API said.
+            IWP_Logger::error('API request failed', 'api-client', array(
+                'status_code' => $response_code,
+                'error'       => $error_message,
+            ));
+
+            // Return a HUMANIZED WP_Error so every downstream caller —
+            // shortcode AJAX, WooCommerce checkout, deferred onboarding,
+            // subscription switch — surfaces customer-friendly text by
+            // default, without each having to know the rewrite rules.
+            return new WP_Error('api_request_failed', self::humanize_error($error_message));
         }
 
         $data = json_decode($response_body, true);

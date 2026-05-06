@@ -396,6 +396,10 @@ class IWP_Woo_Order_Processor {
         );
         
         if (is_wp_error($result)) {
+            $humanized = IWP_API_Client::humanize_error($result);
+            if ($humanized !== $result->get_error_message()) {
+                $result = new WP_Error($result->get_error_code(), $humanized);
+            }
             return $result;
         }
 

@@ -2270,12 +2270,12 @@ class IWP_Admin {
             ));
         }
 
-        // Remote API delete already succeeded above. Soft-delete the local
-        // row so it stays visible under the Trash filter.
-        if (IWP_Sites_Model::get_by_site_id($site_id)) {
-            IWP_Sites_Model::trash($site_id);
-            IWP_Logger::info('Marked site as trashed in database table', 'admin', array('site_id' => $site_id));
-        }
+        // Remote API delete already succeeded above. Trash the local row
+        // (or insert a deletion marker for orphans that live only in order
+        // meta) so the site is hidden from the default list and visible
+        // under the Trash filter.
+        IWP_Sites_Model::trash($site_id);
+        IWP_Logger::info('Marked site as trashed in database table', 'admin', array('site_id' => $site_id));
 
         IWP_Logger::info('Site deleted successfully', 'admin', array(
             'site_id' => $site_id,
