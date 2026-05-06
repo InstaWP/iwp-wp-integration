@@ -396,6 +396,17 @@ class IWP_Woo_Order_Processor {
         );
         
         if (is_wp_error($result)) {
+            $error_message = $result->get_error_message();
+            if (preg_match('/^(.+?) site name is not available\.?$/i', $error_message, $m)) {
+                $result = new WP_Error(
+                    $result->get_error_code(),
+                    sprintf(
+                        /* translators: %s is the subdomain the customer tried to use. */
+                        __('The subdomain "%s" is already taken. Please choose a different one.', 'iwp-wp-integration'),
+                        $m[1]
+                    )
+                );
+            }
             return $result;
         }
 

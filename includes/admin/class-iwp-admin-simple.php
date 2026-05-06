@@ -597,6 +597,21 @@ class IWP_Admin_Simple {
 
         wp_enqueue_script('jquery');
 
+        // Sites list page UI (password show/hide toggle, etc.).
+        wp_enqueue_script(
+            'iwp-sites-list',
+            IWP_PLUGIN_URL . 'assets/js/sites-list.js',
+            array('jquery'),
+            IWP_VERSION,
+            true
+        );
+        wp_localize_script('iwp-sites-list', 'iwpSitesList', array(
+            'labels' => array(
+                'show' => __('Show', 'iwp-wp-integration'),
+                'hide' => __('Hide', 'iwp-wp-integration'),
+            ),
+        ));
+
         // Send Credentials button handler
         wp_add_inline_script('jquery', '
             jQuery(document).ready(function($) {
@@ -651,8 +666,17 @@ class IWP_Admin_Simple {
                 border-top: none;
                 padding: 20px;
             }
-            .iwp-tab-content.active { 
-                display: block; 
+            .iwp-tab-content.active {
+                display: block;
+            }
+            .iwp-password-revealed {
+                display: block;
+                font-family: monospace;
+                word-break: break-all;
+                margin-top: 2px;
+            }
+            .iwp-password-revealed:empty {
+                display: none;
             }
         ');
     }

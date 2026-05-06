@@ -20,6 +20,19 @@ if (!defined('ABSPATH')) {
 class IWP_Woo_Product_Fields {
 
     /**
+     * Customer-facing label for the WooCommerce site-name field. Single
+     * source of truth — reuse anywhere new code mentions the field by name
+     * (cart/checkout review, error messages) so the term stays consistent.
+     * Pre-existing strings that embed the label inside a full sentence are
+     * left as-is to avoid invalidating existing translations.
+     *
+     * @return string
+     */
+    public static function field_label() {
+        return __('Subdomain', 'iwp-wp-integration');
+    }
+
+    /**
      * Constructor
      */
     public function __construct() {
@@ -206,7 +219,7 @@ class IWP_Woo_Product_Fields {
 
         if (!empty($cart_item['iwp_subdomain'])) {
             $item_data[] = array(
-                'key'   => __('Subdomain', 'iwp-wp-integration'),
+                'key'   => self::field_label(),
                 'value' => esc_html($cart_item['iwp_subdomain']),
             );
         }

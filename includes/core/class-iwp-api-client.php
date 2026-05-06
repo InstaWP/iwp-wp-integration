@@ -149,18 +149,23 @@ class IWP_API_Client {
         IWP_Logger::debug('API response body received', 'api-client');
 
         if ($response_code < 200 || $response_code >= 300) {
-            $error_message = sprintf(
-                __('API request failed with status code %d', 'iwp-woo-v2'),
-                $response_code
-            );
-            
-            // Try to get error message from response body
+            // Prefer the upstream body message — it's already a human-readable
+            // explanation (e.g. "john-doe site name is not available."). Fall
+            // back to a generic "status code N" only when no message exists.
             $body_data = json_decode($response_body, true);
-            if (is_array($body_data) && isset($body_data['message'])) {
-                $error_message .= ': ' . sanitize_text_field($body_data['message']);
+            if (is_array($body_data) && !empty($body_data['message'])) {
+                $error_message = sanitize_text_field($body_data['message']);
+            } else {
+                $error_message = sprintf(
+                    __('API request failed with status code %d', 'iwp-woo-v2'),
+                    $response_code
+                );
             }
-            
-            IWP_Logger::error('API request failed', 'api-client', array('error' => $error_message));
+
+            IWP_Logger::error('API request failed', 'api-client', array(
+                'status_code' => $response_code,
+                'error'       => $error_message,
+            ));
             return new WP_Error('api_request_failed', $error_message);
         }
 

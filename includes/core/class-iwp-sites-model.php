@@ -183,7 +183,17 @@ class IWP_Sites_Model {
             $api_client->delete_site($site_id);
         }
 
-        return self::update($site_id, array('status' => self::STATUS_TRASHED));
+        if (self::get_by_site_id($site_id)) {
+            return self::update($site_id, array('status' => self::STATUS_TRASHED));
+        }
+
+        // Orphan: site lives only in order meta. Record a deletion marker so
+        // the listing layer's trashed-status filter can hide it.
+        return (bool) self::create(array(
+            'site_id' => $site_id,
+            'status'  => self::STATUS_TRASHED,
+            'source'  => 'order_meta',
+        ));
     }
 
     /**
