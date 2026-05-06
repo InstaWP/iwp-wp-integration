@@ -191,11 +191,18 @@ class IWP_API_Client {
                 );
             }
 
+            // Log the RAW upstream message so support / debug context
+            // still captures exactly what the API said.
             IWP_Logger::error('API request failed', 'api-client', array(
                 'status_code' => $response_code,
                 'error'       => $error_message,
             ));
-            return new WP_Error('api_request_failed', $error_message);
+
+            // Return a HUMANIZED WP_Error so every downstream caller —
+            // shortcode AJAX, WooCommerce checkout, deferred onboarding,
+            // subscription switch — surfaces customer-friendly text by
+            // default, without each having to know the rewrite rules.
+            return new WP_Error('api_request_failed', self::humanize_error($error_message));
         }
 
         $data = json_decode($response_body, true);
