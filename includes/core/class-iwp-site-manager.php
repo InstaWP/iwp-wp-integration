@@ -690,19 +690,13 @@ class IWP_Site_Manager {
                     'site_type' => $db_site->site_type ?? 'paid',
                     'source' => $db_site->source,
                     'plan_id' => $db_site->plan_id,
+                    // Pass api_response through so the render layer can
+                    // decode the failure message on demand for failed
+                    // sites (via IWP_Site_Manager::resolve_failure_message).
+                    // No precompute here — the work only runs when a
+                    // failed card actually renders.
+                    'api_response' => $db_site->api_response,
                 );
-
-                // For failed sites, surface the real (humanized) error so
-                // the customer-facing render at class-iwp-frontend.php can
-                // show it in place of the generic "contact support" line.
-                // Source: wp_iwp_sites.api_response — written at the instant
-                // of failure, overwritten on success, single source of truth.
-                if ($db_site->status === 'failed') {
-                    $msg = self::resolve_failure_message($db_site->api_response);
-                    if ($msg) {
-                        $site['error_message'] = $msg;
-                    }
-                }
 
                 $unique_key = 'site_' . $db_site->site_id;
                 if (!isset($seen_sites[$unique_key])) {

@@ -514,21 +514,14 @@ class IWP_Sites_List_Table extends WP_List_Table {
                 'is_expired'   => $is_expired,
                 'hours_remaining' => $hours_remaining,
                 'expiry_hours' => $db_site->expiry_hours,
-                'credentials_released' => $credentials_released
+                'credentials_released' => $credentials_released,
+                // Pass api_response through so column_status can decode
+                // the failure message on demand for failed rows (via
+                // IWP_Site_Manager::resolve_failure_message). No
+                // precompute — the work only runs when a failed row
+                // actually renders.
+                'api_response' => $db_site->api_response,
             );
-
-            // For failed rows that survive the empty-URL skip above,
-            // surface the real failure cause (humanized) so the Failed
-            // tab shows what went wrong instead of just a Failed badge.
-            // Source: wp_iwp_sites.api_response (written at instant of
-            // failure, overwritten on success — always reflects current
-            // state, no fallback / stale-data risk).
-            if ($db_site->status === 'failed' && class_exists('IWP_Site_Manager')) {
-                $msg = IWP_Site_Manager::resolve_failure_message($db_site->api_response);
-                if ($msg) {
-                    $site['error_message'] = $msg;
-                }
-            }
 
             $sites[] = $site;
         }
@@ -1068,9 +1061,13 @@ class IWP_Sites_List_Table extends WP_List_Table {
                 $text = __('Failed', 'iwp-wp-integration');
                 // Append the humanized error so the Failed tab shows
                 // why each row failed (subdomain taken, etc.) instead
-                // of just a Failed badge.
-                if (!empty($item['error_message'])) {
-                    $text .= '<br><small class="iwp-status-failure-reason">' . esc_html($item['error_message']) . '</small>';
+                // of just a Failed badge. Decode on demand from the
+                // api_response carried in $item — no precompute.
+                $failure_msg = class_exists('IWP_Site_Manager')
+                    ? IWP_Site_Manager::resolve_failure_message($item['api_response'] ?? null)
+                    : null;
+                if ($failure_msg) {
+                    $text .= '<br><small class="iwp-status-failure-reason">' . esc_html($failure_msg) . '</small>';
                 }
                 break;
             case IWP_Sites_Model::STATUS_TRASHED:
