@@ -808,7 +808,7 @@ class IWP_Site_Manager {
         if (!is_array($decoded) || empty($decoded['error'])) {
             return null;
         }
-        return IWP_API_Client::humanize_error($decoded['error']);
+        return $decoded['error'];
     }
 
     private function transform_site_data_for_frontend($site_data) {
