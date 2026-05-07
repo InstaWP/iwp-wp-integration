@@ -357,12 +357,14 @@ This plugin is licensed under the GPL v2 or later.
 ## Changelog
 
 ### Version 0.0.12
-- **NEW: Show/Hide toggle works on the Sites list Password column** — masked password reveals inline when clicked
-- **FIXED: Orphan sites (in order meta only) can now be deleted from the admin Sites list** — previously they silently reappeared after delete; now hidden via the standard Trash filter and visible under the **Trash** tab
-- **FIXED: Sites list page now sees orders created under HPOS** — the order-meta merge previously ran raw SQL against `wp_posts`/`wp_postmeta`, missing every order under authoritative HPOS; replaced with a new HPOS-aware single-query helper that also UNIONs in legacy postmeta values for full coverage on stores mid-migration
-- **FIXED: Friendlier "subdomain already taken" error** — replaces the raw `API request failed with status code 422: ... site name is not available.` text on both the shortcode form and WooCommerce checkout
-- **FIXED: API error messages no longer prefixed with `API request failed with status code N:`** — upstream message surfaces directly when present
-- **CHANGED: Full compatibility with WooCommerce High-Performance Order Storage (HPOS)** — site records now store and read correctly across all flows under HPOS; older orders are migrated forward on first read; My Account "Your Sites" panel and admin "Sites created" statistic both work regardless of data store
+- **NEW**: Show/Hide password toggle on the Sites list — click to reveal a site's WordPress password inline
+- **CHANGED**: Full WooCommerce HPOS support — sites created from orders show up correctly everywhere (My Account dashboard, order details, admin "Sites created" stat); older orders are upgraded automatically on first read
+- **FIXED**: Clearer "subdomain already taken" error — customers see *"The subdomain X is already taken. Please choose a different one."* on checkout, thank-you page, deferred-onboarding form, and order email
+- **FIXED**: Failed site creations now show the real reason to the customer on the thank-you page, order details, and order email — not just a generic "contact support" message
+- **FIXED**: Admin Sites list shows the failure reason under the "Failed" badge, so admins can see at a glance why each one failed
+- **FIXED**: No more phantom rows in the admin Sites list — failed/trashed sites with no URL are hidden from every tab
+- **FIXED**: Old orphaned sites (left over from older plugin versions) can now be deleted from the admin Sites list — previously they would reappear after deletion
+- **FIXED**: Every failed order now keeps its own record — previously a database quirk caused only the first failed site per cycle to be recorded
 
 ### Version 0.0.11
 - **NEW: Trash filter on the Sites list page** — deleting a site now moves it to a new **Trash** status instead of removing the row
