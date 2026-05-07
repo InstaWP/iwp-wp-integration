@@ -432,6 +432,15 @@ class IWP_Sites_List_Table extends WP_List_Table {
         $db_sites = IWP_Sites_Model::get_all(array('limit' => 100));
 
         foreach ($db_sites as $db_site) {
+            // Hide rows that carry no actionable info — failed or trashed
+            // with no site URL. They were left behind by older code paths
+            // (failed creates with no API response, pre-fallback tombstones)
+            // and only clutter the list. Visible failed/trashed rows still
+            // pass through (they have a URL or dashboard link to act on).
+            if (empty($db_site->site_url) && in_array($db_site->status, array('failed', IWP_Sites_Model::STATUS_TRASHED), true)) {
+                continue;
+            }
+
             $order = null;
             $order_link = '';
 
@@ -507,6 +516,19 @@ class IWP_Sites_List_Table extends WP_List_Table {
                 'expiry_hours' => $db_site->expiry_hours,
                 'credentials_released' => $credentials_released
             );
+
+            // For failed rows that survive the empty-URL skip above,
+            // surface the real failure cause (humanized) so the Failed
+            // tab shows what went wrong instead of just a Failed badge.
+            // Source: wp_iwp_sites.api_response (written at instant of
+            // failure, overwritten on success — always reflects current
+            // state, no fallback / stale-data risk).
+            if ($db_site->status === 'failed' && class_exists('IWP_Site_Manager')) {
+                $msg = IWP_Site_Manager::resolve_failure_message($db_site->api_response);
+                if ($msg) {
+                    $site['error_message'] = $msg;
+                }
+            }
 
             $sites[] = $site;
         }
@@ -1044,6 +1066,12 @@ class IWP_Sites_List_Table extends WP_List_Table {
             case 'failed':
                 $class = 'iwp-status-failed';
                 $text = __('Failed', 'iwp-wp-integration');
+                // Append the humanized error so the Failed tab shows
+                // why each row failed (subdomain taken, etc.) instead
+                // of just a Failed badge.
+                if (!empty($item['error_message'])) {
+                    $text .= '<br><small class="iwp-status-failure-reason">' . esc_html($item['error_message']) . '</small>';
+                }
                 break;
             case IWP_Sites_Model::STATUS_TRASHED:
                 $class = 'iwp-status-trashed';
