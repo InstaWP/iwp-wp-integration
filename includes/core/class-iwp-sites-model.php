@@ -17,6 +17,66 @@ class IWP_Sites_Model {
 
     private static $table_name;
 
+    /**
+     * wpdb format hint per column.
+     *
+     * Required because WP core's `wp_set_wpdb_vars()` (wp-includes/load.php)
+     * pre-populates `$wpdb->field_types['site_id'] = '%d'` and
+     * `field_types['user_id'] = '%d'` for multisite. When `$wpdb->insert()`
+     * or `$wpdb->update()` is called WITHOUT an explicit `$format`, wpdb
+     * falls back to that registry by column NAME (see
+     * wp-includes/class-wpdb.php:2898) — regardless of what the actual
+     * column type is in our custom table.
+     *
+     * Net effect without an explicit format: any non-numeric string
+     * written to `site_id` (e.g. "pending-XYZ" placeholder) is cast to
+     * integer `0` in PHP before the SQL is built. Once one such row
+     * exists, the UNIQUE constraint on `site_id` blocks every subsequent
+     * failed-pending insert with a duplicate-key error.
+     *
+     * Pass `self::format_for_data($data)` as the third arg to insert()
+     * and the fourth arg to update() to override the lookup.
+     *
+     * @var array<string, '%s'|'%d'|'%f'>
+     */
+    private static $column_formats = array(
+        'site_id'       => '%s',
+        'site_url'      => '%s',
+        'wp_username'   => '%s',
+        'wp_password'   => '%s',
+        'wp_admin_url'  => '%s',
+        's_hash'        => '%s',
+        'status'        => '%s',
+        'site_type'     => '%s',
+        'task_id'       => '%s',
+        'snapshot_slug' => '%s',
+        'plan_id'       => '%s',
+        'product_id'    => '%d',
+        'order_id'      => '%d',
+        'user_id'       => '%d',
+        'source'        => '%s',
+        'source_data'   => '%s',
+        'is_pool'       => '%d',
+        'is_reserved'   => '%d',
+        'expiry_hours'  => '%d',
+        'api_response'  => '%s',
+        'created_at'    => '%s',
+        'updated_at'    => '%s',
+    );
+
+    /**
+     * Build a positional `$format` array for wpdb based on $data's keys.
+     * Falls back to '%s' for any column not in the static map (caller
+     * passed an unexpected column — let wpdb treat it as a string).
+     */
+    private static function format_for_data($data) {
+        $formats = array();
+        foreach (array_keys($data) as $col) {
+            $formats[] = isset(self::$column_formats[$col]) ? self::$column_formats[$col] : '%s';
+        }
+        return $formats;
+    }
+
     public static function init() {
         global $wpdb;
         self::$table_name = $wpdb->prefix . 'iwp_sites';
@@ -42,32 +102,39 @@ class IWP_Sites_Model {
 
         $site_data = wp_parse_args($data, $defaults);
 
+        $insert_data = array(
+            'site_id' => sanitize_text_field($site_data['site_id']),
+            'site_url' => !empty($site_data['site_url']) ? esc_url_raw($site_data['site_url']) : null,
+            'wp_username' => !empty($site_data['wp_username']) ? sanitize_text_field($site_data['wp_username']) : null,
+            'wp_password' => !empty($site_data['wp_password']) ? $site_data['wp_password'] : null,
+            'wp_admin_url' => !empty($site_data['wp_admin_url']) ? esc_url_raw($site_data['wp_admin_url']) : null,
+            's_hash' => !empty($site_data['s_hash']) ? sanitize_text_field($site_data['s_hash']) : null,
+            'status' => sanitize_text_field($site_data['status']),
+            'site_type' => sanitize_text_field($site_data['site_type']),
+            'task_id' => !empty($site_data['task_id']) ? sanitize_text_field($site_data['task_id']) : null,
+            'snapshot_slug' => !empty($site_data['snapshot_slug']) ? sanitize_text_field($site_data['snapshot_slug']) : null,
+            'plan_id' => !empty($site_data['plan_id']) ? sanitize_text_field($site_data['plan_id']) : null,
+            'product_id' => !empty($site_data['product_id']) ? intval($site_data['product_id']) : null,
+            'order_id' => !empty($site_data['order_id']) ? intval($site_data['order_id']) : null,
+            'user_id' => intval($site_data['user_id']),
+            'source' => sanitize_text_field($site_data['source']),
+            'source_data' => !empty($site_data['source_data']) ? wp_json_encode($site_data['source_data']) : null,
+            'is_pool' => intval($site_data['is_pool']),
+            'is_reserved' => intval($site_data['is_reserved']),
+            'expiry_hours' => !empty($site_data['expiry_hours']) ? intval($site_data['expiry_hours']) : null,
+            'api_response' => !empty($site_data['api_response']) ? wp_json_encode($site_data['api_response']) : null,
+            'created_at' => $site_data['created_at'],
+            'updated_at' => $site_data['updated_at']
+        );
+
+        // Explicit $format overrides WP core's field_types['site_id']='%d'
+        // lookup (see $column_formats docblock above) so the "pending-XYZ"
+        // placeholder used by IWP_Site_Manager::create_site_with_tracking
+        // stores as the actual string instead of being cast to integer 0.
         $result = $wpdb->insert(
             self::$table_name,
-            array(
-                'site_id' => sanitize_text_field($site_data['site_id']),
-                'site_url' => !empty($site_data['site_url']) ? esc_url_raw($site_data['site_url']) : null,
-                'wp_username' => !empty($site_data['wp_username']) ? sanitize_text_field($site_data['wp_username']) : null,
-                'wp_password' => !empty($site_data['wp_password']) ? $site_data['wp_password'] : null,
-                'wp_admin_url' => !empty($site_data['wp_admin_url']) ? esc_url_raw($site_data['wp_admin_url']) : null,
-                's_hash' => !empty($site_data['s_hash']) ? sanitize_text_field($site_data['s_hash']) : null,
-                'status' => sanitize_text_field($site_data['status']),
-                'site_type' => sanitize_text_field($site_data['site_type']),
-                'task_id' => !empty($site_data['task_id']) ? sanitize_text_field($site_data['task_id']) : null,
-                'snapshot_slug' => !empty($site_data['snapshot_slug']) ? sanitize_text_field($site_data['snapshot_slug']) : null,
-                'plan_id' => !empty($site_data['plan_id']) ? sanitize_text_field($site_data['plan_id']) : null,
-                'product_id' => !empty($site_data['product_id']) ? intval($site_data['product_id']) : null,
-                'order_id' => !empty($site_data['order_id']) ? intval($site_data['order_id']) : null,
-                'user_id' => intval($site_data['user_id']),
-                'source' => sanitize_text_field($site_data['source']),
-                'source_data' => !empty($site_data['source_data']) ? wp_json_encode($site_data['source_data']) : null,
-                'is_pool' => intval($site_data['is_pool']),
-                'is_reserved' => intval($site_data['is_reserved']),
-                'expiry_hours' => !empty($site_data['expiry_hours']) ? intval($site_data['expiry_hours']) : null,
-                'api_response' => !empty($site_data['api_response']) ? wp_json_encode($site_data['api_response']) : null,
-                'created_at' => $site_data['created_at'],
-                'updated_at' => $site_data['updated_at']
-            )
+            $insert_data,
+            self::format_for_data($insert_data)
         );
 
         if ($result === false) {
@@ -103,10 +170,21 @@ class IWP_Sites_Model {
         $sanitized_data['updated_at'] = current_time('mysql');
 
         error_log('IWP DEBUG: sites model update() - About to call wpdb->update with sanitized data');
+
+        // Explicit $format (4th arg) and $where_format (5th arg) both
+        // override WP core's field_types['site_id']='%d' lookup. Without
+        // the 4th, a site_id present in $sanitized_data (e.g. when
+        // create_site_with_tracking updates the placeholder to the real
+        // site_id) would be cast to int in the SET clause. Without the
+        // 5th, the WHERE clause would match against integer 0 instead of
+        // the actual stored placeholder string — UPDATE would silently
+        // affect 0 rows. See $column_formats docblock above.
         $result = $wpdb->update(
             self::$table_name,
             $sanitized_data,
-            array('site_id' => sanitize_text_field($site_id))
+            array('site_id' => sanitize_text_field($site_id)),
+            self::format_for_data($sanitized_data),
+            array('%s')
         );
         error_log('IWP DEBUG: sites model update() - wpdb->update result: ' . ($result !== false ? 'SUCCESS' : 'FAILED'));
 
