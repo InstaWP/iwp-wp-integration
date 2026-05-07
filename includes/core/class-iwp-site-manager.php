@@ -692,6 +692,16 @@ class IWP_Site_Manager {
                     'plan_id' => $db_site->plan_id,
                 );
 
+                // For failed sites, resolve the real (humanized) error so the
+                // customer-facing render at class-iwp-frontend.php can show
+                // it in place of the generic "contact support" placeholder.
+                if ($db_site->status === 'failed') {
+                    $msg = $this->resolve_failure_message($order_id, $db_site->product_id, $db_site->api_response);
+                    if ($msg) {
+                        $site['error_message'] = $msg;
+                    }
+                }
+
                 $unique_key = 'site_' . $db_site->site_id;
                 if (!isset($seen_sites[$unique_key])) {
                     $all_sites[] = $site;
@@ -711,6 +721,22 @@ class IWP_Site_Manager {
                 // Transform order processor format to frontend format
                 $site = $this->transform_site_data_for_frontend($site_data);
                 if ($site) {
+                    // For failed sites, resolve the real (humanized) error so
+                    // the render at class-iwp-frontend.php shows it in place
+                    // of the generic "contact support" placeholder. The
+                    // product_id lives at the top of the raw $site_data
+                    // (one level above the inner site_data wrapper).
+                    if (($site['status'] ?? '') === 'failed') {
+                        $msg = $this->resolve_failure_message(
+                            $order_id,
+                            isset($site_data['product_id']) ? $site_data['product_id'] : null,
+                            null
+                        );
+                        if ($msg) {
+                            $site['error_message'] = $msg;
+                        }
+                    }
+
                     // Create a unique key for deduplication (use site_id if available, otherwise wp_url)
                     $unique_key = '';
                     if (!empty($site['site_id'])) {
@@ -773,6 +799,56 @@ class IWP_Site_Manager {
      * @param array $site_data Site data from order processor
      * @return array|null Transformed site data or null if invalid
      */
+    /**
+     * Resolve a customer-facing failure message for a failed site.
+     *
+     * Looks first at the per-site api_response (set when the API call
+     * itself failed in IWP_Site_Manager::create_site_with_tracking() —
+     * shape `['error' => $msg]`), then falls back to the per-order
+     * `_iwp_creation_errors` meta written by the order processor (shape
+     * `[{product_id, product_name, error}, …]`) keyed by product_id.
+     *
+     * Runs the resolved string through IWP_API_Client::humanize_error()
+     * — idempotent for messages already humanized at make_request(), and
+     * applies the rewrite to legacy values stored before that fix.
+     *
+     * @param int             $order_id         Order whose meta to consult.
+     * @param int|string|null $product_id       Item product to match in
+     *                                          _iwp_creation_errors.
+     * @param mixed           $api_response_raw JSON string or array from
+     *                                          wp_iwp_sites.api_response.
+     * @return string|null    Friendly error message, or null when no
+     *                        error data was found anywhere.
+     */
+    private function resolve_failure_message($order_id, $product_id, $api_response_raw) {
+        // Primary: per-site api_response. Decode JSON when it's still a
+        // string (DB-sourced rows come through as JSON; pre-parsed callers
+        // may pass an array).
+        if (!empty($api_response_raw)) {
+            $decoded = is_string($api_response_raw) ? json_decode($api_response_raw, true) : $api_response_raw;
+            if (is_array($decoded) && !empty($decoded['error'])) {
+                return IWP_API_Client::humanize_error($decoded['error']);
+            }
+        }
+
+        // Fallback: per-order _iwp_creation_errors. HPOS-safe read.
+        if ($order_id && $product_id) {
+            $errors = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_creation_errors');
+            if (is_array($errors)) {
+                foreach ($errors as $err) {
+                    if (!is_array($err) || empty($err['error'])) {
+                        continue;
+                    }
+                    if (isset($err['product_id']) && (int) $err['product_id'] === (int) $product_id) {
+                        return IWP_API_Client::humanize_error($err['error']);
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
     private function transform_site_data_for_frontend($site_data) {
         if (!is_array($site_data) || !isset($site_data['site_data'])) {
             return null;
