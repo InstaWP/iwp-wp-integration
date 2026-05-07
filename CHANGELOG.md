@@ -5,25 +5,21 @@ All notable changes to the InstaWP Integration plugin will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.0.12] - 2026-05-07
+## [0.0.12] - 2026-05-08
 
 ### Added
-- **Working Show/Hide toggle on the Sites list password column.** The masked password column now has a functional reveal button that toggles between hidden and visible inline values.
+- **Show/Hide password toggle on the Sites list.** Click to reveal a site's WordPress password inline; click again to hide it.
 
 ### Changed
-- **Full compatibility with WooCommerce High-Performance Order Storage (HPOS).**
-  - With HPOS enabled, newly created site records now store and read correctly across all flows — checkout auto-create, manual site creation from the order screen, subscription plan switches, deferred onboarding, and the customer My Account dashboard.
-  - Orders created on older versions of the plugin continue to work. Their site data is migrated forward to the HPOS-aware storage the first time any part of the plugin reads the order.
-  - The My Account "Your Sites" panel now lists every site the customer owns regardless of which data store WooCommerce is configured to use.
-  - The admin "Sites created" statistic reflects real data under HPOS instead of returning zero.
-  - Standard debug-log notices previously emitted by WooCommerce when the plugin issued order queries under HPOS are gone.
-- New `IWP_Woo_Product_Fields::field_label()` static — single source of truth for the customer-facing **Subdomain** label, ready for reuse in new code that mentions the field by name (cart/checkout review, error messages). Existing strings that embed the label inside a full sentence are left as-is so existing translations remain valid.
+- **Full WooCommerce HPOS (High-Performance Order Storage) support.** Sites created from orders now show up correctly everywhere — the customer's My Account dashboard, the order details page, and the admin "Sites created" statistic — regardless of which order storage WooCommerce is configured to use. Orders from older plugin versions are upgraded automatically on first read.
 
 ### Fixed
-- **Orphan sites can now be deleted from the admin Sites list.** Sites that lived only in WooCommerce order meta — typically left over from older plugin versions before `wp_iwp_sites` existed — used to silently reappear after delete because the trash flow only updated the DB row, and there was no DB row to update. Delete now records a deletion marker in `wp_iwp_sites`, and the Sites list skips any order-meta entry whose `site_id` is already represented in the DB so the standard trashed-status filter hides it from the default view (and shows it under the **Trash** tab).
-- **Sites list page now sees orders created under HPOS.** The order-meta merge in the admin Sites list ran a raw SQL join against `wp_posts` + `wp_postmeta` filtered by `post_type='shop_order'`, which under authoritative HPOS misses every order (orders live in `wp_wc_orders`, meta in `wp_wc_orders_meta`). Replaced with a new `IWP_Woo_HPOS::get_orders_with_meta()` helper that queries the active store and UNIONs in any legacy `wp_postmeta` values that haven't been forward-migrated yet — single round trip in both modes. The orphan-delete fix above now works correctly on HPOS-authoritative stores.
-- **Friendlier "subdomain already taken" error message.** Previously surfaced to customers as `API request failed with status code 422: john-doe site name is not available.` It now reads `The subdomain "john-doe" is already taken. Please choose a different one.` on both the `[iwp_site_creator]` shortcode form and the WooCommerce checkout flow.
-- **API error messages no longer get prefixed with `API request failed with status code N: `.** The upstream API's human-readable message is used directly when present; the generic status-code text is kept only as a fallback when the response body has no message.
+- **Clearer "subdomain already taken" error.** Customers attempting to use a subdomain that's already in use now see *"The subdomain "X" is already taken. Please choose a different one."* — on the product checkout, the thank-you page, the deferred-onboarding form, and the order-confirmation email. Replaces the previous raw technical error text.
+- **Failed site creations now show the real reason to the customer.** On the thank-you page, order details, and order-confirmation email, the customer now sees the actual cause of the failure (e.g. subdomain taken) instead of a generic "Sorry, please contact support" message.
+- **Admin Sites list shows the failure reason at a glance.** Failed sites now display the real cause directly under the "Failed" status badge — no need to click into the order to find out what went wrong.
+- **No more phantom rows in the admin Sites list.** Failed or trashed sites that have no usable URL are hidden from every tab, since they carry no actionable information.
+- **Old orphaned sites can now be deleted.** Sites left over in order meta from older plugin versions (before the dedicated sites table existed) used to silently reappear after deletion. They can now be deleted properly and stay deleted.
+- **Every failed order now keeps its own record.** Previously, due to a database quirk, only the first failed site creation per cycle was recorded — every subsequent failed order silently lost its row, and the failed card didn't render on the customer's view. Each failed order now keeps its own record and renders correctly.
 
 ## [0.0.11] - 2026-04-21
 

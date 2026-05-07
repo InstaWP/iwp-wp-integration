@@ -74,7 +74,7 @@ class IWP_API_Client {
         if (preg_match('/^(.+?) site name is not available\.?$/i', $message, $m)) {
             return sprintf(
                 /* translators: %s is the site name the customer tried to use. */
-                __('The site name "%s" is already taken. Please choose a different one.', 'iwp-wp-integration'),
+                __('The site subdomain (%s) is already taken. Please choose a different one.', 'iwp-wp-integration'),
                 $m[1]
             );
         }

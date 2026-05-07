@@ -464,10 +464,24 @@ class IWP_Sites_List_Table extends WP_List_Table {
 
             // Check if credentials have been released
             $credentials_released = false;
+            $site_name = '';
+            $user_name = '';
             if (!empty($db_site->source_data)) {
                 $source_data_parsed = json_decode($db_site->source_data, true);
-                if (is_array($source_data_parsed) && !empty($source_data_parsed['credentials_released'])) {
-                    $credentials_released = true;
+                if (is_array($source_data_parsed)) {
+                    if (!empty($source_data_parsed['credentials_released'])) {
+                        $credentials_released = true;
+                    }
+                    
+                    if (!empty($source_data_parsed['site_data']) && is_array($source_data_parsed['site_data'])) {
+                        if (!empty($source_data_parsed['site_data']['site_name'])) {
+                            $site_name = $source_data_parsed['site_data']['site_name'];
+                        }
+
+                        if (!empty($source_data_parsed['site_data']['user_name'])) {
+                            $user_name = $source_data_parsed['site_data']['user_name'];
+                        }
+                    }
                 }
             }
 
@@ -487,8 +501,8 @@ class IWP_Sites_List_Table extends WP_List_Table {
             }
 
             $site = array(
-                'site_url'     => $db_site->site_url ?: '',
-                'username'     => $db_site->wp_username ?: '',
+                'site_url'     => $db_site->site_url ?: $site_name,
+                'username'     => $db_site->wp_username ?: $user_name,
                 'password'     => $db_site->wp_password ?: '',
                 'user'         => $this->get_user_display_name($order, $db_site->user_id),
                 'source'       => $source_type['text'],
@@ -505,7 +519,13 @@ class IWP_Sites_List_Table extends WP_List_Table {
                 'is_expired'   => $is_expired,
                 'hours_remaining' => $hours_remaining,
                 'expiry_hours' => $db_site->expiry_hours,
-                'credentials_released' => $credentials_released
+                'credentials_released' => $credentials_released,
+                // Pass api_response through so column_status can decode
+                // the failure message on demand for failed rows (via
+                // IWP_Site_Manager::resolve_failure_message). No
+                // precompute — the work only runs when a failed row
+                // actually renders.
+                'api_response' => $db_site->api_response,
             );
 
             $sites[] = $site;
@@ -1014,6 +1034,7 @@ class IWP_Sites_List_Table extends WP_List_Table {
         $status = $item['status'];
         $class = '';
         $text = '';
+        $title = '';
 
         switch ($status) {
             case 'completed':
@@ -1044,6 +1065,13 @@ class IWP_Sites_List_Table extends WP_List_Table {
             case 'failed':
                 $class = 'iwp-status-failed';
                 $text = __('Failed', 'iwp-wp-integration');
+                // Append the humanized error so the Failed tab shows
+                // why each row failed (subdomain taken, etc.) instead
+                // of just a Failed badge. Decode on demand from the
+                // api_response carried in $item — no precompute.
+                $title = class_exists('IWP_Site_Manager')
+                    ? IWP_Site_Manager::resolve_failure_message($item['api_response'] ?? '')
+                    : '';
                 break;
             case IWP_Sites_Model::STATUS_TRASHED:
                 $class = 'iwp-status-trashed';
@@ -1054,7 +1082,7 @@ class IWP_Sites_List_Table extends WP_List_Table {
                 $text = __('Unknown', 'iwp-wp-integration');
         }
 
-        return sprintf('<span class="iwp-status %s">%s</span>', $class, $text);
+        return sprintf('<span class="iwp-status %s" title="%s">%s</span>', $class, esc_html($title), $text);
     }
 
     /**

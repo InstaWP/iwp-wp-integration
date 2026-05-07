@@ -808,7 +808,14 @@ class IWP_Frontend {
             
         } elseif ($status === 'failed') {
             echo '<div class="iwp-site-error">';
-            echo '<p>' . __('Sorry, there was an issue creating your site. Please contact support for assistance.', 'iwp-wp-integration') . '</p>';
+            $msg = class_exists('IWP_Site_Manager')
+                ? IWP_Site_Manager::resolve_failure_message($site['api_response'] ?? null)
+                : null;
+            if ($msg) {
+                echo '<p>' . esc_html($msg) . '</p>';
+            } else {
+                echo '<p>' . __('Sorry, there was an issue creating your site. Please contact support for assistance.', 'iwp-wp-integration') . '</p>';
+            }
             echo '</div>';
         }
 
@@ -1041,7 +1048,13 @@ class IWP_Frontend {
                 } elseif ($status === 'progress') {
                     echo '<p style="color: #856404; background: #fff3cd; padding: 10px; border-radius: 4px;">' . __('Your site is being created. You will receive another email when it\'s ready.', 'iwp-wp-integration') . '</p>';
                 } elseif ($status === 'failed') {
-                    echo '<p style="color: #721c24; background: #f8d7da; padding: 10px; border-radius: 4px;">' . __('There was an issue creating your site. Please contact support.', 'iwp-wp-integration') . '</p>';
+                    $msg = class_exists('IWP_Site_Manager')
+                        ? IWP_Site_Manager::resolve_failure_message($site['api_response'] ?? null)
+                        : null;
+                    $err_text = $msg
+                        ? esc_html($msg)
+                        : __('There was an issue creating your site. Please contact support.', 'iwp-wp-integration');
+                    echo '<p style="color: #721c24; background: #f8d7da; padding: 10px; border-radius: 4px;">' . $err_text . '</p>';
                 }
                 echo '</div>';
             }

@@ -690,6 +690,12 @@ class IWP_Site_Manager {
                     'site_type' => $db_site->site_type ?? 'paid',
                     'source' => $db_site->source,
                     'plan_id' => $db_site->plan_id,
+                    // Pass api_response through so the render layer can
+                    // decode the failure message on demand for failed
+                    // sites (via IWP_Site_Manager::resolve_failure_message).
+                    // No precompute here — the work only runs when a
+                    // failed card actually renders.
+                    'api_response' => $db_site->api_response,
                 );
 
                 $unique_key = 'site_' . $db_site->site_id;
@@ -773,6 +779,38 @@ class IWP_Site_Manager {
      * @param array $site_data Site data from order processor
      * @return array|null Transformed site data or null if invalid
      */
+    /**
+     * Resolve a customer-facing failure message for a failed site row.
+     *
+     * Single source of truth: the per-site `api_response` column on
+     * wp_iwp_sites. The failure path stores `['error' => $msg]` here at
+     * the instant the API call fails (see create_site_with_tracking()
+     * lines 88-95) and the success path overwrites the column with the
+     * full success response (line 119) — so the column always reflects
+     * the row's *current* state. No order-meta fallback, no per-product
+     * lookup, no stale-data risk.
+     *
+     * Runs the resolved string through IWP_API_Client::humanize_error()
+     * for legacy rows whose error was stored before the make_request
+     * humanize fix landed (idempotent for already-humanized text).
+     *
+     * @param mixed $api_response_raw JSON string or array from
+     *                                wp_iwp_sites.api_response.
+     * @return string|null Friendly error message, or null when the
+     *                     column carries no `error` key (i.e. the row
+     *                     either succeeded or has no API response yet).
+     */
+    public static function resolve_failure_message($api_response_raw) {
+        if (empty($api_response_raw)) {
+            return null;
+        }
+        $decoded = is_string($api_response_raw) ? json_decode($api_response_raw, true) : $api_response_raw;
+        if (!is_array($decoded) || empty($decoded['error'])) {
+            return null;
+        }
+        return $decoded['error'];
+    }
+
     private function transform_site_data_for_frontend($site_data) {
         if (!is_array($site_data) || !isset($site_data['site_data'])) {
             return null;
