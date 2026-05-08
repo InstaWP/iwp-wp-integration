@@ -5,6 +5,22 @@ All notable changes to the InstaWP Integration plugin will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.12] - 2026-05-08
+
+### Added
+- **Show/Hide password toggle on the Sites list.** Click to reveal a site's WordPress password inline; click again to hide it.
+
+### Changed
+- **Full WooCommerce HPOS (High-Performance Order Storage) support.** Sites created from orders now show up correctly everywhere — the customer's My Account dashboard, the order details page, and the admin "Sites created" statistic — regardless of which order storage WooCommerce is configured to use. Orders from older plugin versions are upgraded automatically on first read.
+
+### Fixed
+- **Clearer "subdomain already taken" error.** Customers attempting to use a subdomain that's already in use now see *"The subdomain "X" is already taken. Please choose a different one."* — on the product checkout, the thank-you page, the deferred-onboarding form, and the order-confirmation email. Replaces the previous raw technical error text.
+- **Failed site creations now show the real reason to the customer.** On the thank-you page, order details, and order-confirmation email, the customer now sees the actual cause of the failure (e.g. subdomain taken) instead of a generic "Sorry, please contact support" message.
+- **Admin Sites list shows the failure reason at a glance.** Failed sites now display the real cause directly under the "Failed" status badge — no need to click into the order to find out what went wrong.
+- **No more phantom rows in the admin Sites list.** Failed or trashed sites that have no usable URL are hidden from every tab, since they carry no actionable information.
+- **Old orphaned sites can now be deleted.** Sites left over in order meta from older plugin versions (before the dedicated sites table existed) used to silently reappear after deletion. They can now be deleted properly and stay deleted.
+- **Every failed order now keeps its own record.** Previously, due to a database quirk, only the first failed site creation per cycle was recorded — every subsequent failed order silently lost its row, and the failed card didn't render on the customer's view. Each failed order now keeps its own record and renders correctly.
+
 ## [0.0.11] - 2026-04-21
 
 ### Added

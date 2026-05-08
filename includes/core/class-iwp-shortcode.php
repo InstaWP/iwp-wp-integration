@@ -204,7 +204,7 @@ class IWP_Shortcode {
             $result = $api_client->create_site_from_snapshot($snapshot_slug, $site_data);
 
             if (is_wp_error($result)) {
-                wp_send_json_error(array('message' => $result->get_error_message()));
+                wp_send_json_error(array('message' => IWP_API_Client::humanize_error($result)));
             }
 
             // Check if site was created successfully

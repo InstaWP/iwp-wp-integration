@@ -385,8 +385,11 @@ class IWP_Sites_List_Table extends WP_List_Table {
         $db_sites = $this->get_sites_from_database();
         $all_sites = array_merge($all_sites, $db_sites);
 
-        // Get sites from WooCommerce orders (legacy/backup)
-        $order_sites = $this->get_sites_from_orders();
+        // Get sites from WooCommerce orders (legacy/backup). Pass $db_sites so
+        // any order-meta entry whose site_id is already represented in the DB
+        // (including trashed rows / deletion markers) is skipped at the source
+        // instead of relying on downstream dedupe.
+        $order_sites = $this->get_sites_from_orders($db_sites);
         $all_sites = array_merge($all_sites, $order_sites);
 
         // Get sites from shortcode usage (stored in options)
@@ -461,10 +464,24 @@ class IWP_Sites_List_Table extends WP_List_Table {
 
             // Check if credentials have been released
             $credentials_released = false;
+            $site_name = '';
+            $user_name = '';
             if (!empty($db_site->source_data)) {
                 $source_data_parsed = json_decode($db_site->source_data, true);
-                if (is_array($source_data_parsed) && !empty($source_data_parsed['credentials_released'])) {
-                    $credentials_released = true;
+                if (is_array($source_data_parsed)) {
+                    if (!empty($source_data_parsed['credentials_released'])) {
+                        $credentials_released = true;
+                    }
+                    
+                    if (!empty($source_data_parsed['site_data']) && is_array($source_data_parsed['site_data'])) {
+                        if (!empty($source_data_parsed['site_data']['site_name'])) {
+                            $site_name = $source_data_parsed['site_data']['site_name'];
+                        }
+
+                        if (!empty($source_data_parsed['site_data']['user_name'])) {
+                            $user_name = $source_data_parsed['site_data']['user_name'];
+                        }
+                    }
                 }
             }
 
@@ -484,8 +501,8 @@ class IWP_Sites_List_Table extends WP_List_Table {
             }
 
             $site = array(
-                'site_url'     => $db_site->site_url ?: '',
-                'username'     => $db_site->wp_username ?: '',
+                'site_url'     => $db_site->site_url ?: $site_name,
+                'username'     => $db_site->wp_username ?: $user_name,
                 'password'     => $db_site->wp_password ?: '',
                 'user'         => $this->get_user_display_name($order, $db_site->user_id),
                 'source'       => $source_type['text'],
@@ -502,7 +519,13 @@ class IWP_Sites_List_Table extends WP_List_Table {
                 'is_expired'   => $is_expired,
                 'hours_remaining' => $hours_remaining,
                 'expiry_hours' => $db_site->expiry_hours,
-                'credentials_released' => $credentials_released
+                'credentials_released' => $credentials_released,
+                // Pass api_response through so column_status can decode
+                // the failure message on demand for failed rows (via
+                // IWP_Site_Manager::resolve_failure_message). No
+                // precompute — the work only runs when a failed row
+                // actually renders.
+                'api_response' => $db_site->api_response,
             );
 
             $sites[] = $site;
@@ -516,40 +539,45 @@ class IWP_Sites_List_Table extends WP_List_Table {
      *
      * @return array
      */
-    private function get_sites_from_orders() {
-        global $wpdb;
-        
+    private function get_sites_from_orders($db_sites = array()) {
         $sites = array();
 
-        // Query all orders with InstaWP sites
-        $results = $wpdb->get_results("
-            SELECT p.ID as order_id, pm.meta_value as sites_data
-            FROM {$wpdb->posts} p
-            JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
-            WHERE p.post_type = 'shop_order'
-            AND pm.meta_key IN ('_iwp_sites_created', '_iwp_created_sites')
-            AND pm.meta_value IS NOT NULL
-            AND pm.meta_value != ''
-        ");
+        // Site_ids already represented by the DB-sourced list. Order-meta
+        // entries matching one of these are skipped: the DB row is the source
+        // of truth (including trashed rows / orphan deletion markers, which
+        // the downstream status filter then hides).
+        $db_site_ids = empty($db_sites) ? array(): array_column($db_sites, 'site_id');
+        $has_site_ids = count($db_site_ids) > 0;
+
+        // One HPOS-aware round trip — returns only orders that actually have
+        // one of the IWP meta keys (under either data store, with legacy
+        // postmeta fallback under HPOS). See
+        // IWP_Woo_HPOS::get_orders_with_meta() for the data-store branching.
+        $results = IWP_Woo_HPOS::get_orders_with_meta(array(
+            '_iwp_sites_created',
+            '_iwp_created_sites',
+        ));
 
         foreach ($results as $result) {
-            $order_id = $result->order_id;
-            $sites_data = maybe_unserialize($result->sites_data);
-
+            $sites_data = maybe_unserialize($result->meta_value);
             if (!is_array($sites_data)) {
                 continue;
             }
 
-            $order = wc_get_order($order_id);
+            $order = wc_get_order($result->order_id);
             if (!$order) {
                 continue;
             }
 
             foreach ($sites_data as $site_data) {
                 $site = $this->format_order_site($site_data, $order);
-                if ($site) {
-                    $sites[] = $site;
+                if (!$site) {
+                    continue;
                 }
+                if ( $has_site_ids && !empty($site['site_id']) && in_array($site['site_id'], $db_site_ids, true) ) {
+                    continue;
+                }
+                $sites[] = $site;
             }
         }
 
@@ -908,9 +936,9 @@ class IWP_Sites_List_Table extends WP_List_Table {
         if (empty($item['password'])) {
             return '—';
         }
-        
+
         return sprintf(
-            '<span class="iwp-password-hidden">••••••••</span> <button type="button" class="iwp-show-password button-link" data-password="%s">%s</button>',
+            '<span class="iwp-password-hidden">••••••••</span> <button type="button" class="iwp-show-password button-link" data-password="%s">%s</button><span class="iwp-password-revealed"></span>',
             esc_attr($item['password']),
             __('Show', 'iwp-wp-integration')
         );
@@ -1006,6 +1034,7 @@ class IWP_Sites_List_Table extends WP_List_Table {
         $status = $item['status'];
         $class = '';
         $text = '';
+        $title = '';
 
         switch ($status) {
             case 'completed':
@@ -1036,6 +1065,13 @@ class IWP_Sites_List_Table extends WP_List_Table {
             case 'failed':
                 $class = 'iwp-status-failed';
                 $text = __('Failed', 'iwp-wp-integration');
+                // Append the humanized error so the Failed tab shows
+                // why each row failed (subdomain taken, etc.) instead
+                // of just a Failed badge. Decode on demand from the
+                // api_response carried in $item — no precompute.
+                $title = class_exists('IWP_Site_Manager')
+                    ? IWP_Site_Manager::resolve_failure_message($item['api_response'] ?? '')
+                    : '';
                 break;
             case IWP_Sites_Model::STATUS_TRASHED:
                 $class = 'iwp-status-trashed';
@@ -1046,7 +1082,7 @@ class IWP_Sites_List_Table extends WP_List_Table {
                 $text = __('Unknown', 'iwp-wp-integration');
         }
 
-        return sprintf('<span class="iwp-status %s">%s</span>', $class, $text);
+        return sprintf('<span class="iwp-status %s" title="%s">%s</span>', $class, esc_html($title), $text);
     }
 
     /**

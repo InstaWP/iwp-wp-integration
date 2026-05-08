@@ -65,6 +65,19 @@ iwp-wp-integration/
 
 Handles all communication with InstaWP's REST API.
 
+#### `IWP_PLUGIN_APP_URL` — no trailing slash
+
+Defined in `iwp-wp-integration.php`. This constant is the base host for every
+URL the plugin builds — API calls, magic-login URLs, dashboard links, values
+passed to localized JS.
+
+**Rule:** store as scheme + host only, no path and no trailing slash
+(`'https://app.instawp.io'`, never `'https://app.instawp.io/'`). All
+consumer code owns the leading slash on its side (`. '/api/v2/...'`,
+`. '/wordpress-auto-login?...'`). Concatenating a trailing-slash base with a
+leading-slash path produces doubled slashes in the resulting URL, which some
+reverse-proxy / router stacks no longer silently normalize.
+
 #### Key Features
 - **Authentication**: Bearer token with API key
 - **Endpoints**: Complete API coverage (v1 and v2)
@@ -676,6 +689,28 @@ if (!empty($s_hash)) {
 // Frontend Display
 // "Magic Login" button replaces "Admin Login" when s_hash available
 ```
+
+### HPOS Compatibility (`class-iwp-woo-hpos.php`)
+
+`IWP_Woo_HPOS` is the abstraction layer for WooCommerce's High-Performance Order Storage. Always go through it for order/order-meta reads and writes — never query `wp_posts`/`wp_postmeta` directly when looking for `shop_order` rows or their meta. Under authoritative HPOS those tables don't carry the data, so direct queries silently return nothing.
+
+#### Picking the right read helper
+
+| Scenario | Use | Why |
+|----------|-----|-----|
+| You have an order ID and want one meta value | `IWP_Woo_HPOS::get_order_meta($order_or_id, $key)` | Reads from active store, falls back to legacy postmeta and forward-migrates on hit. |
+| You want orders matching first-class args (customer/status/date) and meta is incidental | `IWP_Woo_HPOS::get_orders($args_with_meta_query)` | Wraps `wc_get_orders()`. Strips `meta_query` and re-evaluates in PHP via `get_order_meta()` — handles legacy postmeta. **Slow on site-wide queries** (loads all matching orders into objects before filtering); the docstring at the top of the method warns to bound it with first-class args or a `limit`. |
+| You want every order that has any of N meta keys, and meta IS the primary selector | `IWP_Woo_HPOS::get_orders_with_meta(array $meta_keys)` | Single raw SQL query (with UNION on the legacy postmeta path under HPOS). Returns raw `(order_id, meta_key, meta_value)` rows; caller decides whether to `maybe_unserialize` and whether to hydrate orders. **Use this on admin list pages** and any site-wide scan. |
+
+#### Read-helper performance trade-off
+
+`get_orders()` is ergonomic but does PHP-side meta filtering — fine when the result set is bounded by other args (e.g. one customer's orders) but quadratic-ish when used on a whole-store scan. `get_orders_with_meta()` exists exactly for the whole-store-scan case: one indexed query, returns only matching rows, no per-non-match hydration cost.
+
+Concrete example: the admin Sites list at `wp-admin/admin.php?page=instawp-sites` has to enumerate every order with `_iwp_sites_created` or `_iwp_created_sites` meta. Using `get_orders(['limit' => -1, 'meta_query' => ...])` on a 100k-order store would hydrate all 100k orders into PHP and then filter — likely OOM at default admin memory limits. `get_orders_with_meta()` returns the matching ~50 rows in a single millisecond-scale query.
+
+#### Writes
+
+Use `IWP_Woo_HPOS::update_order_meta($order_or_id, $key, $value)` and `IWP_Woo_HPOS::delete_order_meta($order_or_id, $key)`. They route through the active store and run the standard WC order-update hooks. Direct `update_post_meta()`/`delete_post_meta()` writes are an anti-pattern — under HPOS they end up only in `wp_postmeta` and become invisible to the rest of the plugin (and require the `get_order_meta()` legacy-fallback path to repair on next read).
 
 ## Admin Interface
 

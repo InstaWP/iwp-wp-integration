@@ -40,7 +40,8 @@ class IWP_Woo_Subscription_Site_Manager {
         ));
         
         foreach ($orders as $order) {
-            $order_sites = get_post_meta($order->get_id(), '_iwp_sites_created', true);
+            // HPOS-safe read — covers both data stores and legacy postmeta values.
+            $order_sites = IWP_Woo_HPOS::get_order_meta($order, '_iwp_sites_created');
             if (!empty($order_sites) && is_array($order_sites)) {
                 foreach ($order_sites as $site) {
                     $sites[] = array_merge($site, array(
@@ -98,10 +99,10 @@ class IWP_Woo_Subscription_Site_Manager {
     public static function get_subscription_sites($subscription) {
         $sites = array();
         
-        // Get sites from parent order
+        // Get sites from parent order — HPOS-safe read.
         $parent_order_id = $subscription->get_parent_id();
         if ($parent_order_id) {
-            $parent_sites = get_post_meta($parent_order_id, '_iwp_sites_created', true);
+            $parent_sites = IWP_Woo_HPOS::get_order_meta($parent_order_id, '_iwp_sites_created');
             if (!empty($parent_sites) && is_array($parent_sites)) {
                 foreach ($parent_sites as $site) {
                     $sites[] = array_merge($site, array(
@@ -112,10 +113,10 @@ class IWP_Woo_Subscription_Site_Manager {
             }
         }
         
-        // Get sites from renewal orders
+        // Get sites from renewal orders — HPOS-safe read.
         $related_orders = $subscription->get_related_orders('all', 'renewal');
         foreach ($related_orders as $order_id) {
-            $order_sites = get_post_meta($order_id, '_iwp_sites_created', true);
+            $order_sites = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_sites_created');
             if (!empty($order_sites) && is_array($order_sites)) {
                 foreach ($order_sites as $site) {
                     $sites[] = array_merge($site, array(

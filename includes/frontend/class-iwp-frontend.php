@@ -453,8 +453,9 @@ class IWP_Frontend {
      * @param WC_Order $order
      */
     private function display_deferred_onboarding($order) {
-        $order_id       = $order->get_id();
-        $deferred_items = get_post_meta($order_id, '_iwp_deferred_items', true);
+        $order_id = $order->get_id();
+        // HPOS-safe read — covers both data stores and any legacy postmeta value.
+        $deferred_items = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_deferred_items');
 
         if (empty($deferred_items) || !is_array($deferred_items)) {
             return;
@@ -807,7 +808,14 @@ class IWP_Frontend {
             
         } elseif ($status === 'failed') {
             echo '<div class="iwp-site-error">';
-            echo '<p>' . __('Sorry, there was an issue creating your site. Please contact support for assistance.', 'iwp-wp-integration') . '</p>';
+            $msg = class_exists('IWP_Site_Manager')
+                ? IWP_Site_Manager::resolve_failure_message($site['api_response'] ?? null)
+                : null;
+            if ($msg) {
+                echo '<p>' . esc_html($msg) . '</p>';
+            } else {
+                echo '<p>' . __('Sorry, there was an issue creating your site. Please contact support for assistance.', 'iwp-wp-integration') . '</p>';
+            }
             echo '</div>';
         }
 
@@ -884,7 +892,8 @@ class IWP_Frontend {
         
         <!-- Display existing mapped domains -->
         <?php
-        $mapped_domains = get_post_meta($order_id, '_iwp_mapped_domains', true);
+        // HPOS-safe read so the domain list renders on both data stores.
+        $mapped_domains = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_mapped_domains');
         if (is_array($mapped_domains) && !empty($mapped_domains)) {
             echo '<div class="iwp-existing-domains">';
             echo '<h4>' . __('Mapped Domains:', 'iwp-wp-integration') . '</h4>';
@@ -1039,7 +1048,13 @@ class IWP_Frontend {
                 } elseif ($status === 'progress') {
                     echo '<p style="color: #856404; background: #fff3cd; padding: 10px; border-radius: 4px;">' . __('Your site is being created. You will receive another email when it\'s ready.', 'iwp-wp-integration') . '</p>';
                 } elseif ($status === 'failed') {
-                    echo '<p style="color: #721c24; background: #f8d7da; padding: 10px; border-radius: 4px;">' . __('There was an issue creating your site. Please contact support.', 'iwp-wp-integration') . '</p>';
+                    $msg = class_exists('IWP_Site_Manager')
+                        ? IWP_Site_Manager::resolve_failure_message($site['api_response'] ?? null)
+                        : null;
+                    $err_text = $msg
+                        ? esc_html($msg)
+                        : __('There was an issue creating your site. Please contact support.', 'iwp-wp-integration');
+                    echo '<p style="color: #721c24; background: #f8d7da; padding: 10px; border-radius: 4px;">' . $err_text . '</p>';
                 }
                 echo '</div>';
             }
@@ -1056,20 +1071,30 @@ class IWP_Frontend {
             return;
         }
 
-        // Check for orders with deferred items (pending setup)
-        $deferred_orders = wc_get_orders(array(
+        // Check for orders with deferred items (pending setup).
+        // Routed through IWP_Woo_HPOS::get_orders() so the meta_query is
+        // evaluated correctly on both CPT and HPOS data stores and picks up
+        // legacy values that may still live in wp_postmeta.
+        $deferred_orders = IWP_Woo_HPOS::get_orders(array(
             'customer_id' => $customer_id,
             'limit'       => 5,
             'status'      => array('completed', 'processing'),
-            'meta_key'    => '_iwp_deferred_items',
             'orderby'     => 'date',
             'order'       => 'DESC',
+            'meta_query'  => array(
+                array(
+                    'key'     => '_iwp_deferred_items',
+                    'compare' => 'EXISTS',
+                ),
+            ),
         ));
 
         // Show pending setup notice with link to order
         if (!empty($deferred_orders)) {
             foreach ($deferred_orders as $def_order) {
-                $deferred_items = get_post_meta($def_order->get_id(), '_iwp_deferred_items', true);
+                // Read via the HPOS-safe helper: covers both wp_wc_orders_meta
+                // and wp_postmeta, with forward-migration for legacy values.
+                $deferred_items = IWP_Woo_HPOS::get_order_meta($def_order, '_iwp_deferred_items');
                 if (!empty($deferred_items) && is_array($deferred_items)) {
                     $order_url = $def_order->get_view_order_url();
                     $count     = count($deferred_items);
@@ -1090,17 +1115,19 @@ class IWP_Frontend {
             }
         }
 
-        // Get customer's orders with sites
-        $orders = wc_get_orders(array(
+        // Get customer's orders with created sites.
+        // Same compat helper as above — keeps the standard meta_query shape at
+        // the call site while handling the CPT vs HPOS split and legacy data.
+        $orders = IWP_Woo_HPOS::get_orders(array(
             'customer_id' => $customer_id,
-            'limit' => -1,
-            'status' => array('completed', 'processing'),
-            'meta_query' => array(
+            'limit'       => -1,
+            'status'      => array('completed', 'processing'),
+            'meta_query'  => array(
                 array(
-                    'key' => '_iwp_created_sites',
-                    'compare' => 'EXISTS'
-                )
-            )
+                    'key'     => '_iwp_created_sites',
+                    'compare' => 'EXISTS',
+                ),
+            ),
         ));
 
         if (empty($orders) && empty($deferred_orders)) {

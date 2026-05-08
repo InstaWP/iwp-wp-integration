@@ -17,6 +17,66 @@ class IWP_Sites_Model {
 
     private static $table_name;
 
+    /**
+     * wpdb format hint per column.
+     *
+     * Required because WP core's `wp_set_wpdb_vars()` (wp-includes/load.php)
+     * pre-populates `$wpdb->field_types['site_id'] = '%d'` and
+     * `field_types['user_id'] = '%d'` for multisite. When `$wpdb->insert()`
+     * or `$wpdb->update()` is called WITHOUT an explicit `$format`, wpdb
+     * falls back to that registry by column NAME (see
+     * wp-includes/class-wpdb.php:2898) — regardless of what the actual
+     * column type is in our custom table.
+     *
+     * Net effect without an explicit format: any non-numeric string
+     * written to `site_id` (e.g. "pending-XYZ" placeholder) is cast to
+     * integer `0` in PHP before the SQL is built. Once one such row
+     * exists, the UNIQUE constraint on `site_id` blocks every subsequent
+     * failed-pending insert with a duplicate-key error.
+     *
+     * Pass `self::format_for_data($data)` as the third arg to insert()
+     * and the fourth arg to update() to override the lookup.
+     *
+     * @var array<string, '%s'|'%d'|'%f'>
+     */
+    private static $column_formats = array(
+        'site_id'       => '%s',
+        'site_url'      => '%s',
+        'wp_username'   => '%s',
+        'wp_password'   => '%s',
+        'wp_admin_url'  => '%s',
+        's_hash'        => '%s',
+        'status'        => '%s',
+        'site_type'     => '%s',
+        'task_id'       => '%s',
+        'snapshot_slug' => '%s',
+        'plan_id'       => '%s',
+        'product_id'    => '%d',
+        'order_id'      => '%d',
+        'user_id'       => '%d',
+        'source'        => '%s',
+        'source_data'   => '%s',
+        'is_pool'       => '%d',
+        'is_reserved'   => '%d',
+        'expiry_hours'  => '%d',
+        'api_response'  => '%s',
+        'created_at'    => '%s',
+        'updated_at'    => '%s',
+    );
+
+    /**
+     * Build a positional `$format` array for wpdb based on $data's keys.
+     * Falls back to '%s' for any column not in the static map (caller
+     * passed an unexpected column — let wpdb treat it as a string).
+     */
+    private static function format_for_data($data) {
+        $formats = array();
+        foreach (array_keys($data) as $col) {
+            $formats[] = isset(self::$column_formats[$col]) ? self::$column_formats[$col] : '%s';
+        }
+        return $formats;
+    }
+
     public static function init() {
         global $wpdb;
         self::$table_name = $wpdb->prefix . 'iwp_sites';
@@ -42,32 +102,39 @@ class IWP_Sites_Model {
 
         $site_data = wp_parse_args($data, $defaults);
 
+        $insert_data = array(
+            'site_id' => sanitize_text_field($site_data['site_id']),
+            'site_url' => !empty($site_data['site_url']) ? esc_url_raw($site_data['site_url']) : null,
+            'wp_username' => !empty($site_data['wp_username']) ? sanitize_text_field($site_data['wp_username']) : null,
+            'wp_password' => !empty($site_data['wp_password']) ? $site_data['wp_password'] : null,
+            'wp_admin_url' => !empty($site_data['wp_admin_url']) ? esc_url_raw($site_data['wp_admin_url']) : null,
+            's_hash' => !empty($site_data['s_hash']) ? sanitize_text_field($site_data['s_hash']) : null,
+            'status' => sanitize_text_field($site_data['status']),
+            'site_type' => sanitize_text_field($site_data['site_type']),
+            'task_id' => !empty($site_data['task_id']) ? sanitize_text_field($site_data['task_id']) : null,
+            'snapshot_slug' => !empty($site_data['snapshot_slug']) ? sanitize_text_field($site_data['snapshot_slug']) : null,
+            'plan_id' => !empty($site_data['plan_id']) ? sanitize_text_field($site_data['plan_id']) : null,
+            'product_id' => !empty($site_data['product_id']) ? intval($site_data['product_id']) : null,
+            'order_id' => !empty($site_data['order_id']) ? intval($site_data['order_id']) : null,
+            'user_id' => intval($site_data['user_id']),
+            'source' => sanitize_text_field($site_data['source']),
+            'source_data' => !empty($site_data['source_data']) ? wp_json_encode($site_data['source_data']) : null,
+            'is_pool' => intval($site_data['is_pool']),
+            'is_reserved' => intval($site_data['is_reserved']),
+            'expiry_hours' => !empty($site_data['expiry_hours']) ? intval($site_data['expiry_hours']) : null,
+            'api_response' => !empty($site_data['api_response']) ? wp_json_encode($site_data['api_response']) : null,
+            'created_at' => $site_data['created_at'],
+            'updated_at' => $site_data['updated_at']
+        );
+
+        // Explicit $format overrides WP core's field_types['site_id']='%d'
+        // lookup (see $column_formats docblock above) so the "pending-XYZ"
+        // placeholder used by IWP_Site_Manager::create_site_with_tracking
+        // stores as the actual string instead of being cast to integer 0.
         $result = $wpdb->insert(
             self::$table_name,
-            array(
-                'site_id' => sanitize_text_field($site_data['site_id']),
-                'site_url' => !empty($site_data['site_url']) ? esc_url_raw($site_data['site_url']) : null,
-                'wp_username' => !empty($site_data['wp_username']) ? sanitize_text_field($site_data['wp_username']) : null,
-                'wp_password' => !empty($site_data['wp_password']) ? $site_data['wp_password'] : null,
-                'wp_admin_url' => !empty($site_data['wp_admin_url']) ? esc_url_raw($site_data['wp_admin_url']) : null,
-                's_hash' => !empty($site_data['s_hash']) ? sanitize_text_field($site_data['s_hash']) : null,
-                'status' => sanitize_text_field($site_data['status']),
-                'site_type' => sanitize_text_field($site_data['site_type']),
-                'task_id' => !empty($site_data['task_id']) ? sanitize_text_field($site_data['task_id']) : null,
-                'snapshot_slug' => !empty($site_data['snapshot_slug']) ? sanitize_text_field($site_data['snapshot_slug']) : null,
-                'plan_id' => !empty($site_data['plan_id']) ? sanitize_text_field($site_data['plan_id']) : null,
-                'product_id' => !empty($site_data['product_id']) ? intval($site_data['product_id']) : null,
-                'order_id' => !empty($site_data['order_id']) ? intval($site_data['order_id']) : null,
-                'user_id' => intval($site_data['user_id']),
-                'source' => sanitize_text_field($site_data['source']),
-                'source_data' => !empty($site_data['source_data']) ? wp_json_encode($site_data['source_data']) : null,
-                'is_pool' => intval($site_data['is_pool']),
-                'is_reserved' => intval($site_data['is_reserved']),
-                'expiry_hours' => !empty($site_data['expiry_hours']) ? intval($site_data['expiry_hours']) : null,
-                'api_response' => !empty($site_data['api_response']) ? wp_json_encode($site_data['api_response']) : null,
-                'created_at' => $site_data['created_at'],
-                'updated_at' => $site_data['updated_at']
-            )
+            $insert_data,
+            self::format_for_data($insert_data)
         );
 
         if ($result === false) {
@@ -103,10 +170,21 @@ class IWP_Sites_Model {
         $sanitized_data['updated_at'] = current_time('mysql');
 
         error_log('IWP DEBUG: sites model update() - About to call wpdb->update with sanitized data');
+
+        // Explicit $format (4th arg) and $where_format (5th arg) both
+        // override WP core's field_types['site_id']='%d' lookup. Without
+        // the 4th, a site_id present in $sanitized_data (e.g. when
+        // create_site_with_tracking updates the placeholder to the real
+        // site_id) would be cast to int in the SET clause. Without the
+        // 5th, the WHERE clause would match against integer 0 instead of
+        // the actual stored placeholder string — UPDATE would silently
+        // affect 0 rows. See $column_formats docblock above.
         $result = $wpdb->update(
             self::$table_name,
             $sanitized_data,
-            array('site_id' => sanitize_text_field($site_id))
+            array('site_id' => sanitize_text_field($site_id)),
+            self::format_for_data($sanitized_data),
+            array('%s')
         );
         error_log('IWP DEBUG: sites model update() - wpdb->update result: ' . ($result !== false ? 'SUCCESS' : 'FAILED'));
 
@@ -183,7 +261,157 @@ class IWP_Sites_Model {
             $api_client->delete_site($site_id);
         }
 
-        return self::update($site_id, array('status' => self::STATUS_TRASHED));
+        if (self::get_by_site_id($site_id)) {
+            return self::update($site_id, array('status' => self::STATUS_TRASHED));
+        }
+
+        // Orphan: site lives only in order meta. Record a deletion marker
+        // populated with whatever metadata we can recover from the order
+        // entry (URL, credentials, order, customer, dates) so the Trash
+        // view at admin.php?page=instawp-sites&status=trashed shows
+        // meaningful details instead of an empty row with just the site_id.
+        // Tombstone-specific fields (site_id, status, source) overwrite
+        // anything the recovery returned for those keys.
+        $tombstone = array_merge(
+            self::collect_orphan_metadata($site_id),
+            array(
+                'site_id' => $site_id,
+                'status'  => self::STATUS_TRASHED,
+                'source'  => 'order_meta',
+            )
+        );
+
+        return (bool) self::create($tombstone);
+    }
+
+    /**
+     * Pull whatever metadata exists in WooCommerce order meta for $site_id
+     * and map it onto wp_iwp_sites columns. Used by trash() to give orphan-
+     * tombstone rows real context when no DB row existed at delete time —
+     * without this, the Trash filter view shows empty cells for every
+     * orphan because only site_id/status/source were populated.
+     *
+     * Same data path as IWP_Sites_List_Table::get_sites_from_orders():
+     * IWP_Woo_HPOS::get_orders_with_meta() returns one indexed row per
+     * matching order under either data store, with legacy postmeta
+     * fallback. Entry-shape detection mirrors format_order_site() — both
+     * the new wrapped form (['site_data' => [...]]) and the legacy flat
+     * form are handled.
+     *
+     * Always returns at least {site_url, wp_admin_url} pointing at the
+     * InstaWP dashboard for $site_id, so the Trash row is always
+     * actionable even when the lookup matched nothing in order meta.
+     *
+     * @param string $site_id InstaWP site identifier.
+     * @return array Subset of wp_iwp_sites columns.
+     */
+    private static function collect_orphan_metadata($site_id) {
+        $extracted = array();
+        $matched   = false;
+
+        if (class_exists('IWP_Woo_HPOS')) {
+            $rows = IWP_Woo_HPOS::get_orders_with_meta(array(
+                '_iwp_sites_created',
+                '_iwp_created_sites',
+            ));
+
+            foreach ($rows as $row) {
+                $sites_data = maybe_unserialize($row->meta_value);
+                if (!is_array($sites_data)) {
+                    continue;
+                }
+
+                foreach ($sites_data as $entry) {
+                    $inner = (isset($entry['site_data']) && is_array($entry['site_data']))
+                        ? $entry['site_data']
+                        : $entry;
+
+                    $entry_site_id = isset($inner['site_id']) ? $inner['site_id']
+                        : (isset($inner['id']) ? $inner['id'] : '');
+                    if ((string) $entry_site_id !== (string) $site_id) {
+                        continue;
+                    }
+
+                    $matched = true;
+
+                    $extracted['order_id'] = (int) $row->order_id;
+                    if (!empty($entry['product_id'])) {
+                        $extracted['product_id'] = (int) $entry['product_id'];
+                    }
+
+                    // Source field name → wp_iwp_sites column. First non-
+                    // empty value wins; alternative source-field names
+                    // accommodate older entry shapes.
+                    $field_map = array(
+                        'site_url'      => array('wp_url', 'site_url'),
+                        'wp_username'   => array('wp_username'),
+                        'wp_password'   => array('wp_password'),
+                        'wp_admin_url'  => array('wp_admin_url'),
+                        's_hash'        => array('s_hash'),
+                        'plan_id'       => array('plan_id'),
+                        'snapshot_slug' => array('snapshot_slug'),
+                        'task_id'       => array('task_id'),
+                        'created_at'    => array('created_at'),
+                    );
+                    foreach ($field_map as $col => $candidates) {
+                        foreach ($candidates as $key) {
+                            if (!empty($inner[$key])) {
+                                $extracted[$col] = $inner[$key];
+                                break;
+                            }
+                        }
+                    }
+
+                    // Pull customer + order date from the WC_Order itself.
+                    if (function_exists('wc_get_order')) {
+                        $order = wc_get_order((int) $row->order_id);
+                        if ($order) {
+                            $extracted['user_id'] = (int) $order->get_customer_id();
+                            if (empty($extracted['created_at'])) {
+                                $created = $order->get_date_created();
+                                if ($created) {
+                                    $extracted['created_at'] = $created->format('Y-m-d H:i:s');
+                                }
+                            }
+                        }
+                    }
+
+                    // Forensic snapshot — once order meta is cleaned up, the
+                    // tombstone is the only place this entry survives.
+                    // create() JSON-encodes arrays, so pass an array, not a
+                    // pre-encoded string.
+                    $extracted['source_data'] = array(
+                        'order_id'   => (int) $row->order_id,
+                        'meta_key'   => $row->meta_key,
+                        'entry'      => $entry,
+                        'trashed_at' => current_time('mysql'),
+                    );
+
+                    break 2;
+                }
+            }
+        }
+
+        // Derive wp_admin_url from site_url when the entry didn't carry
+        // one (older order-meta payloads usually don't).
+        if ($matched && empty($extracted['wp_admin_url']) && !empty($extracted['site_url']) && function_exists('trailingslashit')) {
+            $extracted['wp_admin_url'] = trailingslashit($extracted['site_url']) . 'wp-admin';
+        }
+
+        // Last-resort fallback when order meta yielded nothing: at least
+        // give admins a clickable InstaWP dashboard link for $site_id so
+        // the Trash row is never an empty cell. Both site_url and
+        // wp_admin_url get the same dashboard URL — the actual WP site
+        // URL isn't recoverable without the order-meta entry, but the
+        // dashboard is still actionable (lets the admin investigate /
+        // restore on the InstaWP side).
+        if (!$matched && defined('IWP_PLUGIN_APP_URL')) {
+            $dashboard = IWP_PLUGIN_APP_URL . '/sites/' . rawurlencode($site_id);
+            $extracted['site_url']     = $dashboard;
+            $extracted['wp_admin_url'] = $dashboard;
+        }
+
+        return $extracted;
     }
 
     /**

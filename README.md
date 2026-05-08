@@ -356,6 +356,25 @@ This plugin is licensed under the GPL v2 or later.
 
 ## Changelog
 
+### Version 0.0.12
+- **NEW**: Show/Hide password toggle on the Sites list — click to reveal a site's WordPress password inline
+- **CHANGED**: Full WooCommerce HPOS support — sites created from orders show up correctly everywhere (My Account dashboard, order details, admin "Sites created" stat); older orders are upgraded automatically on first read
+- **FIXED**: Clearer "subdomain already taken" error — customers see *"The subdomain X is already taken. Please choose a different one."* on checkout, thank-you page, deferred-onboarding form, and order email
+- **FIXED**: Failed site creations now show the real reason to the customer on the thank-you page, order details, and order email — not just a generic "contact support" message
+- **FIXED**: Admin Sites list shows the failure reason under the "Failed" badge, so admins can see at a glance why each one failed
+- **FIXED**: No more phantom rows in the admin Sites list — failed/trashed sites with no URL are hidden from every tab
+- **FIXED**: Old orphaned sites (left over from older plugin versions) can now be deleted from the admin Sites list — previously they would reappear after deletion
+- **FIXED**: Every failed order now keeps its own record — previously a database quirk caused only the first failed site per cycle to be recorded
+
+### Version 0.0.11
+- **NEW: Trash filter on the Sites list page** — deleting a site now moves it to a new **Trash** status instead of removing the row
+- **NEW: Trash view** alongside All, Active, Creating, Failed, Expired; on Trash the URL is shown as plain text and row actions (Visit Site, Magic Login, Delete, Send Credentials, Open in InstaWP) are hidden
+- **NEW: "Show Site Credentials on Dashboard" option** (off by default) — when enabled, each site card on My Account shows the WordPress admin username and password
+- **CHANGED: Default "All" view now excludes trashed sites** (standard WordPress convention); deleting a site no longer removes the local record — moved to **Trash** instead. Remote API delete still runs as before.
+- **CHANGED: Trashed sites no longer appear in customer-facing views** (My Account dashboard, order detail page, order emails); the order detail "Sites" section is hidden entirely when every site for that order has been trashed
+- **CHANGED: Snapshots cache duration increased from 15 minutes to 4 hours** — still overridable via **Refresh Snapshots** in Settings → InstaWP Data
+- **FIXED: Trashed sites no longer get resurrected after a new order** — the pending-sites poller now skips trashed rows and treats a remote "site not found" response as proof the site is deleted
+
 ### Version 0.0.10
 - **NEW: Post-Purchase Onboarding** — defer site creation to after purchase, collect credentials via `[iwp_onboarding]` shortcode
 - **NEW: My Account deferred setup** — pending sites show on order view and dashboard banner

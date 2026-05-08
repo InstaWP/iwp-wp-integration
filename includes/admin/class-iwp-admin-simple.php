@@ -259,30 +259,35 @@ class IWP_Admin_Simple {
         if (!function_exists('wc_get_orders')) {
             return array();
         }
-        
-        $orders = wc_get_orders(array(
-            'limit' => 50,
-            'status' => array('completed', 'processing'),
+
+        // Route through the HPOS/CPT compat wrapper so meta_query is evaluated
+        // correctly on both data stores and orders whose meta still lives in
+        // wp_postmeta (pre-HPOS-fix plugin builds) are included.
+        $orders = IWP_Woo_HPOS::get_orders(array(
+            'limit'      => 50,
+            'status'     => array('completed', 'processing'),
             'meta_query' => array(
                 array(
-                    'key' => '_iwp_created_sites',
-                    'compare' => 'EXISTS'
-                )
-            )
+                    'key'     => '_iwp_created_sites',
+                    'compare' => 'EXISTS',
+                ),
+            ),
         ));
-        
+
         $sites = array();
         foreach ($orders as $order) {
-            $order_sites = $order->get_meta('_iwp_created_sites');
+            // HPOS-safe read — handles wp_postmeta fallback + forward-migrate
+            // for values written by older plugin builds.
+            $order_sites = IWP_Woo_HPOS::get_order_meta($order, '_iwp_created_sites');
             if (is_array($order_sites)) {
                 foreach ($order_sites as $site) {
-                    $site['order_id'] = $order->get_id();
+                    $site['order_id']   = $order->get_id();
                     $site['order_date'] = $order->get_date_created()->format('Y-m-d H:i:s');
-                    $sites[] = $site;
+                    $sites[]            = $site;
                 }
             }
         }
-        
+
         return $sites;
     }
     
@@ -592,6 +597,21 @@ class IWP_Admin_Simple {
 
         wp_enqueue_script('jquery');
 
+        // Sites list page UI (password show/hide toggle, etc.).
+        wp_enqueue_script(
+            'iwp-sites-list',
+            IWP_PLUGIN_URL . 'assets/js/sites-list.js',
+            array('jquery'),
+            IWP_VERSION,
+            true
+        );
+        wp_localize_script('iwp-sites-list', 'iwpSitesList', array(
+            'labels' => array(
+                'show' => __('Show', 'iwp-wp-integration'),
+                'hide' => __('Hide', 'iwp-wp-integration'),
+            ),
+        ));
+
         // Send Credentials button handler
         wp_add_inline_script('jquery', '
             jQuery(document).ready(function($) {
@@ -646,8 +666,17 @@ class IWP_Admin_Simple {
                 border-top: none;
                 padding: 20px;
             }
-            .iwp-tab-content.active { 
-                display: block; 
+            .iwp-tab-content.active {
+                display: block;
+            }
+            .iwp-password-revealed {
+                display: block;
+                font-family: monospace;
+                word-break: break-all;
+                margin-top: 2px;
+            }
+            .iwp-password-revealed:empty {
+                display: none;
             }
         ');
     }
@@ -986,7 +1015,11 @@ class IWP_Admin_Simple {
         }
 
         // Update created sites meta
-        $created_sites = $order->get_meta('_iwp_created_sites');
+        // Read via the helper so pre-HPOS-fix orders whose _iwp_created_sites
+        // value still lives in wp_postmeta are picked up (and migrated
+        // forward). Write stays on the in-scope $order — one meta-only save,
+        // no order-lifecycle hooks.
+        $created_sites = IWP_Woo_HPOS::get_order_meta($order, '_iwp_created_sites');
         if (is_array($created_sites)) {
             foreach ($created_sites as $index => $site) {
                 if (isset($site['site_id']) && intval($site['site_id']) === $site_id) {
@@ -996,7 +1029,7 @@ class IWP_Admin_Simple {
                 }
             }
             $order->update_meta_data('_iwp_created_sites', $created_sites);
-            $order->save();
+            $order->save_meta_data();
         }
 
         // Update sites database if using IWP_Site_Manager
