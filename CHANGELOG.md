@@ -5,6 +5,11 @@ All notable changes to the InstaWP Integration plugin will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.13] - 2026-06-16
+
+### Fixed
+- **Upgraded sites now show their URL and login details.** When a customer upgrades an existing or demo site — through either the plan-upgrade flow or a WooCommerce Subscriptions plan switch — the order-received and My Account pages now display the site URL, WordPress username and password, and login button. Previously these were left blank even though the details had already been fetched from InstaWP (they were being read from the wrong place in the API response).
+
 ## [0.0.12] - 2026-05-08
 
 ### Added

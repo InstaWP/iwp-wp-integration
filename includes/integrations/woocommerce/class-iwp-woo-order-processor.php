@@ -487,31 +487,11 @@ class IWP_Woo_Order_Processor {
             'upgrade_response' => $result
         );
 
-        // Try to extract site details from the API response
-        if (is_array($result) && isset($result['data'])) {
-            $site_details = $result['data'];
-            
-            // Get site details to update database
-            if (isset($site_details['site_details']) && is_array($site_details['site_details'])) {
-                $details = $site_details['site_details'];
-                if (isset($details['data']) && is_array($details['data'])) {
-                    $site_info = $details['data'];
-                    
-                    if (isset($site_info['url'])) {
-                        $upgrade_site_data['site_url'] = $site_info['url'];
-                    }
-                    if (isset($site_info['wp_username'])) {
-                        $upgrade_site_data['wp_username'] = $site_info['wp_username'];
-                    }
-                    if (isset($site_info['wp_password'])) {
-                        $upgrade_site_data['wp_password'] = $site_info['wp_password'];
-                    }
-                    if (isset($site_info['s_hash'])) {
-                        $upgrade_site_data['s_hash'] = $site_info['s_hash'];
-                    }
-                }
-            }
-        }
+        // Extract site URL/credentials from the merged site_details that the
+        // API client attaches to the upgrade response (top-level 'site_details'
+        // sibling of 'data'). The shared parser handles the correct key paths
+        // (creds under site_meta, site hash from 'hash').
+        $upgrade_site_data = array_merge($upgrade_site_data, IWP_API_Client::extract_upgrade_site_details($result));
 
         // Update the database with the plan change
         IWP_Sites_Model::init();
@@ -540,6 +520,9 @@ class IWP_Woo_Order_Processor {
         }
         if (isset($upgrade_site_data['wp_username'])) {
             $upgrade_data['wp_username'] = $upgrade_site_data['wp_username'];
+        }
+        if (isset($upgrade_site_data['wp_password'])) {
+            $upgrade_data['wp_password'] = $upgrade_site_data['wp_password'];
         }
         if (isset($upgrade_site_data['s_hash'])) {
             $upgrade_data['s_hash'] = $upgrade_site_data['s_hash'];

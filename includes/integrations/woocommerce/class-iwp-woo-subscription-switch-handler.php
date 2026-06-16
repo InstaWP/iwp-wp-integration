@@ -453,19 +453,11 @@ class IWP_Woo_Subscription_Switch_Handler {
                 'upgrade_response' => $api_result,
             );
 
-            // Extract site details from API response if available
-            if (isset($api_result['url'])) {
-                $upgrade_data['site_url'] = $api_result['url'];
-            }
-            if (isset($api_result['site_meta']['wp_username'])) {
-                $upgrade_data['wp_username'] = $api_result['site_meta']['wp_username'];
-            }
-            if (isset($api_result['site_meta']['wp_password'])) {
-                $upgrade_data['wp_password'] = $api_result['site_meta']['wp_password'];
-            }
-            if (isset($api_result['s_hash'])) {
-                $upgrade_data['s_hash'] = $api_result['s_hash'];
-            }
+            // Extract site URL/credentials from the merged site_details the API
+            // client attaches to the upgrade response. The shared parser handles
+            // the correct key paths (site_details.data, creds under site_meta,
+            // site hash from 'hash').
+            $upgrade_data = array_merge($upgrade_data, IWP_API_Client::extract_upgrade_site_details($api_result));
 
             IWP_Sites_Model::update_plan($site_id, $new_plan_id, $upgrade_data);
 
@@ -631,11 +623,10 @@ class IWP_Woo_Subscription_Switch_Handler {
                 return;
             }
 
-            // Success — update local DB
+            // Success — update local DB. Use the shared parser so the retry
+            // path captures URL + credentials + site hash, not just the URL.
             $upgrade_data = array('upgrade_response' => $api_result);
-            if (isset($api_result['url'])) {
-                $upgrade_data['site_url'] = $api_result['url'];
-            }
+            $upgrade_data = array_merge($upgrade_data, IWP_API_Client::extract_upgrade_site_details($api_result));
 
             IWP_Sites_Model::update_plan($site_id, $new_plan_id, $upgrade_data);
 

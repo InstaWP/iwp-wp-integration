@@ -356,6 +356,9 @@ This plugin is licensed under the GPL v2 or later.
 
 ## Changelog
 
+### Version 0.0.13
+- **FIXED**: Upgraded sites now show their URL and login details — when a customer upgrades an existing/demo site via the plan-upgrade flow or a WooCommerce Subscriptions plan switch, the order-received and My Account pages now display the site URL, WordPress username/password, and login button (previously left blank)
+
 ### Version 0.0.12
 - **NEW**: Show/Hide password toggle on the Sites list — click to reveal a site's WordPress password inline
 - **CHANGED**: Full WooCommerce HPOS support — sites created from orders show up correctly everywhere (My Account dashboard, order details, admin "Sites created" stat); older orders are upgraded automatically on first read
