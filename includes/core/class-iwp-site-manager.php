@@ -338,22 +338,10 @@ class IWP_Site_Manager {
             );
             
             if (!is_wp_error($site_details_response) && isset($site_details_response['data'])) {
-                $site_details = $site_details_response['data'];
-                
-                // Update credentials and URLs from site details
-                if (!empty($site_details['url'])) {
-                    $update_data['site_url'] = $site_details['url'];
-                }
-                if (isset($site_details['site_meta']['wp_username'])) {
-                    $update_data['wp_username'] = $site_details['site_meta']['wp_username'];
-                }
-                if (isset($site_details['site_meta']['wp_password'])) {
-                    $update_data['wp_password'] = $site_details['site_meta']['wp_password'];
-                }
-                if (isset($site_details['s_hash'])) {
-                    $update_data['s_hash'] = $site_details['s_hash'];
-                }
-                
+                // Use the shared parser for correct key paths (creds under
+                // site_meta, site hash from 'hash' → stored as s_hash).
+                $update_data = array_merge($update_data, IWP_API_Client::flatten_site_details($site_details_response));
+
                 IWP_Logger::info('Updated database site with fresh credentials', 'site-manager', array(
                     'site_id' => $db_site->site_id,
                     'has_username' => !empty($update_data['wp_username']),
@@ -486,25 +474,13 @@ class IWP_Site_Manager {
                 );
                 
                 if (!is_wp_error($site_details_response) && isset($site_details_response['data'])) {
-                    $site_details = $site_details_response['data'];
-
-                    // Update site_info with fresh credentials and URLs
-                    if (!empty($site_details['url'])) {
-                        $site_info['wp_url'] = $site_details['url'];
-                        $db_update_data['site_url'] = $site_details['url'];
-                    }
-                    if (isset($site_details['site_meta']['wp_username'])) {
-                        $site_info['wp_username'] = $site_details['site_meta']['wp_username'];
-                        $db_update_data['wp_username'] = $site_details['site_meta']['wp_username'];
-                    }
-                    if (isset($site_details['site_meta']['wp_password'])) {
-                        $site_info['wp_password'] = $site_details['site_meta']['wp_password'];
-                        $db_update_data['wp_password'] = $site_details['site_meta']['wp_password'];
-                    }
-                    if (isset($site_details['s_hash'])) {
-                        $site_info['s_hash'] = $site_details['s_hash'];
-                        $db_update_data['s_hash'] = $site_details['s_hash'];
-                    }
+                    // Shared parser for correct key paths (creds under site_meta,
+                    // site hash from 'hash'). Returns only present DB-column keys.
+                    $flat = IWP_API_Client::flatten_site_details($site_details_response);
+                    $db_update_data = array_merge($db_update_data, $flat);
+                    $site_info = array_merge($site_info, $flat);
+                    // $site_info historically uses 'wp_url' for the URL key.
+                    $site_info['wp_url'] = $flat['site_url'] ?? $site_info['wp_url'] ?? '';
 
                     IWP_Logger::info('Updated legacy site with fresh credentials', 'site-manager', array(
                         'site_id' => $site_info['site_id'],

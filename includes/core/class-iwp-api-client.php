@@ -574,6 +574,70 @@ class IWP_API_Client {
     }
 
     /**
+     * Flatten a GET /sites/{id} response envelope into the flat column names
+     * used by IWP_Sites_Model.
+     *
+     * The envelope shape is { status, message, data: { url, site_meta: {
+     * wp_username, wp_password, ... }, hash, ... } }. Credentials live under
+     * `data.site_meta`, and `data.hash` is the SITE hash (stored locally as
+     * `s_hash` and used to build the auto-login URL) — it is the site hash,
+     * not a separate magic-login token.
+     *
+     * Only the keys that are actually present are returned, so the result is
+     * safe to array_merge() into an existing update payload. (wp_admin_url is
+     * intentionally omitted: it is not a stored column — the frontend derives
+     * the admin URL from site_url.)
+     *
+     * @param array|mixed $details_response The get_site_details() envelope.
+     * @return array Flat fields keyed by DB column name.
+     */
+    public static function flatten_site_details($details_response) {
+        // Pull the inner data object; bail out (empty array) if it's missing.
+        $data = (is_array($details_response) && isset($details_response['data']) && is_array($details_response['data']))
+            ? $details_response['data'] : array();
+        if (empty($data)) {
+            return array();
+        }
+
+        // Credentials are nested under site_meta, not the top level of data.
+        $site_meta = (isset($data['site_meta']) && is_array($data['site_meta'])) ? $data['site_meta'] : array();
+
+        $fields = array();
+        if (!empty($data['url'])) {
+            $fields['site_url'] = $data['url'];
+        }
+        if (!empty($site_meta['wp_username'])) {
+            $fields['wp_username'] = $site_meta['wp_username'];
+        }
+        if (!empty($site_meta['wp_password'])) {
+            $fields['wp_password'] = $site_meta['wp_password'];
+        }
+        // 'hash' is the site hash; stored locally as s_hash.
+        if (!empty($data['hash'])) {
+            $fields['s_hash'] = $data['hash'];
+        }
+
+        return $fields;
+    }
+
+    /**
+     * Pull the merged site details out of an upgrade_site_plan() response.
+     *
+     * upgrade_site_plan() attaches the full get_site_details() envelope under a
+     * top-level `site_details` key (a sibling of `data`, NOT nested inside it).
+     * This unwraps that key and flattens it via flatten_site_details().
+     *
+     * @param array|mixed $upgrade_response The upgrade_site_plan() response.
+     * @return array Flat fields keyed by DB column name.
+     */
+    public static function extract_upgrade_site_details($upgrade_response) {
+        $details = (is_array($upgrade_response) && isset($upgrade_response['site_details']))
+            ? $upgrade_response['site_details'] : array();
+
+        return self::flatten_site_details($details);
+    }
+
+    /**
      * Get site details by site ID
      *
      * @param int $site_id
