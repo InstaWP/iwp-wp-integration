@@ -787,6 +787,12 @@
                 } else {
                     $button.after($notice);
                 }
+
+                // Match the notice text to the button it belongs to: dashboard
+                // cards use the small button variant, order pages the regular one.
+                if ($button.hasClass('iwp-btn-sm')) {
+                    $notice.addClass('iwp-purge-notice-sm');
+                }
             }
 
             // Cancel any pending auto-hide from a previous click.

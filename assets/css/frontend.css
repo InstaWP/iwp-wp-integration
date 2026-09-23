@@ -608,18 +608,33 @@
     position: relative;
     display: none;
     margin: 12px 0 0;
-    padding-right: 32px;
+    padding: 10px 32px 10px 15px;
+    /* Match .iwp-btn rather than inheriting the theme's body size, which is
+       much larger and makes the notice dominate the card. */
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.iwp-purge-notice p {
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* Dashboard cards use .iwp-btn-sm, so the notice matches that size there. */
+.iwp-purge-notice-sm,
+.iwp-purge-notice-sm p {
+    font-size: 12px;
 }
 
 .iwp-purge-notice-dismiss {
     position: absolute;
-    top: 6px;
+    top: 8px;
     right: 8px;
     padding: 0 4px;
     background: transparent;
     border: none;
     color: inherit;
-    font-size: 18px;
+    font-size: 16px;
     line-height: 1;
     opacity: 0.6;
     cursor: pointer;
