@@ -595,6 +595,56 @@
     color: #fff;
 }
 
+/* Clear Cache button - busy state while the purge request is in flight */
+.iwp-purge-cache-btn:disabled,
+.iwp-purge-cache-btn[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Clear Cache result, shown inside the site card next to the button.
+   Colours come from the .iwp-message-* classes. */
+.iwp-purge-notice {
+    position: relative;
+    display: none;
+    margin: 12px 0 0;
+    padding: 10px 32px 10px 15px;
+    /* Match .iwp-btn rather than inheriting the theme's body size, which is
+       much larger and makes the notice dominate the card. */
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.iwp-purge-notice p {
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* Dashboard cards use .iwp-btn-sm, so the notice matches that size there. */
+.iwp-purge-notice-sm,
+.iwp-purge-notice-sm p {
+    font-size: 12px;
+}
+
+.iwp-purge-notice-dismiss {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 0 4px;
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-size: 16px;
+    line-height: 1;
+    opacity: 0.6;
+    cursor: pointer;
+}
+
+.iwp-purge-notice-dismiss:hover,
+.iwp-purge-notice-dismiss:focus-visible {
+    opacity: 1;
+}
+
 .iwp-modal {
     position: fixed;
     top: 0;

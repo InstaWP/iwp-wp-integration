@@ -79,6 +79,22 @@ class IWP_API_Client {
             );
         }
 
+        // Cache-purge responses. These reach end customers of a reseller store,
+        // who have no InstaWP account and must not see InstaWP branding or
+        // hosting-platform vocabulary ("CDN", "not hosted with us").
+        if (stripos($message, 'does not have a CDN') !== false) {
+            return __('Cache clearing is not available on your current plan.', 'iwp-wp-integration');
+        }
+
+        if (stripos($message, 'not hosted with') !== false
+            || stripos($message, 'not allowed to perform') !== false) {
+            return __('Cache clearing is not available for this site.', 'iwp-wp-integration');
+        }
+
+        if (stripos($message, 'Server error') !== false) {
+            return __('We could not clear the cache just now. Please try again in a few minutes.', 'iwp-wp-integration');
+        }
+
         return $message;
     }
 
@@ -617,6 +633,22 @@ class IWP_API_Client {
             $fields['s_hash'] = $data['hash'];
         }
 
+        // Whether this site's plan includes CDN. The Clear Cache button purges
+        // the Bunny CDN pull zone and nothing else, so a plan without CDN has
+        // nothing to purge and must not show the button at all.
+        //
+        // Only set when plan_details.features is actually present: this method
+        // returns "only the keys that exist", so a partial response must never
+        // clobber a previously known value with 0.
+        if (isset($data['plan_details']['features']) && is_array($data['plan_details']['features'])) {
+            foreach ($data['plan_details']['features'] as $feature) {
+                if (isset($feature['feature']) && $feature['feature'] === 'cdn') {
+                    $fields['has_cdn'] = !empty($feature['value']) ? 1 : 0;
+                    break;
+                }
+            }
+        }
+
         return $fields;
     }
 
@@ -891,6 +923,56 @@ class IWP_API_Client {
             'site_id' => $sanitized_site_id,
             'new_status' => isset($response['is_reserved']) ? ($response['is_reserved'] ? 'permanent' : 'temporary') : 'unknown'
         ));
+        return $response;
+    }
+
+    /**
+     * Purge the CDN cache for a site.
+     *
+     * Calls the InstaWP API with the store's own API key, so the customer's
+     * WordPress site never needs a connect ID or credentials of its own.
+     * Cross-account access is rejected upstream: the endpoint authorises
+     * against the token's team, so a site this store does not own returns 403.
+     *
+     * @param int|string $site_id Site ID (numeric ID or hash).
+     * @return array|WP_Error API response, or WP_Error on failure.
+     */
+    public function purge_site_cache($site_id) {
+        if (empty($site_id)) {
+            return new WP_Error('invalid_site_id', __('Site ID is required', 'iwp-wp-integration'));
+        }
+
+        // Support both numeric and hash site IDs
+        $sanitized_site_id = is_numeric($site_id) ? intval($site_id) : sanitize_text_field($site_id);
+
+        IWP_Logger::info('Purging site cache', 'api-client', array('site_id' => $sanitized_site_id));
+
+        $endpoint = 'sites/' . $sanitized_site_id . '/purge-cache';
+
+        try {
+            $response = $this->make_request($endpoint, array(
+                'method' => 'POST'
+            ));
+        } catch (\Throwable $e) {
+            // make_request() returns WP_Error rather than throwing, but a fatal
+            // anywhere beneath it (HTTP transport, JSON handling) must not take
+            // the whole request down -- degrade to the WP_Error callers expect.
+            IWP_Logger::error('Site cache purge threw an exception', 'api-client', array(
+                'site_id' => $sanitized_site_id,
+                'error' => $e->getMessage()
+            ));
+            return new WP_Error('purge_cache_failed', __('Server error, please re-try later.', 'iwp-wp-integration'));
+        }
+
+        if (is_wp_error($response)) {
+            IWP_Logger::error('Site cache purge failed', 'api-client', array(
+                'site_id' => $sanitized_site_id,
+                'error' => $response->get_error_message()
+            ));
+            return $response;
+        }
+
+        IWP_Logger::info('Site cache purge successful', 'api-client', array('site_id' => $sanitized_site_id));
         return $response;
     }
 

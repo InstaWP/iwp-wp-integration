@@ -50,6 +50,8 @@
             
             // Domain mapping events
             $(document).on('click', '.iwp-map-domain-btn', this.handleMapDomainClick);
+            $(document).on('click', '.iwp-purge-cache-btn', this.handlePurgeCacheClick);
+            $(document).on('click', '.iwp-purge-notice-dismiss', this.handlePurgeNoticeDismiss);
             $(document).on('click', '.iwp-modal-close', this.handleModalClose);
             $(document).on('click', '.iwp-modal-cancel', this.handleModalClose);
             $(document).on('submit', '#iwp-domain-form', this.handleDomainSubmit);
@@ -477,10 +479,15 @@
         showNotice: function(message, type) {
             type = type || 'info';
             
+            // Build the message with .text() rather than string concatenation:
+            // these messages originate from API responses, so they must never be
+            // interpreted as markup.
             var $notice = $('<div class="iwp-notice iwp-notice-' + type + '">' +
-                '<p>' + message + '</p>' +
+                '<p></p>' +
                 '<button class="iwp-notice-dismiss">&times;</button>' +
                 '</div>');
+
+            $notice.find('p').text(message);
             
             $('body').prepend($notice);
             $notice.fadeIn();
@@ -698,6 +705,136 @@
             
             // Focus on the domain input
             $('#iwp-domain-name').focus();
+        },
+
+        /**
+         * Handle "Clear Cache" click on a site card
+         */
+        handlePurgeCacheClick: function(e) {
+            e.preventDefault();
+
+            var $button = $(this);
+            var siteId = $button.data('site-id');
+
+            if (!siteId || $button.prop('disabled')) {
+                return;
+            }
+
+            var originalText = $button.text();
+            var strings = (iwp_frontend && iwp_frontend.strings) ? iwp_frontend.strings : {};
+
+            $button.prop('disabled', true).text(strings.purging || 'Clearing...');
+
+            $.ajax({
+                url: iwp_frontend.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'iwp_purge_cache',
+                    site_id: siteId,
+                    nonce: iwp_frontend.purge_cache_nonce
+                },
+                success: function(response) {
+                    if (response.success) {
+                        IWP_Frontend.showCardNotice($button, response.data.message, 'success');
+                    } else {
+                        IWP_Frontend.showCardNotice(
+                            $button,
+                            (response.data && response.data.message) ? response.data.message : (strings.error || 'An error occurred. Please try again.'),
+                            'error'
+                        );
+                    }
+                },
+                error: function() {
+                    IWP_Frontend.showCardNotice($button, strings.error || 'An error occurred. Please try again.', 'error');
+                },
+                complete: function() {
+                    // A purge changes nothing on this page, so just restore the
+                    // button rather than reloading.
+                    $button.prop('disabled', false).text(originalText);
+                }
+            });
+        },
+
+        /**
+         * Show a notice inside the site card that owns the given button.
+         *
+         * The global showNotice() prepends to <body>, which on a long My Account
+         * page puts the message off-screen. This keeps the feedback next to the
+         * button the customer just clicked.
+         *
+         * @param {jQuery} $button  The button the notice belongs to.
+         * @param {string} message  Plain text (never markup).
+         * @param {string} type     'success' or 'error'.
+         */
+        showCardNotice: function($button, message, type) {
+            type = type || 'info';
+
+            var $card = $button.closest('.iwp-dashboard-site-card, .iwp-site-card');
+            var $scope = $card.length ? $card : $button.parent();
+            var $notice = $scope.find('.iwp-purge-notice').first();
+
+            if (!$notice.length) {
+                $notice = $('<div class="iwp-purge-notice" role="status" aria-live="polite">' +
+                    '<p></p>' +
+                    '<button type="button" class="iwp-purge-notice-dismiss" aria-label="Dismiss">&times;</button>' +
+                    '</div>');
+
+                // Insert after the actions row: .iwp-site-actions is display:flex,
+                // so a notice placed inside it would sit alongside the buttons.
+                var $actions = $button.closest('.iwp-site-actions');
+                if ($actions.length) {
+                    $actions.after($notice);
+                } else {
+                    $button.after($notice);
+                }
+
+                // Match the notice text to the button it belongs to: dashboard
+                // cards use the small button variant, order pages the regular one.
+                if ($button.hasClass('iwp-btn-sm')) {
+                    $notice.addClass('iwp-purge-notice-sm');
+                }
+            }
+
+            // Cancel any pending auto-hide from a previous click.
+            var pending = $notice.data('iwp-hide-timeout');
+            if (pending) {
+                clearTimeout(pending);
+                $notice.removeData('iwp-hide-timeout');
+            }
+
+            // .text(), never .html(): these strings come from API responses.
+            $notice
+                .removeClass('iwp-message-success iwp-message-error iwp-message-info')
+                .addClass('iwp-message iwp-message-' + type)
+                .find('p').text(message);
+
+            $notice.stop(true, true).fadeIn();
+
+            // Success needs no action from the customer, so it clears itself.
+            // Errors stay until dismissed so they can be read.
+            if (type === 'success') {
+                var timeout = setTimeout(function() {
+                    $notice.fadeOut();
+                }, 6000);
+                $notice.data('iwp-hide-timeout', timeout);
+            }
+        },
+
+        /**
+         * Dismiss an in-card notice
+         */
+        handlePurgeNoticeDismiss: function(e) {
+            e.preventDefault();
+
+            var $notice = $(this).closest('.iwp-purge-notice');
+            var pending = $notice.data('iwp-hide-timeout');
+
+            if (pending) {
+                clearTimeout(pending);
+                $notice.removeData('iwp-hide-timeout');
+            }
+
+            $notice.fadeOut();
         },
 
         /**

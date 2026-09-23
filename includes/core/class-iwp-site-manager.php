@@ -666,6 +666,10 @@ class IWP_Site_Manager {
                     'site_type' => $db_site->site_type ?? 'paid',
                     'source' => $db_site->source,
                     'plan_id' => $db_site->plan_id,
+                    // Whether the plan includes CDN, so the render layer knows
+                    // if a Clear Cache button can do anything. NULL on rows
+                    // predating this column; resolved lazily on first render.
+                    'has_cdn' => $db_site->has_cdn ?? null,
                     // Pass api_response through so the render layer can
                     // decode the failure message on demand for failed
                     // sites (via IWP_Site_Manager::resolve_failure_message).

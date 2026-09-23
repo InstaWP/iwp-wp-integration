@@ -58,6 +58,9 @@ class IWP_Sites_Model {
         'source_data'   => '%s',
         'is_pool'       => '%d',
         'is_reserved'   => '%d',
+        // 1 = the site's plan includes CDN, so its cache can be purged.
+        // 0 = it cannot. NULL = not yet determined.
+        'has_cdn' => '%d',
         'expiry_hours'  => '%d',
         'api_response'  => '%s',
         'created_at'    => '%s',
