@@ -1169,9 +1169,16 @@ class IWP_Frontend {
      * @return bool
      */
     private function is_cache_purge_enabled() {
-        $options = get_option('iwp_options', array());
+        // Resolved once per request: this is called for every site card, and
+        // the setting cannot change mid-request.
+        static $enabled = null;
 
-        return !isset($options['enable_cache_purge']) || $options['enable_cache_purge'] === 'yes';
+        if ($enabled === null) {
+            $options = get_option('iwp_options', array());
+            $enabled = !isset($options['enable_cache_purge']) || $options['enable_cache_purge'] === 'yes';
+        }
+
+        return $enabled;
     }
 
     /**
@@ -1279,14 +1286,11 @@ class IWP_Frontend {
                 wp_send_json_error(array('message' => IWP_API_Client::humanize_error($result)));
             }
 
-            // 10. Audit trail.
-            IWP_Database::log_activity(
-                'purge_cache',
-                'Customer cleared the site cache',
-                array('site_id' => $site_id),
-                $order_id,
-                $current_user_id
-            );
+            // 10. Audit trail -- file log only, deliberately not a DB row.
+            //     {prefix}iwp_logs has no retention policy, and this is the one
+            //     writer an end customer can trigger at will, so a row per purge
+            //     would grow the table unbounded. InstaWP already records the
+            //     purge against the site independently.
             IWP_Logger::info('Customer purged site cache', 'frontend', array(
                 'site_id' => $site_id,
                 'order_id' => $order_id,

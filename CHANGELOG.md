@@ -5,18 +5,11 @@ All notable changes to the InstaWP Integration plugin will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.0.15] - 2026-09-23
-
-### Changed
-- **Cache clearing result now appears inside the site's card.** Previously the confirmation was shown at the very top of the page, so on a long My Account or order page the customer clicked the button and saw nothing happen without scrolling back up. The message now appears directly beneath the button, and can be dismissed with a × . Success messages clear themselves after a few seconds; errors stay until dismissed.
-
-### Fixed
-- **The "Clear Cache" button no longer appears for sites that have no cache to clear.** Clearing only affects the CDN, so on plans without CDN the button could never do anything and always returned an error. Whether a site includes CDN is now recorded when the site is created and kept up to date when its plan changes, so the button appears only where it will work. Sites created before this release still show the button once; the first click works out whether the plan includes CDN and remembers the answer from then on.
-
 ## [0.0.14] - 2026-09-23
 
 ### Added
-- **Customers can clear their own site's cache.** A "Clear Cache" button now appears on each site card on the My Account dashboard and on the order details page, so customers no longer need to ask you to clear it for them. Only the customer who placed the order can clear that site's cache, and it can be cleared once per minute per site. The button can be turned off under InstaWP → Settings → "Allow Customers to Clear Cache" (on by default). Sites on a plan without CDN will see a short message explaining that cache clearing isn't available on their plan.
+- **Customers can clear their own site's cache.** A "Clear Cache" button now appears on each site card on the My Account dashboard and on the order details page, so customers no longer need to ask you to clear it for them. Only the customer who placed the order can clear that site's cache, and it can be cleared once per minute per site. The result is shown inside the site's own card, directly beneath the button, and can be dismissed — success messages clear themselves after a few seconds, errors stay until dismissed. The button can be turned off under InstaWP → Settings → "Allow Customers to Clear Cache" (on by default).
+- Clearing only affects the CDN, so the button is shown only for sites on a plan that includes CDN — on other plans there is nothing to clear. Whether a site includes CDN is recorded when the site is created and kept up to date when its plan changes. Sites created before this release show the button once; the first click works out whether the plan includes CDN and remembers the answer from then on.
 
 ## [0.0.13] - 2026-06-16
 

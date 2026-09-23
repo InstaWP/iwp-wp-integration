@@ -33,7 +33,7 @@ class IWP_Installer {
         '0.0.3' => array(
             array('IWP_Installer', 'add_site_type_column'),
         ),
-        '0.0.15' => array(
+        '0.0.14' => array(
             array('IWP_Installer', 'add_has_cdn_column'),
         ),
     );
@@ -476,23 +476,30 @@ class IWP_Installer {
     public static function add_has_cdn_column() {
         global $wpdb;
 
-        $table_name = $wpdb->prefix . 'iwp_sites';
+        // A migration runs on admin page load during a plugin update. A schema
+        // failure must never be able to fatal that request -- log it and let
+        // the rest of the update continue.
+        try {
+            $table_name = $wpdb->prefix . 'iwp_sites';
 
-        error_log('InstaWP Integration: Adding has_cdn column to database');
+            error_log('InstaWP Integration: Adding has_cdn column to database');
 
-        // Check if column already exists
-        $column_exists = $wpdb->get_results("SHOW COLUMNS FROM {$table_name} LIKE 'has_cdn'");
+            // Check if column already exists
+            $column_exists = $wpdb->get_results("SHOW COLUMNS FROM {$table_name} LIKE 'has_cdn'");
 
-        if (empty($column_exists)) {
-            $result = $wpdb->query("ALTER TABLE {$table_name} ADD COLUMN has_cdn TINYINT(1) NULL DEFAULT NULL AFTER is_reserved");
+            if (empty($column_exists)) {
+                $result = $wpdb->query("ALTER TABLE {$table_name} ADD COLUMN has_cdn TINYINT(1) NULL DEFAULT NULL AFTER is_reserved");
 
-            if ($result !== false) {
-                error_log('InstaWP Integration: Successfully added has_cdn column');
+                if ($result !== false) {
+                    error_log('InstaWP Integration: Successfully added has_cdn column');
+                } else {
+                    error_log('InstaWP Integration: Failed to add has_cdn column: ' . $wpdb->last_error);
+                }
             } else {
-                error_log('InstaWP Integration: Failed to add has_cdn column: ' . $wpdb->last_error);
+                error_log('InstaWP Integration: has_cdn column already exists, skipping');
             }
-        } else {
-            error_log('InstaWP Integration: has_cdn column already exists, skipping');
+        } catch (\Throwable $e) {
+            error_log('InstaWP Integration: Exception adding has_cdn column: ' . $e->getMessage());
         }
     }
 }
