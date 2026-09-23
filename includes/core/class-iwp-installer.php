@@ -33,6 +33,9 @@ class IWP_Installer {
         '0.0.3' => array(
             array('IWP_Installer', 'add_site_type_column'),
         ),
+        '0.0.15' => array(
+            array('IWP_Installer', 'add_has_cdn_column'),
+        ),
     );
 
     /**
@@ -159,6 +162,7 @@ class IWP_Installer {
                 source_data longtext NULL,
                 is_pool tinyint(1) NOT NULL DEFAULT 0,
                 is_reserved tinyint(1) NOT NULL DEFAULT 1,
+                has_cdn tinyint(1) NULL DEFAULT NULL,
                 expiry_hours int(11) NULL DEFAULT NULL,
                 api_response longtext NULL,
                 created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -459,6 +463,36 @@ class IWP_Installer {
             }
         } else {
             error_log('InstaWP Integration: site_type column already exists, skipping');
+        }
+    }
+
+    /**
+     * Add has_cdn column to wp_iwp_sites table
+     *
+     * Records whether the site's plan includes CDN, which is the only thing the
+     * Clear Cache button can actually purge. NULL means "not yet determined" —
+     * existing rows are backfilled lazily the first time a card is rendered.
+     */
+    public static function add_has_cdn_column() {
+        global $wpdb;
+
+        $table_name = $wpdb->prefix . 'iwp_sites';
+
+        error_log('InstaWP Integration: Adding has_cdn column to database');
+
+        // Check if column already exists
+        $column_exists = $wpdb->get_results("SHOW COLUMNS FROM {$table_name} LIKE 'has_cdn'");
+
+        if (empty($column_exists)) {
+            $result = $wpdb->query("ALTER TABLE {$table_name} ADD COLUMN has_cdn TINYINT(1) NULL DEFAULT NULL AFTER is_reserved");
+
+            if ($result !== false) {
+                error_log('InstaWP Integration: Successfully added has_cdn column');
+            } else {
+                error_log('InstaWP Integration: Failed to add has_cdn column: ' . $wpdb->last_error);
+            }
+        } else {
+            error_log('InstaWP Integration: has_cdn column already exists, skipping');
         }
     }
 }

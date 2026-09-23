@@ -633,6 +633,22 @@ class IWP_API_Client {
             $fields['s_hash'] = $data['hash'];
         }
 
+        // Whether this site's plan includes CDN. The Clear Cache button purges
+        // the Bunny CDN pull zone and nothing else, so a plan without CDN has
+        // nothing to purge and must not show the button at all.
+        //
+        // Only set when plan_details.features is actually present: this method
+        // returns "only the keys that exist", so a partial response must never
+        // clobber a previously known value with 0.
+        if (isset($data['plan_details']['features']) && is_array($data['plan_details']['features'])) {
+            foreach ($data['plan_details']['features'] as $feature) {
+                if (isset($feature['feature']) && $feature['feature'] === 'cdn') {
+                    $fields['has_cdn'] = !empty($feature['value']) ? 1 : 0;
+                    break;
+                }
+            }
+        }
+
         return $fields;
     }
 

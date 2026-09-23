@@ -1099,9 +1099,65 @@ class IWP_Frontend {
             return;
         }
 
+        // Only the CDN cache can be purged, so a plan without CDN has nothing
+        // to clear. has_cdn is recorded at site creation and refreshed on plan
+        // upgrade; sites predating it hold NULL, and for those we show the
+        // button and resolve on click (see ajax_purge_cache). Rendering never
+        // calls the API.
+        if (isset($site['has_cdn']) && $site['has_cdn'] !== null && $site['has_cdn'] !== ''
+            && (int) $site['has_cdn'] !== 1) {
+            return;
+        }
+
         $classes = implode(' ', array_filter(array('iwp-btn', $size, 'iwp-btn-tertiary', 'iwp-purge-cache-btn')));
 
         echo '<button type="button" class="' . esc_attr($classes) . '" data-site-id="' . esc_attr($site_id) . '">' . esc_html__('Clear Cache', 'iwp-wp-integration') . '</button>';
+    }
+
+    /**
+     * Resolve and store whether a site's plan includes CDN.
+     *
+     * Only runs for sites recorded before has_cdn existed, where the value is
+     * still NULL. Those sites show the button, and the answer is worked out
+     * here on the first click and written back -- so the lookup happens at most
+     * once per site, and never during page rendering.
+     *
+     * @param string $site_id InstaWP site ID.
+     * @return bool|null True/false when resolved, null when it could not be determined.
+     */
+    private function resolve_has_cdn($site_id) {
+        if (empty($site_id) || !is_numeric($site_id)) {
+            return null;
+        }
+
+        $details = IWP_Service::get_site_details($site_id);
+
+        if (is_wp_error($details)) {
+            IWP_Logger::warning('Could not resolve CDN support for site', 'frontend', array(
+                'site_id' => $site_id,
+                'error' => $details->get_error_message()
+            ));
+            return null;
+        }
+
+        $flat = IWP_API_Client::flatten_site_details($details);
+
+        if (!array_key_exists('has_cdn', $flat)) {
+            return null;
+        }
+
+        $has_cdn = (int) $flat['has_cdn'];
+
+        // Persist so this lookup never repeats for this site.
+        IWP_Sites_Model::init();
+        IWP_Sites_Model::update($site_id, array('has_cdn' => $has_cdn));
+
+        IWP_Logger::info('Recorded CDN support for site', 'frontend', array(
+            'site_id' => $site_id,
+            'has_cdn' => $has_cdn
+        ));
+
+        return $has_cdn === 1;
     }
 
     /**
@@ -1191,13 +1247,30 @@ class IWP_Frontend {
                 wp_send_json_error(array('message' => __('You do not have permission to manage this site.', 'iwp-wp-integration')));
             }
 
-            // 7. Cooldown -- one purge per site per 60 seconds. Keyed per site
+            // 7. CDN support. Recorded at creation and on plan upgrade; older
+            //    sites have it unset, so resolve it now and store it. Only the
+            //    CDN cache can be purged, so without it there is nothing to do.
+            $has_cdn = isset($site_row->has_cdn) ? $site_row->has_cdn : null;
+
+            if ($has_cdn === null || $has_cdn === '') {
+                $has_cdn = $this->resolve_has_cdn($site_id);
+
+                // Could not determine it -- fall through and let the purge
+                // attempt report the real outcome rather than guessing.
+                if ($has_cdn !== null && !$has_cdn) {
+                    wp_send_json_error(array('message' => __('Cache clearing is not available on your current plan.', 'iwp-wp-integration')));
+                }
+            } elseif ((int) $has_cdn !== 1) {
+                wp_send_json_error(array('message' => __('Cache clearing is not available on your current plan.', 'iwp-wp-integration')));
+            }
+
+            // 8. Cooldown -- one purge per site per 60 seconds. Keyed per site
             //    so one customer's retries cannot exhaust another's allowance.
             if (!IWP_Security::check_rate_limit('purge_' . $site_id, $current_user_id, 1, 60)) {
                 wp_send_json_error(array('message' => __('Please wait a moment before clearing the cache again.', 'iwp-wp-integration')));
             }
 
-            // 8. Perform the purge via the store's own API key.
+            // 9. Perform the purge via the store's own API key.
             $result = IWP_Service::purge_site_cache($site_id);
 
             if (is_wp_error($result)) {
@@ -1206,7 +1279,7 @@ class IWP_Frontend {
                 wp_send_json_error(array('message' => IWP_API_Client::humanize_error($result)));
             }
 
-            // 9. Audit trail.
+            // 10. Audit trail.
             IWP_Database::log_activity(
                 'purge_cache',
                 'Customer cleared the site cache',

@@ -251,6 +251,30 @@ class IWP_Service {
     }
 
     /**
+     * Get site details (GET /sites/{id}).
+     *
+     * @param int|string $site_id
+     * @return array|WP_Error
+     */
+    public static function get_site_details($site_id) {
+        try {
+            $api_client = self::get_api_client();
+
+            if (is_wp_error($api_client)) {
+                return $api_client;
+            }
+
+            return $api_client->get_site_details($site_id);
+        } catch (\Throwable $e) {
+            IWP_Logger::error('Fetching site details threw an exception', 'service', array(
+                'site_id' => $site_id,
+                'error' => $e->getMessage()
+            ));
+            return new WP_Error('site_details_failed', __('Server error, please re-try later.', 'iwp-wp-integration'));
+        }
+    }
+
+    /**
      * Purge the CDN cache for a site.
      *
      * @param int|string $site_id

@@ -602,6 +602,34 @@
     cursor: not-allowed;
 }
 
+/* Clear Cache result, shown inside the site card next to the button.
+   Colours come from the .iwp-message-* classes. */
+.iwp-purge-notice {
+    position: relative;
+    display: none;
+    margin: 12px 0 0;
+    padding-right: 32px;
+}
+
+.iwp-purge-notice-dismiss {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    padding: 0 4px;
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-size: 18px;
+    line-height: 1;
+    opacity: 0.6;
+    cursor: pointer;
+}
+
+.iwp-purge-notice-dismiss:hover,
+.iwp-purge-notice-dismiss:focus-visible {
+    opacity: 1;
+}
+
 .iwp-modal {
     position: fixed;
     top: 0;
