@@ -151,8 +151,8 @@ class IWP_Sites_Model {
     public static function update($site_id, $data) {
         global $wpdb;
         
-        error_log('IWP DEBUG: sites model update() - Called with site_id: ' . $site_id);
-        error_log('IWP DEBUG: sites model update() - Data: ' . print_r($data, true));
+        IWP_Logger::debug('sites model update() - Called with site_id: ' . $site_id, 'sites-model');
+        IWP_Logger::debug('sites model update() - data', 'sites-model', $data);
         
         if (!self::$table_name) {
             self::init();
@@ -164,7 +164,7 @@ class IWP_Sites_Model {
             if (is_array($value)) {
                 // JSON encode array values for database storage
                 $sanitized_data[$key] = wp_json_encode($value);
-                error_log('IWP DEBUG: sites model update() - Converted array field "' . $key . '" to JSON');
+                IWP_Logger::debug('sites model update() - Converted array field "' . $key . '" to JSON', 'sites-model');
             } else {
                 $sanitized_data[$key] = $value;
             }
@@ -172,7 +172,7 @@ class IWP_Sites_Model {
         
         $sanitized_data['updated_at'] = current_time('mysql');
 
-        error_log('IWP DEBUG: sites model update() - About to call wpdb->update with sanitized data');
+        IWP_Logger::debug('sites model update() - About to call wpdb->update with sanitized data', 'sites-model');
 
         // Explicit $format (4th arg) and $where_format (5th arg) both
         // override WP core's field_types['site_id']='%d' lookup. Without
@@ -189,7 +189,7 @@ class IWP_Sites_Model {
             self::format_for_data($sanitized_data),
             array('%s')
         );
-        error_log('IWP DEBUG: sites model update() - wpdb->update result: ' . ($result !== false ? 'SUCCESS' : 'FAILED'));
+        IWP_Logger::debug('sites model update() - wpdb->update result: ' . ($result !== false ? 'SUCCESS' : 'FAILED'), 'sites-model');
 
         return $result !== false;
     }
@@ -474,20 +474,20 @@ class IWP_Sites_Model {
         $sql = "SELECT COUNT(*) FROM " . self::$table_name . " " . $where_sql;
 
         if (!empty($where_values)) {
-            error_log('IWP DEBUG: sites model count() - About to prepare SQL with values: ' . print_r($where_values, true));
-            error_log('IWP DEBUG: sites model count() - SQL: ' . $sql);
-            error_log('IWP DEBUG: sites model count() - Values type check: is_array=' . (is_array($where_values) ? 'YES' : 'NO') . ', count=' . (is_array($where_values) ? count($where_values) : 'N/A'));
+            IWP_Logger::debug('sites model count() - where values', 'sites-model', $where_values);
+            IWP_Logger::debug('sites model count() - SQL: ' . $sql, 'sites-model');
+            IWP_Logger::debug('sites model count() - Values type check: is_array=' . (is_array($where_values) ? 'YES' : 'NO') . ', count=' . (is_array($where_values) ? count($where_values) : 'N/A'), 'sites-model');
             
             try {
                 $prepared_sql = $wpdb->prepare($sql, $where_values);
-                error_log('IWP DEBUG: sites model count() - SQL prepared successfully');
+                IWP_Logger::debug('sites model count() - SQL prepared successfully', 'sites-model');
                 return intval($wpdb->get_var($prepared_sql));
             } catch (Exception $e) {
-                error_log('IWP ERROR: sites model count() - Exception during prepare: ' . $e->getMessage());
+                IWP_Logger::error('sites model count() - Exception during prepare: ' . $e->getMessage(), 'sites-model');
                 throw $e;
             }
         } else {
-            error_log('IWP DEBUG: sites model count() - No where values, executing raw SQL');
+            IWP_Logger::debug('sites model count() - No where values, executing raw SQL', 'sites-model');
             return intval($wpdb->get_var($sql));
         }
     }

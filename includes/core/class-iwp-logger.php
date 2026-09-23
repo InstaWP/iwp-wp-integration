@@ -78,6 +78,79 @@ class IWP_Logger {
     }
 
     /**
+     * Keys whose values must never reach a log file.
+     *
+     * Matched case-insensitively as a substring, so 'password' also covers
+     * 'wp_password' and 'admin_password'.
+     *
+     * @var array
+     */
+    private static $sensitive_keys = array(
+        'password',
+        'api_key',
+        'apikey',
+        'authorization',
+        'token',
+        'secret',
+        's_hash',
+        'hash',
+        'nonce',
+        'htpassword',
+    );
+
+    /**
+     * Replace the values of sensitive keys with a placeholder.
+     *
+     * Logs are written to a file that support staff, host backups and anyone
+     * with filesystem access can read, so site credentials and API keys must
+     * never be written verbatim. Recurses into nested arrays/objects because
+     * API responses nest credentials (e.g. data.site_meta.wp_password).
+     *
+     * @param mixed $data  Data about to be logged.
+     * @param int   $depth Current recursion depth (guards against cycles).
+     * @return mixed Data with sensitive values masked.
+     */
+    public static function redact($data, $depth = 0) {
+        if ($depth > 10) {
+            return '[redacted: max depth]';
+        }
+
+        if (is_object($data)) {
+            $data = (array) $data;
+        }
+
+        if (!is_array($data)) {
+            return $data;
+        }
+
+        $clean = array();
+
+        foreach ($data as $key => $value) {
+            $is_sensitive = false;
+
+            if (is_string($key)) {
+                $key_lower = strtolower($key);
+                foreach (self::$sensitive_keys as $needle) {
+                    if (strpos($key_lower, $needle) !== false) {
+                        $is_sensitive = true;
+                        break;
+                    }
+                }
+            }
+
+            if ($is_sensitive) {
+                $clean[$key] = '[redacted]';
+            } elseif (is_array($value) || is_object($value)) {
+                $clean[$key] = self::redact($value, $depth + 1);
+            } else {
+                $clean[$key] = $value;
+            }
+        }
+
+        return $clean;
+    }
+
+    /**
      * Format log message with context
      *
      * @param string $message
@@ -89,17 +162,19 @@ class IWP_Logger {
     private static function format_message($message, $context = '', $level = self::LEVEL_INFO, $data = array()) {
         $timestamp = current_time('Y-m-d H:i:s');
         $level_upper = strtoupper($level);
-        
+
         $formatted = "[{$timestamp}] IWP WooCommerce V2 [{$level_upper}]";
-        
+
         if (!empty($context)) {
             $formatted .= " [{$context}]";
         }
-        
+
         $formatted .= ": {$message}";
-        
+
         if (!empty($data)) {
-            $formatted .= " | Data: " . wp_json_encode($data);
+            // Single choke point: everything written to the log passes through
+            // here, so redacting once covers every caller.
+            $formatted .= " | Data: " . wp_json_encode(self::redact($data));
         }
 
         return $formatted;
@@ -194,32 +269,6 @@ class IWP_Logger {
         }
     }
 
-    /**
-     * Log site creation event
-     *
-     * @param string $event
-     * @param int $order_id
-     * @param array $site_data
-     * @param bool $is_error
-     */
-    public static function site_creation($event, $order_id, $site_data = array(), $is_error = false) {
-        $context = 'SiteCreation';
-        $level = $is_error ? self::LEVEL_ERROR : self::LEVEL_INFO;
-        
-        $log_data = array(
-            'order_id' => $order_id,
-            'site_data_keys' => is_array($site_data) ? array_keys($site_data) : 'no_data'
-        );
-
-        if ($level === self::LEVEL_ERROR) {
-            self::error($event, $context, $log_data);
-        } else {
-            self::info($event, $context, $log_data);  
-        }
-
-        // Also log to database for better tracking
-        IWP_Database::log_activity('site_creation', $event, $site_data, $order_id);
-    }
 
     /**
      * Log security event
@@ -269,52 +318,7 @@ class IWP_Logger {
         self::debug($message, $context, $log_data);
     }
 
-    /**
-     * Log order processing event
-     *
-     * @param string $event
-     * @param int $order_id
-     * @param array $order_data
-     * @param bool $is_error
-     */
-    public static function order_processing($event, $order_id, $order_data = array(), $is_error = false) {
-        $context = 'OrderProcessing';
-        $level = $is_error ? self::LEVEL_ERROR : self::LEVEL_INFO;
-        
-        $log_data = array(
-            'order_id' => $order_id,
-            'order_data_keys' => is_array($order_data) ? array_keys($order_data) : 'no_data'
-        );
 
-        if ($level === self::LEVEL_ERROR) {
-            self::error($event, $context, $log_data);
-        } else {
-            self::info($event, $context, $log_data);
-        }
-
-        // Log to database
-        IWP_Database::log_activity('order_processing', $event, $order_data, $order_id);
-    }
-
-    /**
-     * Log admin action
-     *
-     * @param string $action
-     * @param array $context_data
-     */
-    public static function admin_action($action, $context_data = array()) {
-        $context = 'Admin';
-        
-        $log_data = array_merge($context_data, array(
-            'user_id' => get_current_user_id(),
-            'current_screen' => get_current_screen() ? get_current_screen()->id : 'unknown'
-        ));
-
-        self::info($action, $context, $log_data);
-        
-        // Log to database
-        IWP_Database::log_activity('admin_action', $action, $context_data);
-    }
 
     /**
      * Log frontend action

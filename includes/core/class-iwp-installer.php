@@ -304,10 +304,13 @@ class IWP_Installer {
         delete_option('iwp_version');
 
         // Delete tables
+        // Table names must match what create_tables() actually creates --
+        // 'iwp_order_data' never existed, so the real order-data table was
+        // being left behind on uninstall.
         $tables = array(
             $wpdb->prefix . 'iwp_logs',
             $wpdb->prefix . 'iwp_settings',
-            $wpdb->prefix . 'iwp_order_data',
+            $wpdb->prefix . 'iwp_woo_order_data',
             $wpdb->prefix . 'iwp_sites'
         );
 
