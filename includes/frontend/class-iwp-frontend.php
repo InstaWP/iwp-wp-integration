@@ -122,6 +122,11 @@ class IWP_Frontend {
         
         // My Account dashboard integration
         add_action('woocommerce_account_dashboard', array($this, 'display_customer_sites'), 15);
+
+        // Customer-triggered cache purge. Registered for logged-in users ONLY --
+        // ownership is proven by the order's customer ID, which a logged-out
+        // visitor can never satisfy, so there is deliberately no nopriv variant.
+        add_action('wp_ajax_iwp_purge_cache', array($this, 'ajax_purge_cache'));
         
         // Site ID parameter handling
         add_action('init', array($this, 'handle_site_id_parameter'));
@@ -160,9 +165,11 @@ class IWP_Frontend {
                 'ajax_url' => admin_url('admin-ajax.php'),
                 'nonce' => wp_create_nonce('iwp_frontend_nonce'),
                 'add_domain_nonce' => wp_create_nonce('iwp_add_domain_nonce'),
+                'purge_cache_nonce' => wp_create_nonce('iwp_purge_cache_nonce'),
                 'strings' => array(
                     'loading' => esc_html__('Loading...', 'iwp-wp-integration'),
                     'error' => esc_html__('An error occurred. Please try again.', 'iwp-wp-integration'),
+                    'purging' => esc_html__('Clearing...', 'iwp-wp-integration'),
                 ),
             )
         );
@@ -774,6 +781,9 @@ class IWP_Frontend {
                 if (!empty($site_id) && ($context === 'order-details' || $context === 'order-view' || $context === 'thank-you')) {
                     echo '<button type="button" class="iwp-btn iwp-btn-tertiary iwp-map-domain-btn" data-site-id="' . esc_attr($site_id) . '" data-site-url="' . esc_attr($wp_url) . '">' . __('Map Domain', 'iwp-wp-integration') . '</button>';
                 }
+
+                // Let the customer clear their own site's cache from the order page.
+                $this->render_purge_cache_button($site);
                 echo '</div>';
             }
             echo '</div>';
@@ -1063,6 +1073,165 @@ class IWP_Frontend {
     }
 
     /**
+     * Render the "Clear Cache" button for a site card.
+     *
+     * Shared by the My Account dashboard card and the order-details card so the
+     * markup and behaviour never drift apart.
+     *
+     * Display only -- it grants nothing. Both callers already list only the
+     * current customer's own sites, and ajax_purge_cache() re-derives ownership
+     * from the database on every request regardless of what is rendered here.
+     *
+     * @param array  $site  Normalised site array from IWP_Site_Manager::get_order_sites().
+     * @param string $size  Extra size class to match sibling buttons on the
+     *                      surface being rendered ('iwp-btn-sm' on the dashboard,
+     *                      empty on the order details page).
+     */
+    private function render_purge_cache_button($site, $size = '') {
+        if (!$this->is_cache_purge_enabled()) {
+            return;
+        }
+
+        $status  = isset($site['status']) ? $site['status'] : '';
+        $site_id = isset($site['site_id']) ? $site['site_id'] : '';
+
+        if ($status !== 'completed' || empty($site_id)) {
+            return;
+        }
+
+        $classes = implode(' ', array_filter(array('iwp-btn', $size, 'iwp-btn-tertiary', 'iwp-purge-cache-btn')));
+
+        echo '<button type="button" class="' . esc_attr($classes) . '" data-site-id="' . esc_attr($site_id) . '">' . esc_html__('Clear Cache', 'iwp-wp-integration') . '</button>';
+    }
+
+    /**
+     * Is the customer-facing cache purge feature enabled?
+     *
+     * Defaults to ON so existing stores get the button without having to
+     * re-save their settings (the option is absent until settings are saved).
+     *
+     * @return bool
+     */
+    private function is_cache_purge_enabled() {
+        $options = get_option('iwp_options', array());
+
+        return !isset($options['enable_cache_purge']) || $options['enable_cache_purge'] === 'yes';
+    }
+
+    /**
+     * AJAX: purge the CDN cache for one of the current customer's sites.
+     *
+     * Authorisation is deliberately strict: the only thing accepted from the
+     * browser is the site ID, which is used purely as a lookup key. The owning
+     * order is then resolved from our own sites table, so a caller can never
+     * pair somebody else's site with an order of their own.
+     */
+    public function ajax_purge_cache() {
+        try {
+            // 1. Nonce.
+            if (!wp_verify_nonce(isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '', 'iwp_purge_cache_nonce')) {
+                wp_send_json_error(array('message' => __('Security check failed. Please refresh the page.', 'iwp-wp-integration')));
+            }
+
+            // 2. Must be a logged-in account -- ownership is proven against it.
+            $current_user_id = get_current_user_id();
+            if (!is_user_logged_in() || $current_user_id <= 0) {
+                wp_send_json_error(array('message' => __('Please log in to manage this site.', 'iwp-wp-integration')));
+            }
+
+            // 3. Feature toggle.
+            if (!$this->is_cache_purge_enabled()) {
+                wp_send_json_error(array('message' => __('Cache clearing is not available for this site.', 'iwp-wp-integration')));
+            }
+
+            // 4. Site ID -- the only identifier taken from the request.
+            $site_id = isset($_POST['site_id']) ? sanitize_text_field(wp_unslash($_POST['site_id'])) : '';
+            if (empty($site_id)) {
+                wp_send_json_error(array('message' => __('Site ID is required', 'iwp-wp-integration')));
+            }
+
+            // 5. Resolve our own record for that site.
+            IWP_Sites_Model::init();
+            $site_row = IWP_Sites_Model::get_by_site_id($site_id);
+            if (!$site_row) {
+                wp_send_json_error(array('message' => __('Cache clearing is not available for this site.', 'iwp-wp-integration')));
+            }
+
+            // 6. Ownership: the logged-in account must hold the originating order.
+            //    $site_row->user_id is NOT accepted as proof -- it defaults to 0
+            //    and is only populated on some creation paths, so the order is
+            //    the authoritative link between a site and a customer.
+            $order_id = isset($site_row->order_id) ? (int) $site_row->order_id : 0;
+            if ($order_id <= 0) {
+                wp_send_json_error(array('message' => __('Cache clearing is not available for this site.', 'iwp-wp-integration')));
+            }
+
+            // Without WooCommerce there is no order to prove ownership with, so
+            // deny rather than fall through to a weaker check.
+            if (!function_exists('wc_get_order')) {
+                wp_send_json_error(array('message' => __('Cache clearing is not available for this site.', 'iwp-wp-integration')));
+            }
+
+            $order = wc_get_order($order_id);
+            if (!$order) {
+                wp_send_json_error(array('message' => __('Cache clearing is not available for this site.', 'iwp-wp-integration')));
+            }
+
+            // Guest orders (customer_id 0) can never satisfy this, by design.
+            // Note this is intentionally stricter than
+            // IWP_Security::can_user_access_order(), which lets any user with
+            // manage_woocommerce through -- only the account holder may purge.
+            $order_customer_id = (int) $order->get_customer_id();
+            if ($order_customer_id <= 0 || $order_customer_id !== $current_user_id) {
+                IWP_Logger::warning('Cache purge denied - not the order owner', 'frontend', array(
+                    'site_id' => $site_id,
+                    'order_id' => $order_id,
+                    'user_id' => $current_user_id
+                ));
+                wp_send_json_error(array('message' => __('You do not have permission to manage this site.', 'iwp-wp-integration')));
+            }
+
+            // 7. Cooldown -- one purge per site per 60 seconds. Keyed per site
+            //    so one customer's retries cannot exhaust another's allowance.
+            if (!IWP_Security::check_rate_limit('purge_' . $site_id, $current_user_id, 1, 60)) {
+                wp_send_json_error(array('message' => __('Please wait a moment before clearing the cache again.', 'iwp-wp-integration')));
+            }
+
+            // 8. Perform the purge via the store's own API key.
+            $result = IWP_Service::purge_site_cache($site_id);
+
+            if (is_wp_error($result)) {
+                // humanize_error() strips platform vocabulary and branding that
+                // an end customer of a reseller store must never see.
+                wp_send_json_error(array('message' => IWP_API_Client::humanize_error($result)));
+            }
+
+            // 9. Audit trail.
+            IWP_Database::log_activity(
+                'purge_cache',
+                'Customer cleared the site cache',
+                array('site_id' => $site_id),
+                $order_id,
+                $current_user_id
+            );
+            IWP_Logger::info('Customer purged site cache', 'frontend', array(
+                'site_id' => $site_id,
+                'order_id' => $order_id,
+                'user_id' => $current_user_id
+            ));
+
+            wp_send_json_success(array('message' => __('Cache cleared successfully.', 'iwp-wp-integration')));
+        } catch (\Throwable $e) {
+            // Log the detail, return something generic: exception text can carry
+            // file paths and upstream specifics.
+            IWP_Logger::error('Cache purge handler threw an exception', 'frontend', array(
+                'error' => $e->getMessage()
+            ));
+            wp_send_json_error(array('message' => __('We could not clear the cache just now. Please try again in a few minutes.', 'iwp-wp-integration')));
+        }
+    }
+
+    /**
      * Display customer's sites on My Account dashboard
      */
     public function display_customer_sites() {
@@ -1212,6 +1381,10 @@ class IWP_Frontend {
                 echo '<a href="' . esc_url($magic_login_url) . '" target="_blank" rel="noopener" class="iwp-btn iwp-btn-sm iwp-btn-magic-login">' . __('Magic Login', 'iwp-wp-integration') . '</a>';
             }
         }
+
+        // Let the customer clear their own site's cache from the dashboard.
+        $this->render_purge_cache_button($site, 'iwp-btn-sm');
+
         if ($order_id) {
             echo '<a href="' . esc_url(wc_get_endpoint_url('view-order', $order_id, wc_get_page_permalink('myaccount'))) . '" class="iwp-btn iwp-btn-sm iwp-btn-secondary">' . __('View Details', 'iwp-wp-integration') . '</a>';
         }

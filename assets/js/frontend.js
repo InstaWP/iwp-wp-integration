@@ -50,6 +50,7 @@
             
             // Domain mapping events
             $(document).on('click', '.iwp-map-domain-btn', this.handleMapDomainClick);
+            $(document).on('click', '.iwp-purge-cache-btn', this.handlePurgeCacheClick);
             $(document).on('click', '.iwp-modal-close', this.handleModalClose);
             $(document).on('click', '.iwp-modal-cancel', this.handleModalClose);
             $(document).on('submit', '#iwp-domain-form', this.handleDomainSubmit);
@@ -477,10 +478,15 @@
         showNotice: function(message, type) {
             type = type || 'info';
             
+            // Build the message with .text() rather than string concatenation:
+            // these messages originate from API responses, so they must never be
+            // interpreted as markup.
             var $notice = $('<div class="iwp-notice iwp-notice-' + type + '">' +
-                '<p>' + message + '</p>' +
+                '<p></p>' +
                 '<button class="iwp-notice-dismiss">&times;</button>' +
                 '</div>');
+
+            $notice.find('p').text(message);
             
             $('body').prepend($notice);
             $notice.fadeIn();
@@ -698,6 +704,53 @@
             
             // Focus on the domain input
             $('#iwp-domain-name').focus();
+        },
+
+        /**
+         * Handle "Clear Cache" click on a site card
+         */
+        handlePurgeCacheClick: function(e) {
+            e.preventDefault();
+
+            var $button = $(this);
+            var siteId = $button.data('site-id');
+
+            if (!siteId || $button.prop('disabled')) {
+                return;
+            }
+
+            var originalText = $button.text();
+            var strings = (iwp_frontend && iwp_frontend.strings) ? iwp_frontend.strings : {};
+
+            $button.prop('disabled', true).text(strings.purging || 'Clearing...');
+
+            $.ajax({
+                url: iwp_frontend.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'iwp_purge_cache',
+                    site_id: siteId,
+                    nonce: iwp_frontend.purge_cache_nonce
+                },
+                success: function(response) {
+                    if (response.success) {
+                        IWP_Frontend.showNotice(response.data.message, 'success');
+                    } else {
+                        IWP_Frontend.showNotice(
+                            (response.data && response.data.message) ? response.data.message : (strings.error || 'An error occurred. Please try again.'),
+                            'error'
+                        );
+                    }
+                },
+                error: function() {
+                    IWP_Frontend.showNotice(strings.error || 'An error occurred. Please try again.', 'error');
+                },
+                complete: function() {
+                    // A purge changes nothing on this page, so just restore the
+                    // button rather than reloading.
+                    $button.prop('disabled', false).text(originalText);
+                }
+            });
         },
 
         /**

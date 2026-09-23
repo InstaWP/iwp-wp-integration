@@ -251,6 +251,32 @@ class IWP_Service {
     }
 
     /**
+     * Purge the CDN cache for a site.
+     *
+     * @param int|string $site_id
+     * @return array|WP_Error
+     */
+    public static function purge_site_cache($site_id) {
+        try {
+            $api_client = self::get_api_client();
+
+            if (is_wp_error($api_client)) {
+                return $api_client;
+            }
+
+            return $api_client->purge_site_cache($site_id);
+        } catch (\Throwable $e) {
+            // Never let a fatal escape into the AJAX handler -- log it and hand
+            // back the WP_Error shape every caller already branches on.
+            IWP_Logger::error('Site cache purge threw an exception', 'service', array(
+                'site_id' => $site_id,
+                'error' => $e->getMessage()
+            ));
+            return new WP_Error('purge_cache_failed', __('Server error, please re-try later.', 'iwp-wp-integration'));
+        }
+    }
+
+    /**
      * Add domain to site
      *
      * @param int $site_id

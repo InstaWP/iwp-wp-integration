@@ -595,6 +595,13 @@
     color: #fff;
 }
 
+/* Clear Cache button - busy state while the purge request is in flight */
+.iwp-purge-cache-btn:disabled,
+.iwp-purge-cache-btn[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .iwp-modal {
     position: fixed;
     top: 0;
