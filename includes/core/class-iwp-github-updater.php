@@ -311,7 +311,10 @@ class IWP_GitHub_Updater {
             // handler is filtered - keeping the redirect inside the try means a
             // caught failure can never show the success notice.
             wp_safe_redirect(add_query_arg('iwp_update_checked', '1', admin_url('plugins.php')));
-            exit;
+
+            // Hand control back rather than exiting; the 302 is already sent,
+            // so the browser follows it and the rest of the request is moot.
+            return;
         } catch (\Throwable $e) {
             // Log and fall through: plugins.php still renders normally, just
             // without the confirmation notice.
