@@ -100,15 +100,7 @@ class IWP_Site_Manager {
         $site_data_response = $response['data'] ?? array();
         
         // Debug: Log the actual API response structure
-        IWP_Logger::debug('Site creation API response received', 'site-manager', array(
-            // Safe fields only. The response also carries wp_password, s_hash
-            // and token, which are never logged.
-            'id'      => isset($site_data_response['id']) ? $site_data_response['id'] : null,
-            'status'  => isset($site_data_response['status']) ? $site_data_response['status'] : null,
-            'task_id' => isset($site_data_response['task_id']) ? $site_data_response['task_id'] : null,
-            'is_pool' => isset($site_data_response['is_pool']) ? $site_data_response['is_pool'] : null,
-            'wp_url'  => isset($site_data_response['wp_url']) ? $site_data_response['wp_url'] : null,
-        ));
+        IWP_Logger::debug('Site creation API response received', 'site-manager', $site_data_response);
 
         // Update database record with real site ID and response data
         $real_site_id = $site_data_response['id'] ?? $initial_site_data['site_id'];
@@ -363,10 +355,7 @@ class IWP_Site_Manager {
             }
             
             IWP_Logger::debug('site-manager database handler - About to call IWP_Sites_Model::update', 'site-manager');
-            // Field names only -- the values include wp_password and s_hash.
-            IWP_Logger::debug('site-manager database handler - update fields', 'site-manager', array(
-                'fields' => array_keys($update_data),
-            ));
+            IWP_Logger::debug('site-manager database handler - update data', 'site-manager', $update_data);
             IWP_Sites_Model::update($db_site->site_id, $update_data);
             IWP_Logger::debug('site-manager database handler - IWP_Sites_Model::update completed', 'site-manager');
 

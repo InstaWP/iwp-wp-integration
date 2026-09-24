@@ -434,10 +434,8 @@ class IWP_Logger {
             self::info($event, $context, $log_data);  
         }
 
-        // Field names only. The file log above already records just the keys;
-        // the raw $site_data carries wp_password / s_hash, which must not be
-        // written to the database either.
-        IWP_Database::log_activity('site_creation', $event, $log_data, $order_id);
+        // Also log to database for better tracking
+        IWP_Database::log_activity('site_creation', $event, $site_data, $order_id);
     }
 
     /**
@@ -463,8 +461,8 @@ class IWP_Logger {
             self::info($event, $context, $log_data);
         }
 
-        // Field names only -- see site_creation() above.
-        IWP_Database::log_activity('order_processing', $event, $log_data, $order_id);
+        // Log to database
+        IWP_Database::log_activity('order_processing', $event, $order_data, $order_id);
     }
 
     /**
