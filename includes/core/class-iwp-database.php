@@ -333,4 +333,142 @@ class IWP_Database {
     public static function update_schema_version($version) {
         return update_option('iwp_db_version', $version);
     }
+
+    /**
+     * Create custom table for plugin logs
+     *
+     * @return bool
+     */
+    public static function create_logs_table() {
+        global $wpdb;
+
+        $table_name = $wpdb->prefix . 'iwp_logs';
+
+        $charset_collate = $wpdb->get_charset_collate();
+
+        $sql = "CREATE TABLE IF NOT EXISTS $table_name (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+            order_id bigint(20) unsigned NULL DEFAULT NULL,
+            action varchar(100) NOT NULL,
+            message text NOT NULL,
+            data longtext,
+            created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY user_id (user_id),
+            KEY order_id (order_id),
+            KEY action (action),
+            KEY created_at (created_at)
+        ) $charset_collate;";
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        return dbDelta($sql);
+    }
+
+    /**
+     * Log plugin activity to custom table
+     *
+     * @param string $action
+     * @param string $message
+     * @param array $data
+     * @param int $order_id
+     * @param int $user_id
+     * @return bool
+     */
+    public static function log_activity($action, $message, $data = array(), $order_id = null, $user_id = null) {
+        global $wpdb;
+
+        $table_name = $wpdb->prefix . 'iwp_logs';
+
+        if ($user_id === null) {
+            $user_id = get_current_user_id();
+        }
+
+        return $wpdb->insert(
+            $table_name,
+            array(
+                'user_id' => $user_id,
+                'order_id' => $order_id,
+                'action' => $action,
+                'message' => $message,
+                'data' => wp_json_encode($data),
+                'created_at' => current_time('mysql')
+            ),
+            array('%d', '%d', '%s', '%s', '%s', '%s')
+        );
+    }
+
+    /**
+     * Get plugin activity logs
+     *
+     * @param array $args
+     * @return array
+     */
+    public static function get_activity_logs($args = array()) {
+        global $wpdb;
+
+        $table_name = $wpdb->prefix . 'iwp_logs';
+
+        $defaults = array(
+            'limit' => 50,
+            'offset' => 0,
+            'action' => null,
+            'user_id' => null,
+            'order_id' => null,
+            'start_date' => null,
+            'end_date' => null
+        );
+
+        $args = wp_parse_args($args, $defaults);
+
+        $where_conditions = array('1=1');
+        $where_values = array();
+
+        if ($args['action']) {
+            $where_conditions[] = 'action = %s';
+            $where_values[] = $args['action'];
+        }
+
+        if ($args['user_id']) {
+            $where_conditions[] = 'user_id = %d';
+            $where_values[] = $args['user_id'];
+        }
+
+        if ($args['order_id']) {
+            $where_conditions[] = 'order_id = %d';
+            $where_values[] = $args['order_id'];
+        }
+
+        if ($args['start_date']) {
+            $where_conditions[] = 'created_at >= %s';
+            $where_values[] = $args['start_date'];
+        }
+
+        if ($args['end_date']) {
+            $where_conditions[] = 'created_at <= %s';
+            $where_values[] = $args['end_date'];
+        }
+
+        $where_clause = implode(' AND ', $where_conditions);
+
+        $query = "SELECT * FROM $table_name WHERE $where_clause ORDER BY created_at DESC LIMIT %d OFFSET %d";
+        $where_values[] = $args['limit'];
+        $where_values[] = $args['offset'];
+
+        if (!empty($where_values)) {
+            IWP_Logger::debug('database get_activity_logs() - where values', 'database', $where_values);
+            IWP_Logger::debug('database get_activity_logs() - query', 'database', array('query' => $query));
+            IWP_Logger::debug('database get_activity_logs() - values type check', 'database', array('is_array' => is_array($where_values), 'count' => is_array($where_values) ? count($where_values) : null));
+            
+            try {
+                $query = $wpdb->prepare($query, $where_values);
+                IWP_Logger::debug('database get_activity_logs() - SQL prepared successfully', 'database');
+            } catch (Exception $e) {
+                IWP_Logger::error('database get_activity_logs() - exception during prepare', 'database', array('error' => $e->getMessage()));
+                throw $e;
+            }
+        }
+
+        return $wpdb->get_results($query);
+    }
 }

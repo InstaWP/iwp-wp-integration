@@ -166,10 +166,14 @@ class IWP_API_Client {
 
         $args = wp_parse_args($args, $default_args);
 
-        // Log the request details. IWP_Logger::redact() masks the Authorization
-        // header and any credential-bearing keys in the body.
-        IWP_Logger::debug('Making API request', 'api-client', array('url' => $url));
-        IWP_Logger::debug('Request args', 'api-client', $args);
+        // Only the method and URL are logged. The request args are never logged:
+        // they carry the Authorization header, and the body can carry
+        // credentials. Nothing sensitive is assembled, so there is nothing to
+        // sanitise afterwards.
+        IWP_Logger::debug('Making API request', 'api-client', array(
+            'method' => isset($args['method']) ? $args['method'] : 'GET',
+            'url'    => $url,
+        ));
 
         $response = wp_remote_request($url, $args);
 
@@ -183,18 +187,10 @@ class IWP_API_Client {
 
         $response_code = wp_remote_retrieve_response_code($response);
         $response_body = wp_remote_retrieve_body($response);
-        $response_headers = wp_remote_retrieve_headers($response);
 
-        // Log the response details. Headers come back as a case-insensitive
-        // dictionary from the real transport but can be a plain array from a
-        // filtered/mocked response, so do not assume getAll() exists.
+        // Response headers are deliberately not retrieved or logged -- they
+        // carry auth and cookie material and are rarely useful for support.
         IWP_Logger::debug('API response code', 'api-client', array('code' => $response_code));
-        if (is_object($response_headers) && method_exists($response_headers, 'getAll')) {
-            IWP_Logger::debug('API response headers', 'api-client', $response_headers->getAll());
-        } elseif (is_array($response_headers)) {
-            IWP_Logger::debug('API response headers', 'api-client', $response_headers);
-        }
-        IWP_Logger::debug('API response body received', 'api-client');
 
         if ($response_code < 200 || $response_code >= 300) {
             // Prefer the upstream body message — it's already a human-readable
@@ -231,10 +227,12 @@ class IWP_API_Client {
             return new WP_Error('json_decode_error', __('Invalid JSON response', 'iwp-woo-v2'));
         }
 
-        // Debug level only: this is the full response body, which is both large
-        // (kilobytes per call) and credential-bearing. Redaction happens in
-        // IWP_Logger.
-        IWP_Logger::debug('API request successful', 'api-client', $data);
+        // The response body is never logged: it routinely carries wp_password,
+        // s_hash and tokens, and runs to kilobytes per call. Log its shape
+        // instead, which is useful for support and cannot leak a value.
+        IWP_Logger::debug('API request successful', 'api-client', array(
+            'keys' => is_array($data) ? array_keys($data) : gettype($data),
+        ));
         return $data;
     }
 
@@ -1099,13 +1097,11 @@ class IWP_API_Client {
             return;
         }
 
-        $log_data = array(
-            'endpoint' => $endpoint,
-            'args' => $args,
-            'response' => $response,
+        // Endpoint only. $args carries the Authorization header and $response
+        // the full body, so neither is logged.
+        IWP_Logger::debug('API request', 'api-client', array(
+            'endpoint'  => $endpoint,
             'timestamp' => current_time('mysql'),
-        );
-
-        IWP_Logger::debug('API request', 'api-client', $log_data);
+        ));
     }
 }

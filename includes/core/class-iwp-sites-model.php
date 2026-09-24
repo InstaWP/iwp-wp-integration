@@ -152,7 +152,10 @@ class IWP_Sites_Model {
         global $wpdb;
         
         IWP_Logger::debug('sites model update() - Called with site_id: ' . $site_id, 'sites-model');
-        IWP_Logger::debug('sites model update() - data', 'sites-model', $data);
+        // Field names only -- the values include wp_password and s_hash.
+        IWP_Logger::debug('sites model update() - fields', 'sites-model', array(
+            'fields' => is_array($data) ? array_keys($data) : gettype($data),
+        ));
         
         if (!self::$table_name) {
             self::init();
