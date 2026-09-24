@@ -29,11 +29,13 @@ class IWP_Logger {
     /**
      * Largest encoded payload that will be logged, in bytes.
      *
-     * Log files are read by humans and shipped in host backups; a payload
-     * beyond this is a data dump rather than a diagnostic, and a handful of
-     * them is what bloats a debug.log.
+     * Set high deliberately: this is a safety valve against a pathological
+     * payload filling the disk in one write, not a volume control. Ordinary
+     * API responses log in full, and routine volume is governed by the log
+     * level instead -- debug is off by default, so the large payloads are
+     * only written when someone turns it on.
      */
-    const MAX_PAYLOAD_BYTES = 10240;
+    const MAX_PAYLOAD_BYTES = 1572864; // 1.5 MB
 
     /**
      * Whether debug mode is enabled
