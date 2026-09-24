@@ -33,7 +33,7 @@ class IWP_Logger {
      * beyond this is a data dump rather than a diagnostic, and a handful of
      * them is what bloats a debug.log.
      */
-    const MAX_PAYLOAD_BYTES = 5120;
+    const MAX_PAYLOAD_BYTES = 10240;
 
     /**
      * Whether debug mode is enabled
