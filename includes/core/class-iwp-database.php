@@ -376,41 +376,52 @@ class IWP_Database {
      * @return bool
      */
     public static function log_activity($action, $message, $data = array(), $order_id = null, $user_id = null) {
-        global $wpdb;
+        try {
+            global $wpdb;
 
-        $table_name = $wpdb->prefix . 'iwp_logs';
+            $table_name = $wpdb->prefix . 'iwp_logs';
 
-        if ($user_id === null) {
-            $user_id = get_current_user_id();
-        }
+            if ($user_id === null) {
+                $user_id = get_current_user_id();
+            }
 
-        $encoded = wp_json_encode($data);
+            $encoded = wp_json_encode($data);
 
-        // Same gate as the file log: a row here is persisted indefinitely, so
-        // an unencodable, oversized or credential-bearing payload is dropped
-        // rather than stored. The reason is logged so the drop is traceable.
-        $rejection = IWP_Logger::payload_rejection_reason($encoded);
+            // Same gate as the file log: a row here is persisted indefinitely, so
+            // an unencodable, oversized or credential-bearing payload is dropped
+            // rather than stored. The reason is logged so the drop is traceable.
+            $rejection = IWP_Logger::payload_rejection_reason($encoded);
 
-        if ($rejection !== null) {
-            IWP_Logger::warning('Activity log entry skipped: ' . $rejection, 'database', array(
+            if ($rejection !== null) {
+                IWP_Logger::warning('Activity log entry skipped: ' . $rejection, 'database', array(
+                    'action' => $action,
+                ));
+
+                return false;
+            }
+
+            return $wpdb->insert(
+                $table_name,
+                array(
+                    'user_id' => $user_id,
+                    'order_id' => $order_id,
+                    'action' => $action,
+                    'message' => $message,
+                    'data' => $encoded,
+                    'created_at' => current_time('mysql')
+                ),
+                array('%d', '%d', '%s', '%s', '%s', '%s')
+            );
+        } catch (\Throwable $e) {
+            // Never let an audit-log write break the operation it
+            // was recording.
+            IWP_Logger::error('Activity log write failed', 'database', array(
                 'action' => $action,
+                'error'  => $e->getMessage(),
             ));
 
             return false;
         }
-
-        return $wpdb->insert(
-            $table_name,
-            array(
-                'user_id' => $user_id,
-                'order_id' => $order_id,
-                'action' => $action,
-                'message' => $message,
-                'data' => $encoded,
-                'created_at' => current_time('mysql')
-            ),
-            array('%d', '%d', '%s', '%s', '%s', '%s')
-        );
     }
 
     /**
@@ -478,7 +489,7 @@ class IWP_Database {
             try {
                 $query = $wpdb->prepare($query, $where_values);
                 IWP_Logger::debug('database get_activity_logs() - SQL prepared successfully', 'database');
-            } catch (Exception $e) {
+            } catch (\Throwable $e) {
                 IWP_Logger::error('database get_activity_logs() - exception during prepare', 'database', array('error' => $e->getMessage()));
                 throw $e;
             }

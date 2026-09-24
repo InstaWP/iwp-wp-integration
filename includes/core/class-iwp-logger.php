@@ -205,19 +205,26 @@ class IWP_Logger {
      * @param array  $data
      */
     private static function write($level, $message, $context = '', $data = array()) {
-        if (!self::should_log($level)) {
-            return;
+        try {
+            if (!self::should_log($level)) {
+                return;
+            }
+
+            $formatted = self::format_message($message, $context, $level, $data);
+
+            // null means the payload was rejected by the gate, so the entry is
+            // dropped entirely rather than written in any form.
+            if ($formatted === null) {
+                return;
+            }
+
+            error_log($formatted);
+        } catch (\Throwable $e) {
+            // A logging failure must never break the request that triggered
+            // it. This is the one place that cannot report through the logger
+            // itself, so it writes directly.
+            error_log('IWP WooCommerce V2 [ERROR] [logger]: logging failed - ' . $e->getMessage());
         }
-
-        $formatted = self::format_message($message, $context, $level, $data);
-
-        // null means the payload carried a credential-bearing key, so the
-        // entry is dropped entirely rather than written in any form.
-        if ($formatted === null) {
-            return;
-        }
-
-        error_log($formatted);
     }
 
     /**
@@ -466,22 +473,26 @@ class IWP_Logger {
      * @param bool $is_error
      */
     public static function site_creation($event, $order_id, $site_data = array(), $is_error = false) {
-        $context = 'SiteCreation';
-        $level = $is_error ? self::LEVEL_ERROR : self::LEVEL_INFO;
-        
-        $log_data = array(
-            'order_id' => $order_id,
-            'site_data_keys' => is_array($site_data) ? array_keys($site_data) : 'no_data'
-        );
+        try {
+            $context = 'SiteCreation';
+            $level = $is_error ? self::LEVEL_ERROR : self::LEVEL_INFO;
 
-        if ($level === self::LEVEL_ERROR) {
-            self::error($event, $context, $log_data);
-        } else {
-            self::info($event, $context, $log_data);  
+            $log_data = array(
+                'order_id' => $order_id,
+                'site_data_keys' => is_array($site_data) ? array_keys($site_data) : 'no_data'
+            );
+
+            if ($level === self::LEVEL_ERROR) {
+                self::error($event, $context, $log_data);
+            } else {
+                self::info($event, $context, $log_data);
+            }
+
+            // Also log to database for better tracking
+            IWP_Database::log_activity('site_creation', $event, $site_data, $order_id);
+        } catch (\Throwable $e) {
+            error_log('IWP WooCommerce V2 [ERROR] [logger]: site_creation logging failed - ' . $e->getMessage());
         }
-
-        // Also log to database for better tracking
-        IWP_Database::log_activity('site_creation', $event, $site_data, $order_id);
     }
 
     /**
@@ -493,22 +504,26 @@ class IWP_Logger {
      * @param bool $is_error
      */
     public static function order_processing($event, $order_id, $order_data = array(), $is_error = false) {
-        $context = 'OrderProcessing';
-        $level = $is_error ? self::LEVEL_ERROR : self::LEVEL_INFO;
+        try {
+            $context = 'OrderProcessing';
+            $level = $is_error ? self::LEVEL_ERROR : self::LEVEL_INFO;
         
-        $log_data = array(
-            'order_id' => $order_id,
-            'order_data_keys' => is_array($order_data) ? array_keys($order_data) : 'no_data'
-        );
+            $log_data = array(
+                'order_id' => $order_id,
+                'order_data_keys' => is_array($order_data) ? array_keys($order_data) : 'no_data'
+            );
 
-        if ($level === self::LEVEL_ERROR) {
-            self::error($event, $context, $log_data);
-        } else {
-            self::info($event, $context, $log_data);
+            if ($level === self::LEVEL_ERROR) {
+                self::error($event, $context, $log_data);
+            } else {
+                self::info($event, $context, $log_data);
+            }
+
+            // Log to database
+            IWP_Database::log_activity('order_processing', $event, $order_data, $order_id);
+        } catch (\Throwable $e) {
+            error_log('IWP WooCommerce V2 [ERROR] [logger]: order_processing logging failed - ' . $e->getMessage());
         }
-
-        // Log to database
-        IWP_Database::log_activity('order_processing', $event, $order_data, $order_id);
     }
 
     /**
@@ -518,16 +533,30 @@ class IWP_Logger {
      * @param array $context_data
      */
     public static function admin_action($action, $context_data = array()) {
-        $context = 'Admin';
-        
-        $log_data = array_merge($context_data, array(
-            'user_id' => get_current_user_id(),
-            'current_screen' => get_current_screen() ? get_current_screen()->id : 'unknown'
-        ));
+        try {
+            $context = 'Admin';
 
-        self::info($action, $context, $log_data);
-        
-        // Log to database
-        IWP_Database::log_activity('admin_action', $action, $context_data);
+            // get_current_screen() is only defined inside wp-admin, so calling
+            // it anywhere else is a fatal. Resolve it once, defensively.
+            $screen_id = 'unknown';
+            if (function_exists('get_current_screen')) {
+                $screen = get_current_screen();
+                if ($screen && isset($screen->id)) {
+                    $screen_id = $screen->id;
+                }
+            }
+
+            $log_data = array_merge($context_data, array(
+                'user_id' => get_current_user_id(),
+                'current_screen' => $screen_id
+            ));
+
+            self::info($action, $context, $log_data);
+
+            // Log to database
+            IWP_Database::log_activity('admin_action', $action, $context_data);
+        } catch (\Throwable $e) {
+            error_log('IWP WooCommerce V2 [ERROR] [logger]: admin_action logging failed - ' . $e->getMessage());
+        }
     }
 }
