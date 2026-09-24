@@ -3,16 +3,16 @@
  * Plugin Name: InstaWP Integration
  * Plugin URI: https://instawp.com
  * Description: A comprehensive WordPress integration plugin for InstaWP that provides enhanced functionality, seamless integration, WooCommerce support, and standalone site creation tools.
- * Version: 0.0.13
+ * Version: 0.0.14
  * Author: InstaWP
  * Author URI: https://instawp.com
  * Text Domain: iwp-wp-integration
  * Domain Path: /languages
  * Requires at least: 5.0
- * Tested up to: 7.0
+ * Tested up to: 7.1
  * Requires PHP: 7.4
  * WC requires at least: 5.0
- * WC tested up to: 8.0
+ * WC tested up to: 10.7
  * Network: false
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -24,7 +24,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('IWP_VERSION', '0.0.13');
+define('IWP_VERSION', '0.0.14');
 define('IWP_PLUGIN_FILE', __FILE__);
 define('IWP_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('IWP_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -168,13 +168,16 @@ add_action('plugins_loaded', function() {
             }
             
             if (!empty($message) && strpos($message, 'wpdb::prepare was called incorrectly') !== false) {
-                error_log('=== IWP DEBUG: WPDB::PREPARE ERROR CAUGHT ===');
-                error_log('Message: ' . $message);
-                error_log('File: ' . $file);
-                error_log('Line: ' . $line);
-                error_log('Backtrace:');
-                error_log(wp_debug_backtrace_summary());
-                error_log('=== END IWP DEBUG ===');
+                // class_exists guard: a PHP error can fire before iwp_init()
+                // has loaded the plugin's classes.
+                if (class_exists('IWP_Logger')) {
+                    IWP_Logger::error('wpdb::prepare called incorrectly', 'debug', array(
+                        'message'   => $message,
+                        'file'      => $file,
+                        'line'      => $line,
+                        'backtrace' => wp_debug_backtrace_summary(),
+                    ));
+                }
             }
             return $error;
         }, 10, 5);
@@ -183,7 +186,9 @@ add_action('plugins_loaded', function() {
         add_action('init', function() {
             if (strpos($_SERVER['REQUEST_URI'] ?? '', 'wp-admin') !== false || 
                 strpos($_SERVER['REQUEST_URI'] ?? '', 'wp-json') !== false) {
-                error_log('IWP DEBUG: Admin/AJAX request detected, monitoring for wpdb issues');
+                if (class_exists('IWP_Logger')) {
+                    IWP_Logger::debug('Admin/AJAX request detected, monitoring for wpdb issues', 'debug');
+                }
             }
         });
     }
@@ -196,7 +201,10 @@ add_action('plugins_loaded', 'iwp_init');
 register_activation_hook(__FILE__, 'iwp_activate');
 
 function iwp_activate() {
-    // Load installer if not loaded
+    // The autoloader is registered at file scope (class-iwp-autoloader.php
+    // calls IWP_Autoloader::init() on include), so IWP_Logger and IWP_Database
+    // resolve on demand here -- the installer can log during activation
+    // without them being required explicitly.
     if (!class_exists('IWP_Installer')) {
         require_once plugin_dir_path(__FILE__) . 'includes/core/class-iwp-installer.php';
     }

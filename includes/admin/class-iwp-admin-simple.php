@@ -454,6 +454,20 @@ class IWP_Admin_Simple {
                 'label' => 'Show ordered site username and password on the WooCommerce My Account dashboard page.'
             )
         );
+
+        add_settings_field(
+            'enable_cache_purge',
+            esc_html__('Allow Customers to Clear Cache', 'iwp-wp-integration'),
+            array($this, 'checkbox_callback'),
+            'iwp_settings',
+            'iwp_general',
+            array(
+                'field' => 'enable_cache_purge',
+                'label' => 'Show a "Clear Cache" button on the customer\'s My Account dashboard and order pages, so they can clear their own site\'s cache.',
+                // Default ON so existing stores get the button without re-saving.
+                'default' => 'yes'
+            )
+        );
     }
 
     /**
@@ -507,7 +521,9 @@ class IWP_Admin_Simple {
      */
     public function checkbox_callback($args) {
         $options = get_option('iwp_options', array());
-        $value = isset($options[$args['field']]) ? $options[$args['field']] : 'no';
+        // Fields may opt into a default of 'yes'; everything else stays 'no'.
+        $default = isset($args['default']) ? $args['default'] : 'no';
+        $value = isset($options[$args['field']]) ? $options[$args['field']] : $default;
         $checked = $value === 'yes' ? 'checked="checked"' : '';
         
         printf(
@@ -561,6 +577,9 @@ class IWP_Admin_Simple {
 
             // Show site credentials on customer dashboard - checkbox, so absence means 'no'
             $sanitized['show_site_credentials_on_dashboard'] = isset($input['show_site_credentials_on_dashboard']) && $input['show_site_credentials_on_dashboard'] === 'yes' ? 'yes' : 'no';
+
+            // Allow customers to clear their own site cache - checkbox, so absence means 'no'
+            $sanitized['enable_cache_purge'] = isset($input['enable_cache_purge']) && $input['enable_cache_purge'] === 'yes' ? 'yes' : 'no';
         }
         
         // Debug form fields - only process if this is the debug form
