@@ -342,7 +342,7 @@ When reporting issues, please include:
 ### WooCommerce (Optional)
 - **Minimum Version**: WooCommerce 5.0+
 - **HPOS Support**: Compatible with High Performance Order Storage
-- **Tested Up To**: WooCommerce 8.0+
+- **Tested Up To**: WooCommerce 10.7+
 
 ### Server Requirements
 - **cURL**: For API communications
