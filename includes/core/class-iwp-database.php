@@ -386,10 +386,14 @@ class IWP_Database {
 
         $encoded = wp_json_encode($data);
 
-        // wp_json_encode() returns false on failure; store an empty JSON
-        // object rather than an empty string so the column stays valid JSON.
+        // wp_json_encode() returns false for anything it cannot represent
+        // (recursion, INF/NAN). Do not persist a row we cannot encode.
         if (!is_string($encoded)) {
-            $encoded = '{}';
+            IWP_Logger::warning('Activity log entry skipped: payload could not be encoded', 'database', array(
+                'action' => $action,
+            ));
+
+            return false;
         }
 
         // Backstop: a row here is persisted indefinitely, so if the payload

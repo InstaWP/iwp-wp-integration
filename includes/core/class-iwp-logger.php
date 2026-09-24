@@ -144,13 +144,18 @@ class IWP_Logger {
             // written in any form.
             $encoded = wp_json_encode($data);
 
+            // wp_json_encode() returns false for anything it cannot represent
+            // (recursion, INF/NAN). Without a payload there is nothing to
+            // check and nothing worth writing, so drop the entry.
+            if (!is_string($encoded)) {
+                return null;
+            }
+
             if (self::contains_sensitive_keys($encoded)) {
                 return null;
             }
 
-            // false when encoding fails; append a marker rather than an empty
-            // string so the entry does not look like it carried no data.
-            $formatted .= " | Data: " . (is_string($encoded) ? $encoded : '[unencodable]');
+            $formatted .= " | Data: " . $encoded;
         }
 
         return $formatted;
