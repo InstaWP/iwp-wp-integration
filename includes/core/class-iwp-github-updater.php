@@ -290,31 +290,37 @@ class IWP_GitHub_Updater {
             return;
         }
 
-        if (!current_user_can('update_plugins')) {
-            return;
-        }
-
-        check_admin_referer('iwp_check_update');
-
         try {
+            // The capability and nonce checks sit inside the try too, so no
+            // part of this handler can surface a fatal on the plugins screen.
+            if (!current_user_can('update_plugins')) {
+                return;
+            }
+
+            check_admin_referer('iwp_check_update');
+
             // Bust the 15-minute GitHub cache so the check hits the API again.
             delete_transient('iwp_github_release');
 
             // Bust WP's own cache so wp_update_plugins() doesn't short-circuit on its timeout.
             delete_site_transient('update_plugins');
             wp_update_plugins();
+
+            // Redirect only after the check has actually run. check_admin_referer()
+            // aborts via wp_die(), which throws WPDieException when the wp_die
+            // handler is filtered - keeping the redirect inside the try means a
+            // caught failure can never show the success notice.
+            wp_safe_redirect(add_query_arg('iwp_update_checked', '1', admin_url('plugins.php')));
+            exit;
         } catch (\Throwable $e) {
-            // A failed check must not leave the admin on a fatal. Log it and
-            // fall through to the redirect so the page still resolves.
+            // Log and fall through: plugins.php still renders normally, just
+            // without the confirmation notice.
             if (class_exists('IWP_Logger')) {
                 IWP_Logger::error('Manual update check failed', 'updater', array(
                     'error' => $e->getMessage(),
                 ));
             }
         }
-
-        wp_safe_redirect(add_query_arg('iwp_update_checked', '1', admin_url('plugins.php')));
-        exit;
     }
 
     /**
