@@ -304,19 +304,11 @@ class IWP_Installer {
         delete_option('iwp_version');
 
         // Delete tables
-        // Only this plugin's own tables. Additive rather than a rename: every
-        // name previously listed is kept, and the one that was missing is
-        // added. DROP TABLE IF EXISTS on a name that does not exist is a no-op.
         $tables = array(
             $wpdb->prefix . 'iwp_logs',
             $wpdb->prefix . 'iwp_settings',
-            $wpdb->prefix . 'iwp_sites',
-            // create_tables() makes 'iwp_woo_order_data'; only 'iwp_order_data'
-            // was listed here, so the real table survived every uninstall.
-            $wpdb->prefix . 'iwp_woo_order_data',
-            // Retained for backward compatibility with installs where an older
-            // version may have created this name.
-            $wpdb->prefix . 'iwp_order_data'
+            $wpdb->prefix . 'iwp_order_data',
+            $wpdb->prefix . 'iwp_sites'
         );
 
         foreach ($tables as $table) {
@@ -421,7 +413,7 @@ class IWP_Installer {
         );
         
         if ($result !== false) {
-            IWP_Logger::info("InstaWP Integration: Successfully removed {$result} old auto-create meta keys", 'installer');
+            IWP_Logger::info("Successfully removed {$result} old auto-create meta keys", 'installer');
         } else {
             IWP_Logger::error('Failed to remove old auto-create meta keys: ' . $wpdb->last_error, 'installer');
         }
