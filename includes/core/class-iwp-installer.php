@@ -304,11 +304,10 @@ class IWP_Installer {
         delete_option('iwp_version');
 
         // Delete tables
-        // Additive on purpose: every name previously listed is kept, and the
-        // ones that were missing are added. DROP TABLE IF EXISTS on a name that
-        // does not exist is a no-op, so listing extras is free and safe.
+        // Only this plugin's own tables. Additive rather than a rename: every
+        // name previously listed is kept, and the one that was missing is
+        // added. DROP TABLE IF EXISTS on a name that does not exist is a no-op.
         $tables = array(
-            // Current tables.
             $wpdb->prefix . 'iwp_logs',
             $wpdb->prefix . 'iwp_settings',
             $wpdb->prefix . 'iwp_sites',
@@ -317,13 +316,7 @@ class IWP_Installer {
             $wpdb->prefix . 'iwp_woo_order_data',
             // Retained for backward compatibility with installs where an older
             // version may have created this name.
-            $wpdb->prefix . 'iwp_order_data',
-            // Legacy iwp_woo_v2_* tables. Still present on upgraded installs,
-            // and orphaned since the rename that switched this list to iwp_*.
-            $wpdb->prefix . 'iwp_woo_v2_logs',
-            $wpdb->prefix . 'iwp_woo_v2_settings',
-            $wpdb->prefix . 'iwp_woo_v2_order_data',
-            $wpdb->prefix . 'iwp_woo_v2_sites'
+            $wpdb->prefix . 'iwp_order_data'
         );
 
         foreach ($tables as $table) {
