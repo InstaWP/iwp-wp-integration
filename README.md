@@ -342,7 +342,7 @@ When reporting issues, please include:
 ### WooCommerce (Optional)
 - **Minimum Version**: WooCommerce 5.0+
 - **HPOS Support**: Compatible with High Performance Order Storage
-- **Tested Up To**: WooCommerce 8.0+
+- **Tested Up To**: WooCommerce 10.7+
 
 ### Server Requirements
 - **cURL**: For API communications
@@ -355,6 +355,15 @@ When reporting issues, please include:
 This plugin is licensed under the GPL v2 or later.
 
 ## Changelog
+
+### Version 0.0.14
+- **NEW**: Customers can clear their own site's cache — a "Clear Cache" button on each site card on the My Account dashboard and order details page, with the result shown inside the card. Only the customer who placed the order can clear that site, once per minute per site. Turn it off under InstaWP → Settings → "Allow Customers to Clear Cache"
+- **NEW**: The button only appears for sites on a plan that includes CDN, since that is all cache clearing affects; whether a site has CDN is recorded at creation and refreshed when its plan changes
+- **NEW**: "Check for Updates" link on the Plugins page — forces an immediate update check instead of waiting for WordPress's twelve-hourly one
+- **CHANGED**: Optimised logging — logging now respects the plugin's Debug mode and Log level settings, where previously many calls wrote straight to the PHP error log regardless and produced very large log files. With debug off, routine work now writes nothing, and individual entries are capped in size
+- **FIXED**: A fatal error when plugin activity was logged outside the admin area — an admin-only WordPress function was called without checking it existed
+- **FIXED**: Failed site updates are now reported with the database error; previously the failure was completely silent
+- **FIXED**: A logging failure can no longer interrupt the request that triggered it
 
 ### Version 0.0.13
 - **FIXED**: Upgraded sites now show their URL and login details — when a customer upgrades an existing/demo site via the plan-upgrade flow or a WooCommerce Subscriptions plan switch, the order-received and My Account pages now display the site URL, WordPress username/password, and login button (previously left blank)

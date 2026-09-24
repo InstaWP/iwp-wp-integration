@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Customers can clear their own site's cache.** A "Clear Cache" button now appears on each site card on the My Account dashboard and on the order details page, so customers no longer need to ask you to clear it for them. Only the customer who placed the order can clear that site's cache, and it can be cleared once per minute per site. The result is shown inside the site's own card, directly beneath the button, and can be dismissed — success messages clear themselves after a few seconds, errors stay until dismissed. The button can be turned off under InstaWP → Settings → "Allow Customers to Clear Cache" (on by default).
 - Clearing only affects the CDN, so the button is shown only for sites on a plan that includes CDN — on other plans there is nothing to clear. Whether a site includes CDN is recorded when the site is created and kept up to date when its plan changes. Sites created before this release show the button once; the first click works out whether the plan includes CDN and remembers the answer from then on.
+- **"Check for Updates" link on the Plugins page.** Forces an immediate update check instead of waiting for WordPress's twelve-hourly one, so you can pull a new release as soon as it ships.
+
+### Changed
+
+- **Optimised logging.** Logging now respects the plugin's own Debug mode and Log level settings — previously a large number of log calls wrote straight to the PHP error log regardless, producing very large log files. With Debug mode off, routine work now writes nothing. Individual entries are also capped in size, so one oversized entry cannot fill the disk.
+
+### Fixed
+
+- **A crash when plugin activity was logged outside the admin area.** One logging path called an admin-only WordPress function without checking it existed, which caused a fatal error on front-end and AJAX requests.
+- **Failed site updates are now reported.** When saving a site's details to the database failed, nothing was recorded at all — the failure was silent. It is now logged with the database error.
+- A logging failure can no longer interrupt the request that triggered it.
 
 ## [0.0.13] - 2026-06-16
 
