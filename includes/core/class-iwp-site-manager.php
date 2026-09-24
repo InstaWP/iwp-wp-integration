@@ -327,8 +327,8 @@ class IWP_Site_Manager {
 
         // Task is completed or failed - update database record
         if ($status === 'completed' || $status === 'success') {
-            error_log('IWP DEBUG: site-manager database handler - About to process completed site');
-            error_log('IWP DEBUG: site-manager database handler - Site ID: ' . $db_site->site_id . ', Task ID: ' . $db_site->task_id);
+            IWP_Logger::debug('site-manager database handler - About to process completed site', 'site-manager');
+            IWP_Logger::debug('site-manager database handler - Site ID: ' . $db_site->site_id . ', Task ID: ' . $db_site->task_id, 'site-manager');
             
             // Fetch complete site details now that the site is ready
             $site_details_response = $this->api_client->get_site_details($db_site->site_id);
@@ -354,10 +354,10 @@ class IWP_Site_Manager {
                 ));
             }
             
-            error_log('IWP DEBUG: site-manager database handler - About to call IWP_Sites_Model::update');
-            error_log('IWP DEBUG: site-manager database handler - Update data: ' . print_r($update_data, true));
+            IWP_Logger::debug('site-manager database handler - About to call IWP_Sites_Model::update', 'site-manager');
+            IWP_Logger::debug('site-manager database handler - update data', 'site-manager', $update_data);
             IWP_Sites_Model::update($db_site->site_id, $update_data);
-            error_log('IWP DEBUG: site-manager database handler - IWP_Sites_Model::update completed');
+            IWP_Logger::debug('site-manager database handler - IWP_Sites_Model::update completed', 'site-manager');
 
             // Add success note to order if available (use updated credentials)
             if (!empty($db_site->order_id)) {
@@ -377,7 +377,7 @@ class IWP_Site_Manager {
                 'task_id' => $db_site->task_id
             ));
             
-            error_log('IWP DEBUG: site-manager database handler - Completed processing, about to exit success branch');
+            IWP_Logger::debug('site-manager database handler - Completed processing, about to exit success branch', 'site-manager');
         } else {
             // Task failed
             IWP_Sites_Model::update($db_site->site_id, array(
@@ -872,9 +872,9 @@ class IWP_Site_Manager {
             
             // Check database for updated status if we have a site_id
             if (!empty($site_id)) {
-                error_log('IWP DEBUG: transform_site_data_for_frontend - About to call get_by_site_id for site_id: ' . $site_id);
+                IWP_Logger::debug('transform_site_data_for_frontend - About to call get_by_site_id for site_id: ' . $site_id, 'site-manager');
                 $db_site = IWP_Sites_Model::get_by_site_id($site_id);
-                error_log('IWP DEBUG: transform_site_data_for_frontend - get_by_site_id returned: ' . ($db_site ? 'DATA' : 'NULL'));
+                IWP_Logger::debug('transform_site_data_for_frontend - get_by_site_id returned: ' . ($db_site ? 'DATA' : 'NULL'), 'site-manager');
                 if ($db_site && !empty($db_site->status)) {
                     $current_status = $db_site->status;
                     
@@ -886,11 +886,11 @@ class IWP_Site_Manager {
                         }
                         if (!empty($db_site->wp_username) && empty($raw_site_data['wp_username'])) {
                             $raw_site_data['wp_username'] = $db_site->wp_username;
-                            error_log('IWP DEBUG: Updated wp_username from database: ' . $db_site->wp_username);
+                            IWP_Logger::debug('Updated wp_username from database', 'site-manager');
                         }
                         if (!empty($db_site->wp_password) && empty($raw_site_data['wp_password'])) {
                             $raw_site_data['wp_password'] = $db_site->wp_password;
-                            error_log('IWP DEBUG: Updated wp_password from database: [REDACTED]');
+                            IWP_Logger::debug('Updated wp_password from database: [REDACTED]', 'site-manager');
                         }
                         if (!empty($db_site->s_hash) && empty($raw_site_data['s_hash'])) {
                             $raw_site_data['s_hash'] = $db_site->s_hash;

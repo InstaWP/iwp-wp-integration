@@ -403,7 +403,7 @@ class IWP_Installer {
     public static function cleanup_old_product_meta() {
         global $wpdb;
         
-        error_log('InstaWP Integration: Cleaning up old _iwp_auto_create_site meta keys');
+        IWP_Logger::info('Cleaning up old _iwp_auto_create_site meta keys', 'installer');
         
         // Delete all _iwp_auto_create_site meta keys from products
         $result = $wpdb->delete(
@@ -413,9 +413,9 @@ class IWP_Installer {
         );
         
         if ($result !== false) {
-            error_log("InstaWP Integration: Successfully removed {$result} old auto-create meta keys");
+            IWP_Logger::info("Successfully removed {$result} old auto-create meta keys", 'installer');
         } else {
-            error_log('InstaWP Integration: Failed to remove old auto-create meta keys: ' . $wpdb->last_error);
+            IWP_Logger::error('Failed to remove old auto-create meta keys: ' . $wpdb->last_error, 'installer');
         }
     }
 
@@ -430,7 +430,7 @@ class IWP_Installer {
         if (!isset($options['auto_create_sites_on_purchase'])) {
             $options['auto_create_sites_on_purchase'] = 'yes';
             update_option('iwp_options', $options);
-            error_log('InstaWP Integration: Set default auto-create setting to enabled');
+            IWP_Logger::info('Set default auto-create setting to enabled', 'installer');
         }
     }
 
@@ -443,7 +443,7 @@ class IWP_Installer {
 
         $table_name = $wpdb->prefix . 'iwp_sites';
 
-        error_log('InstaWP Integration: Adding site_type column to database');
+        IWP_Logger::info('Adding site_type column to database', 'installer');
 
         // Check if column already exists
         $column_exists = $wpdb->get_results("SHOW COLUMNS FROM {$table_name} LIKE 'site_type'");
@@ -453,16 +453,16 @@ class IWP_Installer {
             $result = $wpdb->query("ALTER TABLE {$table_name} ADD COLUMN site_type VARCHAR(50) DEFAULT 'paid' AFTER status");
 
             if ($result !== false) {
-                error_log('InstaWP Integration: Successfully added site_type column');
+                IWP_Logger::info('Successfully added site_type column', 'installer');
 
                 // Add index for better query performance
                 $wpdb->query("CREATE INDEX idx_site_type ON {$table_name}(site_type)");
-                error_log('InstaWP Integration: Successfully added site_type index');
+                IWP_Logger::info('Successfully added site_type index', 'installer');
             } else {
-                error_log('InstaWP Integration: Failed to add site_type column: ' . $wpdb->last_error);
+                IWP_Logger::error('Failed to add site_type column: ' . $wpdb->last_error, 'installer');
             }
         } else {
-            error_log('InstaWP Integration: site_type column already exists, skipping');
+            IWP_Logger::info('site_type column already exists, skipping', 'installer');
         }
     }
 
@@ -482,7 +482,7 @@ class IWP_Installer {
         try {
             $table_name = $wpdb->prefix . 'iwp_sites';
 
-            error_log('InstaWP Integration: Adding has_cdn column to database');
+            IWP_Logger::info('Adding has_cdn column to database', 'installer');
 
             // Check if column already exists
             $column_exists = $wpdb->get_results("SHOW COLUMNS FROM {$table_name} LIKE 'has_cdn'");
@@ -491,15 +491,15 @@ class IWP_Installer {
                 $result = $wpdb->query("ALTER TABLE {$table_name} ADD COLUMN has_cdn TINYINT(1) NULL DEFAULT NULL AFTER is_reserved");
 
                 if ($result !== false) {
-                    error_log('InstaWP Integration: Successfully added has_cdn column');
+                    IWP_Logger::info('Successfully added has_cdn column', 'installer');
                 } else {
-                    error_log('InstaWP Integration: Failed to add has_cdn column: ' . $wpdb->last_error);
+                    IWP_Logger::error('Failed to add has_cdn column: ' . $wpdb->last_error, 'installer');
                 }
             } else {
-                error_log('InstaWP Integration: has_cdn column already exists, skipping');
+                IWP_Logger::info('has_cdn column already exists, skipping', 'installer');
             }
         } catch (\Throwable $e) {
-            error_log('InstaWP Integration: Exception adding has_cdn column: ' . $e->getMessage());
+            IWP_Logger::error('Exception adding has_cdn column: ' . $e->getMessage(), 'installer');
         }
     }
 }

@@ -299,6 +299,41 @@ class IWP_Database {
         return $stats;
     }
 
+
+
+
+    /**
+     * Check if table exists
+     *
+     * @param string $table_name
+     * @return bool
+     */
+    public static function table_exists($table_name) {
+        global $wpdb;
+
+        $query = $wpdb->prepare("SHOW TABLES LIKE %s", $table_name);
+        return $wpdb->get_var($query) === $table_name;
+    }
+
+    /**
+     * Get database schema version
+     *
+     * @return string
+     */
+    public static function get_schema_version() {
+        return get_option('iwp_db_version', '1.0.0');
+    }
+
+    /**
+     * Update database schema version
+     *
+     * @param string $version
+     * @return bool
+     */
+    public static function update_schema_version($version) {
+        return update_option('iwp_db_version', $version);
+    }
+
     /**
      * Create custom table for plugin logs
      *
@@ -341,26 +376,52 @@ class IWP_Database {
      * @return bool
      */
     public static function log_activity($action, $message, $data = array(), $order_id = null, $user_id = null) {
-        global $wpdb;
+        try {
+            global $wpdb;
 
-        $table_name = $wpdb->prefix . 'iwp_logs';
+            $table_name = $wpdb->prefix . 'iwp_logs';
 
-        if ($user_id === null) {
-            $user_id = get_current_user_id();
-        }
+            if ($user_id === null) {
+                $user_id = get_current_user_id();
+            }
 
-        return $wpdb->insert(
-            $table_name,
-            array(
-                'user_id' => $user_id,
-                'order_id' => $order_id,
+            $encoded = wp_json_encode($data);
+
+            // Same gate as the file log: a row here is persisted indefinitely, so
+            // an unencodable, oversized or credential-bearing payload is dropped
+            // rather than stored. The reason is logged so the drop is traceable.
+            $rejection = IWP_Logger::payload_rejection_reason($encoded);
+
+            if ($rejection !== null) {
+                IWP_Logger::warning('Activity log entry skipped: ' . $rejection, 'database', array(
+                    'action' => $action,
+                ));
+
+                return false;
+            }
+
+            return $wpdb->insert(
+                $table_name,
+                array(
+                    'user_id' => $user_id,
+                    'order_id' => $order_id,
+                    'action' => $action,
+                    'message' => $message,
+                    'data' => $encoded,
+                    'created_at' => current_time('mysql')
+                ),
+                array('%d', '%d', '%s', '%s', '%s', '%s')
+            );
+        } catch (\Throwable $e) {
+            // Never let an audit-log write break the operation it
+            // was recording.
+            IWP_Logger::error('Activity log write failed', 'database', array(
                 'action' => $action,
-                'message' => $message,
-                'data' => wp_json_encode($data),
-                'created_at' => current_time('mysql')
-            ),
-            array('%d', '%d', '%s', '%s', '%s', '%s')
-        );
+                'error'  => $e->getMessage(),
+            ));
+
+            return false;
+        }
     }
 
     /**
@@ -421,51 +482,19 @@ class IWP_Database {
         $where_values[] = $args['offset'];
 
         if (!empty($where_values)) {
-            error_log('IWP DEBUG: database get_activity_logs() - About to prepare SQL with values: ' . print_r($where_values, true));
-            error_log('IWP DEBUG: database get_activity_logs() - Query: ' . $query);
-            error_log('IWP DEBUG: database get_activity_logs() - Values type check: is_array=' . (is_array($where_values) ? 'YES' : 'NO') . ', count=' . (is_array($where_values) ? count($where_values) : 'N/A'));
+            IWP_Logger::debug('database get_activity_logs() - where values', 'database', $where_values);
+            IWP_Logger::debug('database get_activity_logs() - query', 'database', array('query' => $query));
+            IWP_Logger::debug('database get_activity_logs() - values type check', 'database', array('is_array' => is_array($where_values), 'count' => is_array($where_values) ? count($where_values) : null));
             
             try {
                 $query = $wpdb->prepare($query, $where_values);
-                error_log('IWP DEBUG: database get_activity_logs() - SQL prepared successfully');
-            } catch (Exception $e) {
-                error_log('IWP ERROR: database get_activity_logs() - Exception during prepare: ' . $e->getMessage());
+                IWP_Logger::debug('database get_activity_logs() - SQL prepared successfully', 'database');
+            } catch (\Throwable $e) {
+                IWP_Logger::error('database get_activity_logs() - exception during prepare', 'database', array('error' => $e->getMessage()));
                 throw $e;
             }
         }
 
         return $wpdb->get_results($query);
-    }
-
-    /**
-     * Check if table exists
-     *
-     * @param string $table_name
-     * @return bool
-     */
-    public static function table_exists($table_name) {
-        global $wpdb;
-
-        $query = $wpdb->prepare("SHOW TABLES LIKE %s", $table_name);
-        return $wpdb->get_var($query) === $table_name;
-    }
-
-    /**
-     * Get database schema version
-     *
-     * @return string
-     */
-    public static function get_schema_version() {
-        return get_option('iwp_db_version', '1.0.0');
-    }
-
-    /**
-     * Update database schema version
-     *
-     * @param string $version
-     * @return bool
-     */
-    public static function update_schema_version($version) {
-        return update_option('iwp_db_version', $version);
     }
 }

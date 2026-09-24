@@ -27,6 +27,17 @@ class IWP_Logger {
     const LEVEL_ERROR = 'error';
 
     /**
+     * Largest encoded payload that will be logged, in bytes.
+     *
+     * Set high deliberately: this is a safety valve against a pathological
+     * payload filling the disk in one write, not a volume control. Ordinary
+     * API responses log in full, and routine volume is governed by the log
+     * level instead -- debug is off by default, so the large payloads are
+     * only written when someone turns it on.
+     */
+    const MAX_PAYLOAD_BYTES = 1572864; // 1.5 MB
+
+    /**
      * Whether debug mode is enabled
      *
      * @var bool
@@ -86,23 +97,134 @@ class IWP_Logger {
      * @param array $data
      * @return string
      */
+    /**
+     * Does this encoded payload contain a credential-bearing key?
+     *
+     * A single regex over the already-encoded JSON -- no recursion and no array
+     * copying, so it costs a fraction of a microsecond on a normal payload.
+     * Because it anchors on the key position (`"key":`) it catches keys at any
+     * nesting depth while ignoring values that merely mention a word, so a
+     * message like {"note":"my password is secret"} is not falsely flagged.
+     *
+     * @param string $encoded JSON-encoded payload.
+     * @return bool
+     */
+    private static function contains_sensitive_keys($encoded) {
+        // preg_match() on a non-string is an error, and there is nothing to
+        // scan in an empty payload.
+        if (!is_string($encoded) || $encoded === '') {
+            return false;
+        }
+
+        return (bool) preg_match(
+            '/"[^"]*(?:password|api_?key|secret|authorization|token|s_hash|nonce)[^"]*"\s*:/i',
+            $encoded
+        );
+    }
+
+    /**
+     * Why this payload must not be logged, or null when it is fine.
+     *
+     * Single gate for every sink -- the file log and the activity table both
+     * call this, so the rules live in one place. Ordered cheapest first: a
+     * type check, then a length check, then the regex, so an oversized payload
+     * never reaches the scan.
+     *
+     * @param string|false $encoded JSON-encoded payload.
+     * @return string|null Reason it was rejected, or null if loggable.
+     */
+    public static function payload_rejection_reason($encoded) {
+        if (!is_string($encoded)) {
+            return 'payload could not be encoded';
+        }
+
+        if (strlen($encoded) > self::MAX_PAYLOAD_BYTES) {
+            return 'payload exceeded ' . self::MAX_PAYLOAD_BYTES . ' bytes';
+        }
+
+        if (self::contains_sensitive_keys($encoded)) {
+            return 'payload contained sensitive keys';
+        }
+
+        return null;
+    }
+
+    /**
+     * Format log message with context.
+     *
+     * Returns null when the payload carries a credential-bearing key, which
+     * tells the caller to drop the entry entirely rather than write it.
+     *
+     * @param string $message
+     * @param string $context
+     * @param string $level
+     * @param array $data
+     * @return string|null
+     */
     private static function format_message($message, $context = '', $level = self::LEVEL_INFO, $data = array()) {
         $timestamp = current_time('Y-m-d H:i:s');
         $level_upper = strtoupper($level);
-        
+
         $formatted = "[{$timestamp}] IWP WooCommerce V2 [{$level_upper}]";
-        
+
         if (!empty($context)) {
             $formatted .= " [{$context}]";
         }
-        
+
         $formatted .= ": {$message}";
-        
+
         if (!empty($data)) {
-            $formatted .= " | Data: " . wp_json_encode($data);
+            // Payloads are logged in full by design -- call sites do not pick
+            // fields or sanitise, because that loses detail and spreads the
+            // decision across every caller. The gate below is what keeps
+            // credentials out, and it drops the whole entry rather than
+            // writing a reduced form. Nothing is rewritten on the way out.
+            $encoded = wp_json_encode($data);
+
+            // Unencodable, oversized or credential-bearing payloads mean the
+            // whole entry is dropped rather than written in a reduced form.
+            if (self::payload_rejection_reason($encoded) !== null) {
+                return null;
+            }
+
+            $formatted .= " | Data: " . $encoded;
         }
 
         return $formatted;
+    }
+
+    /**
+     * Write one entry.
+     *
+     * Single place where a log line is gated, formatted and emitted, so the
+     * four level helpers stay one-liners and the rules live in one spot.
+     *
+     * @param string $level
+     * @param string $message
+     * @param string $context
+     * @param array  $data
+     */
+    private static function write($level, $message, $context = '', $data = array()) {
+        try {
+            if (!self::should_log($level)) {
+                return;
+            }
+
+            $formatted = self::format_message($message, $context, $level, $data);
+
+            // null means the payload was rejected by the gate, so the entry is
+            // dropped entirely rather than written in any form.
+            if ($formatted === null) {
+                return;
+            }
+
+            error_log($formatted);
+        } catch (\Throwable $e) {
+            // A logging failure must never break the request that triggered
+            // it. This is the one place that cannot report through the logger
+            // itself, so it writes directly.
+            error_log('IWP WooCommerce V2 [ERROR] [logger]: logging failed - ' . $e->getMessage());
+        }
     }
 
     /**
@@ -113,9 +235,7 @@ class IWP_Logger {
      * @param array $data
      */
     public static function debug($message, $context = '', $data = array()) {
-        if (self::should_log(self::LEVEL_DEBUG)) {
-            error_log(self::format_message($message, $context, self::LEVEL_DEBUG, $data));
-        }
+        self::write(self::LEVEL_DEBUG, $message, $context, $data);
     }
 
     /**
@@ -126,9 +246,7 @@ class IWP_Logger {
      * @param array $data
      */
     public static function info($message, $context = '', $data = array()) {
-        if (self::should_log(self::LEVEL_INFO)) {
-            error_log(self::format_message($message, $context, self::LEVEL_INFO, $data));
-        }
+        self::write(self::LEVEL_INFO, $message, $context, $data);
     }
 
     /**
@@ -139,9 +257,7 @@ class IWP_Logger {
      * @param array $data
      */
     public static function warning($message, $context = '', $data = array()) {
-        if (self::should_log(self::LEVEL_WARNING)) {
-            error_log(self::format_message($message, $context, self::LEVEL_WARNING, $data));
-        }
+        self::write(self::LEVEL_WARNING, $message, $context, $data);
     }
 
     /**
@@ -152,9 +268,7 @@ class IWP_Logger {
      * @param array $data
      */
     public static function error($message, $context = '', $data = array()) {
-        if (self::should_log(self::LEVEL_ERROR)) {
-            error_log(self::format_message($message, $context, self::LEVEL_ERROR, $data));
-        }
+        self::write(self::LEVEL_ERROR, $message, $context, $data);
     }
 
     /**
@@ -194,32 +308,6 @@ class IWP_Logger {
         }
     }
 
-    /**
-     * Log site creation event
-     *
-     * @param string $event
-     * @param int $order_id
-     * @param array $site_data
-     * @param bool $is_error
-     */
-    public static function site_creation($event, $order_id, $site_data = array(), $is_error = false) {
-        $context = 'SiteCreation';
-        $level = $is_error ? self::LEVEL_ERROR : self::LEVEL_INFO;
-        
-        $log_data = array(
-            'order_id' => $order_id,
-            'site_data_keys' => is_array($site_data) ? array_keys($site_data) : 'no_data'
-        );
-
-        if ($level === self::LEVEL_ERROR) {
-            self::error($event, $context, $log_data);
-        } else {
-            self::info($event, $context, $log_data);  
-        }
-
-        // Also log to database for better tracking
-        IWP_Database::log_activity('site_creation', $event, $site_data, $order_id);
-    }
 
     /**
      * Log security event
@@ -269,52 +357,7 @@ class IWP_Logger {
         self::debug($message, $context, $log_data);
     }
 
-    /**
-     * Log order processing event
-     *
-     * @param string $event
-     * @param int $order_id
-     * @param array $order_data
-     * @param bool $is_error
-     */
-    public static function order_processing($event, $order_id, $order_data = array(), $is_error = false) {
-        $context = 'OrderProcessing';
-        $level = $is_error ? self::LEVEL_ERROR : self::LEVEL_INFO;
-        
-        $log_data = array(
-            'order_id' => $order_id,
-            'order_data_keys' => is_array($order_data) ? array_keys($order_data) : 'no_data'
-        );
 
-        if ($level === self::LEVEL_ERROR) {
-            self::error($event, $context, $log_data);
-        } else {
-            self::info($event, $context, $log_data);
-        }
-
-        // Log to database
-        IWP_Database::log_activity('order_processing', $event, $order_data, $order_id);
-    }
-
-    /**
-     * Log admin action
-     *
-     * @param string $action
-     * @param array $context_data
-     */
-    public static function admin_action($action, $context_data = array()) {
-        $context = 'Admin';
-        
-        $log_data = array_merge($context_data, array(
-            'user_id' => get_current_user_id(),
-            'current_screen' => get_current_screen() ? get_current_screen()->id : 'unknown'
-        ));
-
-        self::info($action, $context, $log_data);
-        
-        // Log to database
-        IWP_Database::log_activity('admin_action', $action, $context_data);
-    }
 
     /**
      * Log frontend action
@@ -419,5 +462,101 @@ class IWP_Logger {
         );
 
         return $stats;
+    }
+
+    /**
+     * Log site creation event
+     *
+     * @param string $event
+     * @param int $order_id
+     * @param array $site_data
+     * @param bool $is_error
+     */
+    public static function site_creation($event, $order_id, $site_data = array(), $is_error = false) {
+        try {
+            $context = 'SiteCreation';
+            $level = $is_error ? self::LEVEL_ERROR : self::LEVEL_INFO;
+
+            $log_data = array(
+                'order_id' => $order_id,
+                'site_data_keys' => is_array($site_data) ? array_keys($site_data) : 'no_data'
+            );
+
+            if ($level === self::LEVEL_ERROR) {
+                self::error($event, $context, $log_data);
+            } else {
+                self::info($event, $context, $log_data);
+            }
+
+            // Also log to database for better tracking
+            IWP_Database::log_activity('site_creation', $event, $site_data, $order_id);
+        } catch (\Throwable $e) {
+            error_log('IWP WooCommerce V2 [ERROR] [logger]: site_creation logging failed - ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Log order processing event
+     *
+     * @param string $event
+     * @param int $order_id
+     * @param array $order_data
+     * @param bool $is_error
+     */
+    public static function order_processing($event, $order_id, $order_data = array(), $is_error = false) {
+        try {
+            $context = 'OrderProcessing';
+            $level = $is_error ? self::LEVEL_ERROR : self::LEVEL_INFO;
+        
+            $log_data = array(
+                'order_id' => $order_id,
+                'order_data_keys' => is_array($order_data) ? array_keys($order_data) : 'no_data'
+            );
+
+            if ($level === self::LEVEL_ERROR) {
+                self::error($event, $context, $log_data);
+            } else {
+                self::info($event, $context, $log_data);
+            }
+
+            // Log to database
+            IWP_Database::log_activity('order_processing', $event, $order_data, $order_id);
+        } catch (\Throwable $e) {
+            error_log('IWP WooCommerce V2 [ERROR] [logger]: order_processing logging failed - ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Log admin action
+     *
+     * @param string $action
+     * @param array $context_data
+     */
+    public static function admin_action($action, $context_data = array()) {
+        try {
+            $context = 'Admin';
+
+            // get_current_screen() is only defined inside wp-admin, so calling
+            // it anywhere else is a fatal. Resolve it once, defensively.
+            $screen_id = 'unknown';
+            if (function_exists('get_current_screen')) {
+                $screen = get_current_screen();
+                if ($screen && isset($screen->id)) {
+                    $screen_id = $screen->id;
+                }
+            }
+
+            $log_data = array_merge($context_data, array(
+                'user_id' => get_current_user_id(),
+                'current_screen' => $screen_id
+            ));
+
+            self::info($action, $context, $log_data);
+
+            // Log to database
+            IWP_Database::log_activity('admin_action', $action, $context_data);
+        } catch (\Throwable $e) {
+            error_log('IWP WooCommerce V2 [ERROR] [logger]: admin_action logging failed - ' . $e->getMessage());
+        }
     }
 }

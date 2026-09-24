@@ -166,13 +166,11 @@ class IWP_API_Client {
 
         $args = wp_parse_args($args, $default_args);
 
-        // Log the request details (without sensitive data)
-        $log_args = $args;
-        if (isset($log_args['headers']['Authorization'])) {
-            $log_args['headers']['Authorization'] = 'Bearer ' . $this->api_key;
-        }
+        // Log the request in full. IWP_Logger drops the whole entry if the
+        // payload carries a credential-bearing key, so no filtering is done
+        // here.
         IWP_Logger::debug('Making API request', 'api-client', array('url' => $url));
-        IWP_Logger::debug('Request args', 'api-client', $log_args);
+        IWP_Logger::debug('Request args', 'api-client', $args);
 
         $response = wp_remote_request($url, $args);
 
@@ -188,9 +186,15 @@ class IWP_API_Client {
         $response_body = wp_remote_retrieve_body($response);
         $response_headers = wp_remote_retrieve_headers($response);
 
-        // Log the response details
+        // Log the response details. Headers come back as a case-insensitive
+        // dictionary from the real transport but can be a plain array from a
+        // filtered or mocked response, so do not assume getAll() exists.
         IWP_Logger::debug('API response code', 'api-client', array('code' => $response_code));
-        error_log('IWP WooCommerce V2: API response headers: ' . wp_json_encode($response_headers->getAll()));
+        if (is_object($response_headers) && method_exists($response_headers, 'getAll')) {
+            IWP_Logger::debug('API response headers', 'api-client', $response_headers->getAll());
+        } elseif (is_array($response_headers)) {
+            IWP_Logger::debug('API response headers', 'api-client', $response_headers);
+        }
         IWP_Logger::debug('API response body received', 'api-client');
 
         if ($response_code < 200 || $response_code >= 300) {
@@ -228,7 +232,7 @@ class IWP_API_Client {
             return new WP_Error('json_decode_error', __('Invalid JSON response', 'iwp-woo-v2'));
         }
 
-        error_log('IWP WooCommerce V2: API request successful, parsed data: ' . wp_json_encode($data));
+        IWP_Logger::debug('API request successful', 'api-client', $data);
         return $data;
     }
 
@@ -326,18 +330,18 @@ class IWP_API_Client {
      * @return bool|WP_Error
      */
     public function test_connection() {
-        error_log('IWP WooCommerce V2: test_connection() called');
+        IWP_Logger::debug('Testing API connection', 'api-client');
         
         $response = $this->make_request('snapshots', array(
             'method' => 'GET',
         ));
 
         if (is_wp_error($response)) {
-            error_log('IWP WooCommerce V2: Connection test failed: ' . $response->get_error_message());
+            IWP_Logger::error('Connection test failed', 'api-client', array('error' => $response->get_error_message()));
             return $response;
         }
 
-        error_log('IWP WooCommerce V2: Connection test successful');
+        IWP_Logger::info('Connection test successful', 'api-client');
         return true;
     }
 
@@ -559,7 +563,7 @@ class IWP_API_Client {
             'plan_id' => sanitize_text_field($plan_id)
         );
 
-        error_log('IWP WooCommerce V2: Upgrading site ' . $site_id . ' to plan ' . $plan_id);
+        IWP_Logger::info('Upgrading site plan', 'api-client', array('site_id' => $site_id, 'plan_id' => $plan_id));
 
         $response = $this->make_request('sites/' . intval($site_id) . '/upgrade-plan', array(
             'method' => 'POST',
@@ -567,23 +571,23 @@ class IWP_API_Client {
         ));
 
         if (is_wp_error($response)) {
-            error_log('IWP WooCommerce V2: Site plan upgrade failed: ' . $response->get_error_message());
+            IWP_Logger::error('Site plan upgrade failed', 'api-client', array('site_id' => $site_id, 'error' => $response->get_error_message()));
             return $response;
         }
 
-        error_log('IWP WooCommerce V2: Site plan upgrade successful, fetching updated site details');
+        IWP_Logger::info('Site plan upgrade successful, fetching updated site details', 'api-client', array('site_id' => $site_id));
 
         // Fetch complete site details after successful upgrade
         $site_details = $this->get_site_details($site_id);
 
         if (is_wp_error($site_details)) {
-            error_log('IWP WooCommerce V2: Failed to fetch site details after upgrade: ' . $site_details->get_error_message());
+            IWP_Logger::warning('Failed to fetch site details after upgrade', 'api-client', array('site_id' => $site_id, 'error' => $site_details->get_error_message()));
             // Return upgrade response even if site details fetch fails
             $response['site_details_error'] = $site_details->get_error_message();
         } else {
             // Merge site details into the upgrade response
             $response['site_details'] = $site_details;
-            error_log('IWP WooCommerce V2: Successfully fetched site details after upgrade');
+            IWP_Logger::debug('Fetched site details after upgrade', 'api-client', array('site_id' => $site_id));
         }
 
         return $response;
@@ -680,16 +684,16 @@ class IWP_API_Client {
             return new WP_Error('invalid_site_id', __('Valid site ID is required', 'iwp-woo-v2'));
         }
 
-        error_log('IWP WooCommerce V2: Fetching details for site ID: ' . $site_id);
+        IWP_Logger::debug('Fetching site details', 'api-client', array('site_id' => $site_id));
 
         $response = $this->make_request('sites/' . intval($site_id), array(
             'method' => 'GET',
         ));
 
         if (is_wp_error($response)) {
-            error_log('IWP WooCommerce V2: Failed to fetch site details: ' . $response->get_error_message());
+            IWP_Logger::error('Failed to fetch site details', 'api-client', array('site_id' => $site_id, 'error' => $response->get_error_message()));
         } else {
-            error_log('IWP WooCommerce V2: Successfully fetched site details for site ID: ' . $site_id);
+            IWP_Logger::debug('Fetched site details', 'api-client', array('site_id' => $site_id));
         }
 
         return $response;
@@ -723,7 +727,7 @@ class IWP_API_Client {
             'route_www' => false
         );
 
-        error_log('IWP WooCommerce V2: Adding domain ' . $domain_name . ' to site ' . $site_id . ' as ' . $type);
+        IWP_Logger::info('Adding domain to site', 'api-client', array('site_id' => $site_id, 'domain' => $domain_name, 'type' => $type));
 
         // Use v1 API for domain mapping
         $endpoint = 'site/add-domain/' . intval($site_id);
@@ -741,11 +745,11 @@ class IWP_API_Client {
         $this->api_url = $original_url;
 
         if (is_wp_error($response)) {
-            error_log('IWP WooCommerce V2: Domain mapping failed: ' . $response->get_error_message());
+            IWP_Logger::error('Domain mapping failed', 'api-client', array('site_id' => $site_id, 'domain' => $domain_name, 'error' => $response->get_error_message()));
             return $response;
         }
 
-        error_log('IWP WooCommerce V2: Domain mapping successful');
+        IWP_Logger::info('Domain mapping successful', 'api-client', array('site_id' => $site_id, 'domain' => $domain_name));
         return $response;
     }
 
@@ -1100,6 +1104,6 @@ class IWP_API_Client {
             'timestamp' => current_time('mysql'),
         );
 
-        error_log('IWP WooCommerce v2 API Request: ' . wp_json_encode($log_data));
+        IWP_Logger::debug('API request', 'api-client', $log_data);
     }
 }

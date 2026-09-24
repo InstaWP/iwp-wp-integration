@@ -79,7 +79,7 @@ class IWP_Woo_Order_Processor {
      * @param int $order_id
      */
     public function process_completed_order($order_id) {
-        error_log('IWP WooCommerce V2: Processing completed order: ' . $order_id);
+        IWP_Logger::info('Processing completed order: ' . $order_id, 'order-processor');
         $this->process_order($order_id, 'completed');
     }
 
@@ -89,7 +89,7 @@ class IWP_Woo_Order_Processor {
      * @param int $order_id
      */
     public function process_processing_order($order_id) {
-        error_log('IWP WooCommerce V2: Processing order in processing status: ' . $order_id);
+        IWP_Logger::info('Processing order in processing status: ' . $order_id, 'order-processor');
         $this->process_order($order_id, 'processing');
     }
 
@@ -103,14 +103,14 @@ class IWP_Woo_Order_Processor {
         $order = wc_get_order($order_id);
         
         if (!$order) {
-            error_log('IWP WooCommerce V2: Order not found: ' . $order_id);
+            IWP_Logger::error('Order not found: ' . $order_id, 'order-processor');
             return;
         }
 
         // Skip subscription switch orders — the switch handler manages plan changes,
         // not the order processor. Without this check, a switch order creates a new site.
         if (function_exists('wcs_order_contains_switch') && wcs_order_contains_switch($order_id)) {
-            error_log('IWP WooCommerce V2: Skipping switch order (handled by subscription switch handler): ' . $order_id);
+            IWP_Logger::info('Skipping switch order (handled by subscription switch handler): ' . $order_id, 'order-processor');
             return;
         }
 
@@ -119,7 +119,7 @@ class IWP_Woo_Order_Processor {
         // both data stores (CPT and authoritative HPOS).
         $processed = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_processed');
         if ($processed) {
-            error_log('IWP WooCommerce V2: Order already processed: ' . $order_id);
+            IWP_Logger::info('Order already processed: ' . $order_id, 'order-processor');
             return;
         }
 
@@ -128,7 +128,7 @@ class IWP_Woo_Order_Processor {
         $auto_create_enabled = isset($options['auto_create_sites_on_purchase']) ? $options['auto_create_sites_on_purchase'] : 'yes';
 
         if ($auto_create_enabled !== 'yes') {
-            error_log('IWP WooCommerce V2: Auto-create disabled globally, skipping automatic site creation for order: ' . $order_id);
+            IWP_Logger::info('Auto-create disabled globally, skipping automatic site creation for order: ' . $order_id, 'order-processor');
             return;
         }
 
@@ -144,13 +144,13 @@ class IWP_Woo_Order_Processor {
         $upgrade_site_id = $frontend->get_stored_site_id();
 
         if ($upgrade_site_id) {
-            error_log('IWP WooCommerce V2: Site upgrade mode detected for site ID: ' . $upgrade_site_id);
+            IWP_Logger::info('Site upgrade mode detected for site ID: ' . $upgrade_site_id, 'order-processor');
         }
 
         // Check for demo sites to reconcile before processing order
         $reconciled_sites = $this->reconcile_demo_sites_to_order($order, $upgrade_site_id);
         if (!empty($reconciled_sites)) {
-            error_log('IWP WooCommerce V2: Reconciled ' . count($reconciled_sites) . ' demo site(s) to order');
+            IWP_Logger::info('Reconciled ' . count($reconciled_sites) . ' demo site(s) to order', 'order-processor');
         }
 
         // Process each item in the order
@@ -179,7 +179,7 @@ class IWP_Woo_Order_Processor {
             
             // If we have a site_id for upgrade and a plan_id, upgrade the site instead of creating new one
             if ($upgrade_site_id && !empty($plan_id)) {
-                error_log('IWP WooCommerce V2: Upgrading site ' . $upgrade_site_id . ' to plan ' . $plan_id);
+                IWP_Logger::info('Upgrading site ' . $upgrade_site_id . ' to plan ' . $plan_id, 'order-processor');
                 
                 $upgrade_result = $this->upgrade_site_plan($order, $product, $upgrade_site_id, $plan_id, $item);
                 
@@ -189,7 +189,7 @@ class IWP_Woo_Order_Processor {
                         'product_name' => $product->get_name(),
                         'error' => $upgrade_result->get_error_message()
                     );
-                    error_log('IWP WooCommerce V2: Site upgrade failed for product ' . $product_id . ': ' . $upgrade_result->get_error_message());
+                    IWP_Logger::error('Site upgrade failed for product ' . $product_id . ': ' . $upgrade_result->get_error_message(), 'order-processor');
                 } else {
                     $sites_created[] = array(
                         'product_id' => $product_id,
@@ -197,7 +197,7 @@ class IWP_Woo_Order_Processor {
                         'site_data' => $upgrade_result,
                         'action' => 'upgraded'
                     );
-                    error_log('IWP WooCommerce V2: Site upgraded successfully for product ' . $product_id);
+                    IWP_Logger::info('Site upgraded successfully for product ' . $product_id, 'order-processor');
                 }
                 
                 continue;
@@ -205,7 +205,7 @@ class IWP_Woo_Order_Processor {
             
             // Regular site creation flow
             if (empty($snapshot_slug)) {
-                error_log('IWP WooCommerce V2: No snapshot selected for product ID: ' . $product->get_id());
+                IWP_Logger::info('No snapshot selected for product ID: ' . $product->get_id(), 'order-processor');
                 continue;
             }
 
@@ -227,11 +227,11 @@ class IWP_Woo_Order_Processor {
                     'snapshot_slug' => $snapshot_slug,
                     'plan_id'       => $plan_id,
                 );
-                error_log('IWP WooCommerce V2: Deferred site creation for product ' . $product_id . ' (credentials collected post-purchase)');
+                IWP_Logger::info('Deferred site creation for product ' . $product_id . ' (credentials collected post-purchase)', 'order-processor');
                 continue;
             }
 
-            error_log('IWP WooCommerce V2: Processing product with snapshot slug: ' . $snapshot_slug . ', plan ID: ' . $plan_id);
+            IWP_Logger::info('Processing product with snapshot slug: ' . $snapshot_slug . ', plan ID: ' . $plan_id, 'order-processor');
 
             // Create site for this product
             $site_result = $this->create_site_for_product($order, $product, $snapshot_slug, $item, $plan_id);
@@ -242,7 +242,7 @@ class IWP_Woo_Order_Processor {
                     'product_name' => $product->get_name(),
                     'error' => $site_result->get_error_message()
                 );
-                error_log('IWP WooCommerce V2: Site creation failed for product ' . $product_id . ': ' . $site_result->get_error_message());
+                IWP_Logger::error('Site creation failed for product ' . $product_id . ': ' . $site_result->get_error_message(), 'order-processor');
             } else {
                 $sites_created[] = array(
                     'product_id' => $product_id,
@@ -250,7 +250,7 @@ class IWP_Woo_Order_Processor {
                     'site_data' => $site_result,
                     'action' => 'created'
                 );
-                error_log('IWP WooCommerce V2: Site created successfully for product ' . $product_id);
+                IWP_Logger::info('Site created successfully for product ' . $product_id, 'order-processor');
             }
         }
 
@@ -268,7 +268,7 @@ class IWP_Woo_Order_Processor {
         // Store deferred items for post-purchase onboarding
         if (!empty($deferred_items)) {
             IWP_Woo_HPOS::update_order_meta($order_id, '_iwp_deferred_items', $deferred_items);
-            error_log('IWP WooCommerce V2: Stored ' . count($deferred_items) . ' deferred item(s) for post-purchase onboarding');
+            IWP_Logger::info('Stored ' . count($deferred_items) . ' deferred item(s) for post-purchase onboarding', 'order-processor');
         }
 
         // Mark order as processed (dedupe flag + timestamp).
@@ -285,9 +285,9 @@ class IWP_Woo_Order_Processor {
         }
         $frontend = new IWP_Frontend();
         $frontend->clear_stored_site_id();
-        error_log('IWP WooCommerce V2: Cleared stored site_id after order processing');
+        IWP_Logger::info('Cleared stored site_id after order processing', 'order-processor');
 
-        error_log('IWP WooCommerce V2: Order processing completed for order: ' . $order_id);
+        IWP_Logger::info('Order processing completed for order: ' . $order_id, 'order-processor');
     }
 
     /**
@@ -469,14 +469,14 @@ class IWP_Woo_Order_Processor {
         }
 
         // Plan upgrade successful - now disable demo helper plugin
-        error_log('IWP WooCommerce V2: Plan upgrade successful, attempting to disable demo helper plugin');
+        IWP_Logger::info('Plan upgrade successful, attempting to disable demo helper plugin', 'order-processor');
         $demo_disable_result = $this->api_client->disable_demo_helper($site_id);
         
         if (is_wp_error($demo_disable_result)) {
-            error_log('IWP WooCommerce V2: Failed to disable demo helper: ' . $demo_disable_result->get_error_message());
+            IWP_Logger::error('Failed to disable demo helper: ' . $demo_disable_result->get_error_message(), 'order-processor');
             // Don't fail the upgrade if demo helper disable fails - just log it
         } else {
-            error_log('IWP WooCommerce V2: Demo helper disable result: ' . $demo_disable_result['message']);
+            IWP_Logger::info('Demo helper disable result: ' . $demo_disable_result['message'], 'order-processor');
         }
 
         // Extract site details from upgrade response if available
@@ -498,9 +498,9 @@ class IWP_Woo_Order_Processor {
         $db_update_result = IWP_Sites_Model::update_plan($site_id, $plan_id, $upgrade_site_data);
         
         if (!$db_update_result) {
-            error_log('IWP WooCommerce V2: Failed to update site plan in database for site_id: ' . $site_id);
+            IWP_Logger::error('Failed to update site plan in database for site_id: ' . $site_id, 'order-processor');
         } else {
-            error_log('IWP WooCommerce V2: Successfully updated site plan in database for site_id: ' . $site_id);
+            IWP_Logger::info('Successfully updated site plan in database for site_id: ' . $site_id, 'order-processor');
         }
 
         // Prepare response data for order processing
@@ -845,7 +845,7 @@ class IWP_Woo_Order_Processor {
         }
 
         // Temporarily enable auto-create for this manual process
-        error_log('IWP WooCommerce V2: Manually creating sites for order: ' . $order_id);
+        IWP_Logger::info('Manually creating sites for order: ' . $order_id, 'order-processor');
 
         // Call the same processing logic but bypass the global setting check
         $this->process_order_internal($order_id, 'manual');
@@ -897,7 +897,7 @@ class IWP_Woo_Order_Processor {
         $order = wc_get_order($order_id);
         
         if (!$order) {
-            error_log('IWP WooCommerce V2: Order not found: ' . $order_id);
+            IWP_Logger::error('Order not found: ' . $order_id, 'order-processor');
             return;
         }
 
@@ -905,7 +905,7 @@ class IWP_Woo_Order_Processor {
         // HPOS-safe read so the dedupe flag is visible on both data stores.
         $processed = IWP_Woo_HPOS::get_order_meta($order_id, '_iwp_processed');
         if ($processed && $status !== 'manual') {
-            error_log('IWP WooCommerce V2: Order already processed: ' . $order_id);
+            IWP_Logger::info('Order already processed: ' . $order_id, 'order-processor');
             return;
         }
 
@@ -920,7 +920,7 @@ class IWP_Woo_Order_Processor {
         $upgrade_site_id = $frontend->get_stored_site_id();
         
         if ($upgrade_site_id) {
-            error_log('IWP WooCommerce V2: Site upgrade mode detected for site ID: ' . $upgrade_site_id);
+            IWP_Logger::info('Site upgrade mode detected for site ID: ' . $upgrade_site_id, 'order-processor');
         }
 
         // Process each item in the order (same logic as process_order)
@@ -930,7 +930,7 @@ class IWP_Woo_Order_Processor {
             $product = wc_get_product($product_id);
 
             if (!$product) {
-                error_log('IWP WooCommerce V2: Product not found: ' . $product_id);
+                IWP_Logger::error('Product not found: ' . $product_id, 'order-processor');
                 continue;
             }
 
@@ -949,7 +949,7 @@ class IWP_Woo_Order_Processor {
             }
 
             if (empty($snapshot_slug)) {
-                error_log('IWP WooCommerce V2: No snapshot selected for product ID: ' . $product->get_id());
+                IWP_Logger::info('No snapshot selected for product ID: ' . $product->get_id(), 'order-processor');
                 continue;
             }
 
@@ -976,7 +976,7 @@ class IWP_Woo_Order_Processor {
             }
             
             // Regular site creation
-            error_log('IWP WooCommerce V2: Processing product with snapshot slug: ' . $snapshot_slug . ', plan ID: ' . $plan_id);
+            IWP_Logger::info('Processing product with snapshot slug: ' . $snapshot_slug . ', plan ID: ' . $plan_id, 'order-processor');
 
             $site_result = $this->create_site_for_product($order, $product, $snapshot_slug, $item, $plan_id);
             
@@ -1022,9 +1022,9 @@ class IWP_Woo_Order_Processor {
         }
         $frontend = new IWP_Frontend();
         $frontend->clear_stored_site_id();
-        error_log('IWP WooCommerce V2: Cleared stored site_id after order processing');
+        IWP_Logger::info('Cleared stored site_id after order processing', 'order-processor');
 
-        error_log('IWP WooCommerce V2: Order processing completed for order: ' . $order_id);
+        IWP_Logger::info('Order processing completed for order: ' . $order_id, 'order-processor');
     }
 
     /**

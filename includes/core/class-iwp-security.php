@@ -281,7 +281,7 @@ class IWP_Security {
             'context' => $context
         );
 
-        error_log('IWP Security Event: ' . wp_json_encode($log_data));
+        IWP_Logger::info('Security event', 'security', $log_data);
     }
 
     /**
