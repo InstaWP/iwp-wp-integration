@@ -27,6 +27,15 @@ class IWP_Logger {
     const LEVEL_ERROR = 'error';
 
     /**
+     * Largest encoded payload that will be logged, in bytes.
+     *
+     * Log files are read by humans and shipped in host backups; a payload
+     * beyond this is a data dump rather than a diagnostic, and a handful of
+     * them is what bloats a debug.log.
+     */
+    const MAX_PAYLOAD_BYTES = 5120;
+
+    /**
      * Whether debug mode is enabled
      *
      * @var bool
@@ -98,10 +107,9 @@ class IWP_Logger {
      * @param string $encoded JSON-encoded payload.
      * @return bool
      */
-    public static function contains_sensitive_keys($encoded) {
-        // wp_json_encode() returns false on failure (invalid UTF-8, recursion,
-        // INF/NAN), and preg_match() on a non-string is an error. Nothing to
-        // scan in that case.
+    private static function contains_sensitive_keys($encoded) {
+        // preg_match() on a non-string is an error, and there is nothing to
+        // scan in an empty payload.
         if (!is_string($encoded) || $encoded === '') {
             return false;
         }
@@ -110,6 +118,33 @@ class IWP_Logger {
             '/"[^"]*(?:password|api_?key|secret|authorization|token|s_hash|nonce)[^"]*"\s*:/i',
             $encoded
         );
+    }
+
+    /**
+     * Why this payload must not be logged, or null when it is fine.
+     *
+     * Single gate for every sink -- the file log and the activity table both
+     * call this, so the rules live in one place. Ordered cheapest first: a
+     * type check, then a length check, then the regex, so an oversized payload
+     * never reaches the scan.
+     *
+     * @param string|false $encoded JSON-encoded payload.
+     * @return string|null Reason it was rejected, or null if loggable.
+     */
+    public static function payload_rejection_reason($encoded) {
+        if (!is_string($encoded)) {
+            return 'payload could not be encoded';
+        }
+
+        if (strlen($encoded) > self::MAX_PAYLOAD_BYTES) {
+            return 'payload exceeded ' . self::MAX_PAYLOAD_BYTES . ' bytes';
+        }
+
+        if (self::contains_sensitive_keys($encoded)) {
+            return 'payload contained sensitive keys';
+        }
+
+        return null;
     }
 
     /**
@@ -144,14 +179,9 @@ class IWP_Logger {
             // written in any form.
             $encoded = wp_json_encode($data);
 
-            // wp_json_encode() returns false for anything it cannot represent
-            // (recursion, INF/NAN). Without a payload there is nothing to
-            // check and nothing worth writing, so drop the entry.
-            if (!is_string($encoded)) {
-                return null;
-            }
-
-            if (self::contains_sensitive_keys($encoded)) {
+            // Unencodable, oversized or credential-bearing payloads mean the
+            // whole entry is dropped rather than written in a reduced form.
+            if (self::payload_rejection_reason($encoded) !== null) {
                 return null;
             }
 

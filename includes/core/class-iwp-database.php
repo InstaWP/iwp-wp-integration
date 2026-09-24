@@ -386,21 +386,13 @@ class IWP_Database {
 
         $encoded = wp_json_encode($data);
 
-        // wp_json_encode() returns false for anything it cannot represent
-        // (recursion, INF/NAN). Do not persist a row we cannot encode.
-        if (!is_string($encoded)) {
-            IWP_Logger::warning('Activity log entry skipped: payload could not be encoded', 'database', array(
-                'action' => $action,
-            ));
+        // Same gate as the file log: a row here is persisted indefinitely, so
+        // an unencodable, oversized or credential-bearing payload is dropped
+        // rather than stored. The reason is logged so the drop is traceable.
+        $rejection = IWP_Logger::payload_rejection_reason($encoded);
 
-            return false;
-        }
-
-        // Backstop: a row here is persisted indefinitely, so if the payload
-        // carries a credential-bearing key the entry is dropped rather than
-        // stored. Callers are expected to pass field names, not values.
-        if (IWP_Logger::contains_sensitive_keys($encoded)) {
-            IWP_Logger::warning('Activity log entry skipped: payload contained sensitive keys', 'database', array(
+        if ($rejection !== null) {
+            IWP_Logger::warning('Activity log entry skipped: ' . $rejection, 'database', array(
                 'action' => $action,
             ));
 
