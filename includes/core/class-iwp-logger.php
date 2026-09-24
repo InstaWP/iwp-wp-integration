@@ -174,11 +174,11 @@ class IWP_Logger {
         $formatted .= ": {$message}";
 
         if (!empty($data)) {
-            // Nothing is sanitised here -- that would be work on every write.
-            // Credentials are kept out at the call sites instead. This is only
-            // a backstop for a payload that slips through: if one carries a
-            // credential-bearing key, the whole entry is dropped rather than
-            // written in any form.
+            // Payloads are logged in full by design -- call sites do not pick
+            // fields or sanitise, because that loses detail and spreads the
+            // decision across every caller. The gate below is what keeps
+            // credentials out, and it drops the whole entry rather than
+            // writing a reduced form. Nothing is rewritten on the way out.
             $encoded = wp_json_encode($data);
 
             // Unencodable, oversized or credential-bearing payloads mean the

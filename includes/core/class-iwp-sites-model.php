@@ -191,6 +191,17 @@ class IWP_Sites_Model {
         );
         IWP_Logger::debug('sites model update() - wpdb->update result: ' . ($result !== false ? 'SUCCESS' : 'FAILED'), 'sites-model');
 
+        // The line above is debug level, so a failure would be invisible on a
+        // default install. update() only returns false to the caller, so
+        // without this the row silently not updating leaves no trace. Mirrors
+        // the error log in create().
+        if ($result === false) {
+            IWP_Logger::error('Failed to update site record', 'sites-model', array(
+                'site_id' => $site_id,
+                'error'   => $wpdb->last_error,
+            ));
+        }
+
         return $result !== false;
     }
 

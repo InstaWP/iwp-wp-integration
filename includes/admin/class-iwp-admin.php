@@ -267,7 +267,7 @@ class IWP_Admin {
         );
         
         // Debug: log the current hook to help troubleshoot
-        IWP_Logger::info('IWP Admin Scripts - Current hook: ' . $hook, 'admin');
+        IWP_Logger::info('Admin scripts - current hook: ' . $hook, 'admin');
         
         // Allow scripts on any InstaWP page or if it contains 'instawp'
         if (!in_array($hook, $allowed_hooks) && strpos($hook, 'instawp') === false) {

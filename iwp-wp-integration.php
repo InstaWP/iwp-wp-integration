@@ -201,15 +201,10 @@ add_action('plugins_loaded', 'iwp_init');
 register_activation_hook(__FILE__, 'iwp_activate');
 
 function iwp_activate() {
-    // Load the installer and the logging stack. IWP_Logger::init() reads
-    // options via IWP_Database, so both are needed for the installer to log
-    // through the central system during activation.
-    if (!class_exists('IWP_Database')) {
-        require_once plugin_dir_path(__FILE__) . 'includes/core/class-iwp-database.php';
-    }
-    if (!class_exists('IWP_Logger')) {
-        require_once plugin_dir_path(__FILE__) . 'includes/core/class-iwp-logger.php';
-    }
+    // The autoloader is registered at file scope (class-iwp-autoloader.php
+    // calls IWP_Autoloader::init() on include), so IWP_Logger and IWP_Database
+    // resolve on demand here -- the installer can log during activation
+    // without them being required explicitly.
     if (!class_exists('IWP_Installer')) {
         require_once plugin_dir_path(__FILE__) . 'includes/core/class-iwp-installer.php';
     }
