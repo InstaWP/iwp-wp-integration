@@ -384,6 +384,19 @@ class IWP_Database {
             $user_id = get_current_user_id();
         }
 
+        $encoded = wp_json_encode($data);
+
+        // Backstop: a row here is persisted indefinitely, so if the payload
+        // carries a credential-bearing key the entry is dropped rather than
+        // stored. Callers are expected to pass field names, not values.
+        if (IWP_Logger::contains_sensitive_keys($encoded)) {
+            IWP_Logger::warning('Activity log entry skipped: payload contained sensitive keys', 'database', array(
+                'action' => $action,
+            ));
+
+            return false;
+        }
+
         return $wpdb->insert(
             $table_name,
             array(
@@ -391,7 +404,7 @@ class IWP_Database {
                 'order_id' => $order_id,
                 'action' => $action,
                 'message' => $message,
-                'data' => wp_json_encode($data),
+                'data' => $encoded,
                 'created_at' => current_time('mysql')
             ),
             array('%d', '%d', '%s', '%s', '%s', '%s')

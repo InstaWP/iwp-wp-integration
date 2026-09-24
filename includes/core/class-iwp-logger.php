@@ -86,6 +86,37 @@ class IWP_Logger {
      * @param array $data
      * @return string
      */
+    /**
+     * Does this encoded payload contain a credential-bearing key?
+     *
+     * A single regex over the already-encoded JSON -- no recursion and no array
+     * copying, so it costs a fraction of a microsecond on a normal payload.
+     * Because it anchors on the key position (`"key":`) it catches keys at any
+     * nesting depth while ignoring values that merely mention a word, so a
+     * message like {"note":"my password is secret"} is not falsely flagged.
+     *
+     * @param string $encoded JSON-encoded payload.
+     * @return bool
+     */
+    public static function contains_sensitive_keys($encoded) {
+        return (bool) preg_match(
+            '/"[^"]*(?:password|api_?key|secret|authorization|token|s_hash|nonce)[^"]*"\s*:/i',
+            $encoded
+        );
+    }
+
+    /**
+     * Format log message with context.
+     *
+     * Returns null when the payload carries a credential-bearing key, which
+     * tells the caller to drop the entry entirely rather than write it.
+     *
+     * @param string $message
+     * @param string $context
+     * @param string $level
+     * @param array $data
+     * @return string|null
+     */
     private static function format_message($message, $context = '', $level = self::LEVEL_INFO, $data = array()) {
         $timestamp = current_time('Y-m-d H:i:s');
         $level_upper = strtoupper($level);
@@ -99,14 +130,48 @@ class IWP_Logger {
         $formatted .= ": {$message}";
 
         if (!empty($data)) {
-            // No sanitising happens here by design: it would run on every log
-            // write. Credentials are kept out at the call sites instead -- the
-            // API client never logs request args, response headers or response
-            // bodies, and the site/model layers log field names not values.
-            $formatted .= " | Data: " . wp_json_encode($data);
+            // Nothing is sanitised here -- that would be work on every write.
+            // Credentials are kept out at the call sites instead. This is only
+            // a backstop for a payload that slips through: if one carries a
+            // credential-bearing key, the whole entry is dropped rather than
+            // written in any form.
+            $encoded = wp_json_encode($data);
+
+            if (self::contains_sensitive_keys($encoded)) {
+                return null;
+            }
+
+            $formatted .= " | Data: " . $encoded;
         }
 
         return $formatted;
+    }
+
+    /**
+     * Write one entry.
+     *
+     * Single place where a log line is gated, formatted and emitted, so the
+     * four level helpers stay one-liners and the rules live in one spot.
+     *
+     * @param string $level
+     * @param string $message
+     * @param string $context
+     * @param array  $data
+     */
+    private static function write($level, $message, $context = '', $data = array()) {
+        if (!self::should_log($level)) {
+            return;
+        }
+
+        $formatted = self::format_message($message, $context, $level, $data);
+
+        // null means the payload carried a credential-bearing key, so the
+        // entry is dropped entirely rather than written in any form.
+        if ($formatted === null) {
+            return;
+        }
+
+        error_log($formatted);
     }
 
     /**
@@ -117,9 +182,7 @@ class IWP_Logger {
      * @param array $data
      */
     public static function debug($message, $context = '', $data = array()) {
-        if (self::should_log(self::LEVEL_DEBUG)) {
-            error_log(self::format_message($message, $context, self::LEVEL_DEBUG, $data));
-        }
+        self::write(self::LEVEL_DEBUG, $message, $context, $data);
     }
 
     /**
@@ -130,9 +193,7 @@ class IWP_Logger {
      * @param array $data
      */
     public static function info($message, $context = '', $data = array()) {
-        if (self::should_log(self::LEVEL_INFO)) {
-            error_log(self::format_message($message, $context, self::LEVEL_INFO, $data));
-        }
+        self::write(self::LEVEL_INFO, $message, $context, $data);
     }
 
     /**
@@ -143,9 +204,7 @@ class IWP_Logger {
      * @param array $data
      */
     public static function warning($message, $context = '', $data = array()) {
-        if (self::should_log(self::LEVEL_WARNING)) {
-            error_log(self::format_message($message, $context, self::LEVEL_WARNING, $data));
-        }
+        self::write(self::LEVEL_WARNING, $message, $context, $data);
     }
 
     /**
@@ -156,9 +215,7 @@ class IWP_Logger {
      * @param array $data
      */
     public static function error($message, $context = '', $data = array()) {
-        if (self::should_log(self::LEVEL_ERROR)) {
-            error_log(self::format_message($message, $context, self::LEVEL_ERROR, $data));
-        }
+        self::write(self::LEVEL_ERROR, $message, $context, $data);
     }
 
     /**

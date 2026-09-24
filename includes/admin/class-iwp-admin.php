@@ -267,7 +267,7 @@ class IWP_Admin {
         );
         
         // Debug: log the current hook to help troubleshoot
-        error_log('IWP Admin Scripts - Current hook: ' . $hook);
+        IWP_Logger::info('IWP Admin Scripts - Current hook: ' . $hook, 'admin');
         
         // Allow scripts on any InstaWP page or if it contains 'instawp'
         if (!in_array($hook, $allowed_hooks) && strpos($hook, 'instawp') === false) {
@@ -841,9 +841,9 @@ class IWP_Admin {
         }
 
         IWP_Logger::info('Snapshots fetched successfully in admin interface', 'admin');
-        error_log('IWP WooCommerce V2: Snapshots data structure: ' . wp_json_encode(array_keys($snapshots['data'])));
+        IWP_Logger::info('Snapshots data structure: ' . wp_json_encode(array_keys($snapshots['data'])), 'admin');
         if (isset($snapshots['data']) && is_array($snapshots['data'])) {
-            error_log('IWP WooCommerce V2: Number of snapshots found: ' . count($snapshots['data']));
+            IWP_Logger::info('Number of snapshots found: ' . count($snapshots['data']), 'admin');
         }
 
         echo '<div class="iwp-snapshots-container">';
@@ -911,23 +911,23 @@ class IWP_Admin {
             return;
         }
 
-        error_log('IWP WooCommerce V2: Fetching plans via centralized service');
+        IWP_Logger::info('Fetching plans via centralized service', 'admin');
         $plans = IWP_Service::get_plans();
         
         if (is_wp_error($plans)) {
-            error_log('IWP WooCommerce V2: Plans fetch failed in admin: ' . $plans->get_error_message());
+            IWP_Logger::error('Plans fetch failed in admin: ' . $plans->get_error_message(), 'admin');
             echo '<div class="notice notice-error inline"><p>' . esc_html__('Error fetching plans: ', 'iwp-wp-integration') . esc_html($plans->get_error_message()) . '</p></div>';
             return;
         }
 
-        error_log('IWP WooCommerce V2: Plans fetched successfully in admin interface');
+        IWP_Logger::info('Plans fetched successfully in admin interface', 'admin');
         
         // Count plans (now they are a direct array)
         $plan_count = 0;
         if (isset($plans) && is_array($plans)) {
             $plan_count = count($plans);
         }
-        error_log('IWP WooCommerce V2: Number of plans found: ' . $plan_count);
+        IWP_Logger::info('Number of plans found: ' . $plan_count, 'admin');
 
         echo '<div class="iwp-plans-container">';
         echo '<div class="iwp-plans-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">';
@@ -1708,11 +1708,11 @@ class IWP_Admin {
         $plans = $this->api_client->get_plans();
         
         if (is_wp_error($plans)) {
-            error_log('IWP WooCommerce V2: Failed to refresh plans: ' . $plans->get_error_message());
+            IWP_Logger::error('Failed to refresh plans: ' . $plans->get_error_message(), 'admin');
             return $plans;
         }
         
-        error_log('IWP WooCommerce V2: Plans refreshed successfully');
+        IWP_Logger::info('Plans refreshed successfully', 'admin');
         return $plans;
     }
 
@@ -1746,7 +1746,7 @@ class IWP_Admin {
     public function ajax_clear_transients() {
         IWP_Security::validate_ajax_request('iwp_admin_nonce', 'manage_woocommerce', 'nonce');
         
-        error_log('IWP WooCommerce V2: Clearing all transients via centralized service');
+        IWP_Logger::info('Clearing all transients via centralized service', 'admin');
         IWP_Service::clear_caches();
         
         // Get cache status to determine what was cleared
@@ -1768,7 +1768,7 @@ class IWP_Admin {
     public function ajax_warm_cache() {
         IWP_Security::validate_ajax_request('iwp_admin_nonce', 'manage_woocommerce', 'nonce');
         
-        error_log('IWP WooCommerce V2: Warming up caches via AJAX');
+        IWP_Logger::info('Warming up caches via AJAX', 'admin');
         
         // Warm up caches using centralized service
         $results = IWP_Service::warm_up_caches();
@@ -2026,7 +2026,7 @@ class IWP_Admin {
             ));
 
         } catch (Exception $e) {
-            error_log('IWP WooCommerce V2: Test order creation failed - ' . $e->getMessage());
+            IWP_Logger::error('Test order creation failed - ' . $e->getMessage(), 'admin');
             wp_send_json_error(__('Failed to create test order: ', 'iwp-wp-integration') . $e->getMessage());
         }
     }
@@ -2192,7 +2192,7 @@ class IWP_Admin {
     private function update_site_url_with_mapped_domain($order_id, $site_id, $domain_name) {
         $new_url = 'https://' . $domain_name;
         
-        error_log('IWP WooCommerce V2: Updating site URL to mapped domain: ' . $new_url);
+        IWP_Logger::info('Updating site URL to mapped domain: ' . $new_url, 'admin');
 
         // Update in _iwp_sites_created (order processor format).
         // Route through the HPOS-safe helpers so reads and writes target
@@ -2204,7 +2204,7 @@ class IWP_Admin {
                 if (isset($site_data['site_data']['site_id']) && $site_data['site_data']['site_id'] == $site_id) {
                     $site_data['site_data']['site_url'] = $new_url;
                     $site_data['site_data']['wp_url']   = $new_url;
-                    error_log('IWP WooCommerce V2: Updated site URL in _iwp_sites_created');
+                    IWP_Logger::info('Updated site URL in _iwp_sites_created', 'admin');
                     break;
                 }
             }
@@ -2218,14 +2218,14 @@ class IWP_Admin {
             foreach ($created_sites as &$site_info) {
                 if (isset($site_info['site_id']) && $site_info['site_id'] == $site_id) {
                     $site_info['wp_url'] = $new_url;
-                    error_log('IWP WooCommerce V2: Updated site URL in _iwp_created_sites');
+                    IWP_Logger::info('Updated site URL in _iwp_created_sites', 'admin');
                     break;
                 }
             }
             IWP_Woo_HPOS::update_order_meta($order_id, '_iwp_created_sites', $created_sites);
         }
 
-        error_log('IWP WooCommerce V2: Site URL update completed for domain: ' . $domain_name);
+        IWP_Logger::info('Site URL update completed for domain: ' . $domain_name, 'admin');
     }
 
     /**
