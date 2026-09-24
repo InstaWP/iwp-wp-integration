@@ -99,6 +99,13 @@ class IWP_Logger {
      * @return bool
      */
     public static function contains_sensitive_keys($encoded) {
+        // wp_json_encode() returns false on failure (invalid UTF-8, recursion,
+        // INF/NAN), and preg_match() on a non-string is an error. Nothing to
+        // scan in that case.
+        if (!is_string($encoded) || $encoded === '') {
+            return false;
+        }
+
         return (bool) preg_match(
             '/"[^"]*(?:password|api_?key|secret|authorization|token|s_hash|nonce)[^"]*"\s*:/i',
             $encoded
@@ -141,7 +148,9 @@ class IWP_Logger {
                 return null;
             }
 
-            $formatted .= " | Data: " . $encoded;
+            // false when encoding fails; append a marker rather than an empty
+            // string so the entry does not look like it carried no data.
+            $formatted .= " | Data: " . (is_string($encoded) ? $encoded : '[unencodable]');
         }
 
         return $formatted;

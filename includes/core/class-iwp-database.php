@@ -386,6 +386,12 @@ class IWP_Database {
 
         $encoded = wp_json_encode($data);
 
+        // wp_json_encode() returns false on failure; store an empty JSON
+        // object rather than an empty string so the column stays valid JSON.
+        if (!is_string($encoded)) {
+            $encoded = '{}';
+        }
+
         // Backstop: a row here is persisted indefinitely, so if the payload
         // carries a credential-bearing key the entry is dropped rather than
         // stored. Callers are expected to pass field names, not values.
