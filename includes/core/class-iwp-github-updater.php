@@ -296,12 +296,22 @@ class IWP_GitHub_Updater {
 
         check_admin_referer('iwp_check_update');
 
-        // Bust the 15-minute GitHub cache so the check hits the API again.
-        delete_transient('iwp_github_release');
+        try {
+            // Bust the 15-minute GitHub cache so the check hits the API again.
+            delete_transient('iwp_github_release');
 
-        // Bust WP's own cache so wp_update_plugins() doesn't short-circuit on its timeout.
-        delete_site_transient('update_plugins');
-        wp_update_plugins();
+            // Bust WP's own cache so wp_update_plugins() doesn't short-circuit on its timeout.
+            delete_site_transient('update_plugins');
+            wp_update_plugins();
+        } catch (\Throwable $e) {
+            // A failed check must not leave the admin on a fatal. Log it and
+            // fall through to the redirect so the page still resolves.
+            if (class_exists('IWP_Logger')) {
+                IWP_Logger::error('Manual update check failed', 'updater', array(
+                    'error' => $e->getMessage(),
+                ));
+            }
+        }
 
         wp_safe_redirect(add_query_arg('iwp_update_checked', '1', admin_url('plugins.php')));
         exit;
